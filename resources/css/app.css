@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+/*
+ * ============================================================
+ * NODAL — Design System Tokens
+ * ============================================================
+ * Paleta enterprise inspirada em Linear, Stripe, Notion, Vercel
+ * ============================================================
+ */
+
+@theme {
+    /* Primary */
+    --color-primary-50: #E6EEF7;
+    --color-primary-100: #B3CCE8;
+    --color-primary-200: #80AAD9;
+    --color-primary-300: #4D88CA;
+    --color-primary-400: #2669B9;
+    --color-primary-500: #0048AA;
+    --color-primary-600: #003D91;
+    --color-primary-700: #003278;
+    --color-primary-800: #00275F;
+    --color-primary-900: #001C46;
+
+    /* Neutrals */
+    --color-neutral-50: #FAFAFA;
+    --color-neutral-100: #F5F5F5;
+    --color-neutral-200: #E5E7EB;
+    --color-neutral-300: #D1D5DB;
+    --color-neutral-400: #9CA3AF;
+    --color-neutral-500: #6B7280;
+    --color-neutral-600: #4B5563;
+    --color-neutral-700: #374151;
+    --color-neutral-800: #1F2937;
+    --color-neutral-900: #111111;
+
+    /* Semantic */
+    --color-success-500: #10B981;
+    --color-success-50: #ECFDF5;
+    --color-warning-500: #F59E0B;
+    --color-warning-50: #FFFBEB;
+    --color-danger-500: #EF4444;
+    --color-danger-50: #FEF2F2;
+    --color-info-500: #3B82F6;
+    --color-info-50: #EFF6FF;
+
+    /* Radius */
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+
+    /* Shadows */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.03);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.03);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.03);
+
+    /* Fonts */
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/*
+ * ============================================================
+ * Base Styles
+ * ============================================================
+ */
+
+body {
+    font-family: var(--font-sans);
+    color: var(--color-neutral-900);
+    background-color: #FFFFFF;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/*
+ * ============================================================
+ * Scrollbar Styling (Enterprise feel)
+ * ============================================================
+ */
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-neutral-300);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-neutral-400);
+}
+
+/*
+ * ============================================================
+ * Focus Styles (Accessibility)
+ * ============================================================
+ */
+
+*:focus-visible {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
