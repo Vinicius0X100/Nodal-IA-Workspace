@@ -33,7 +33,7 @@
         <p>Mais um passo para garantir a segurança da sua conta.</p>
     </div>
     <div class="body">
-        <p class="greeting">Olá, {{ $user->name }} 👋</p>
+        <p class="greeting">Olá, {{ $user->name }}</p>
         <p class="text">
             Para garantir que este endereço de e-mail pertence a você e manter sua conta Nodal segura, clique no botão abaixo para confirmar sua identidade.
         </p>
@@ -47,7 +47,7 @@
         </p>
         <hr class="divider">
         <p class="fallback">
-            ⚠️ Este link expira em <strong>60 minutos</strong>. Caso expire, acesse o Nodal e solicite um novo link de verificação.
+            Este link expira em <strong>60 minutos</strong>. Caso expire, acesse o Nodal e solicite um novo link de verificação.
         </p>
     </div>
     <div class="footer">

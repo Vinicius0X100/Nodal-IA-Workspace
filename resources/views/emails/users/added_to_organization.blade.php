@@ -38,7 +38,7 @@
 
         <div style="text-align: center;">
             <a href="{{ $loginUrl }}" style="display: inline-block; background-color: #0048AA; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-                Acessar o Sistema
+                Clique aqui para acessar o Nodal
             </a>
         </div>
 
