@@ -64,14 +64,12 @@ function AlertBanner({ alert }: { alert: Alert }) {
             </div>
             <div>
                 {alert.type === 'email_unverified' && (
-                    <Link
-                        href={route('verification.send')}
-                        method="post"
-                        as="button"
+                    <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-verify-modal'))}
                         className={cn('text-xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer', s.link)}
                     >
                         Verificar agora <ArrowRight className="w-3 h-3" />
-                    </Link>
+                    </button>
                 )}
                 {(alert.type === 'org_unverified' || alert.type === 'org_rejected') && (
                     <Link

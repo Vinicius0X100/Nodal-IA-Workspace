@@ -12,9 +12,22 @@ import {
     ShieldAlert,
     MailWarning,
     X,
+    MailCheck,
+    Loader2
 } from 'lucide-react';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { router } from '@inertiajs/react';
+import { Toaster, toast } from 'sonner';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter
+} from '@/Components/ui/dialog';
+import { Button } from '@/Components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -33,7 +46,34 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children, title }: AppLayoutProps) {
-    const { auth, organization, notifications } = usePage().props as any;
+    const { auth, organization, notifications, flash } = usePage().props as any;
+
+    useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
+        if (flash?.info) toast.info(flash.info);
+        if (flash?.warning) toast.warning(flash.warning);
+    }, [flash]);
+
+    const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+    useEffect(() => {
+        const handleOpenModal = () => setIsVerifyModalOpen(true);
+        window.addEventListener('open-verify-modal', handleOpenModal);
+        return () => window.removeEventListener('open-verify-modal', handleOpenModal);
+    }, []);
+
+    const handleSendVerification = () => {
+        setIsSendingEmail(true);
+        router.post(route('verification.send'), {}, {
+            preserveScroll: true,
+            onFinish: () => {
+                setIsSendingEmail(false);
+                setIsVerifyModalOpen(false);
+            }
+        });
+    };
 
     const navigationGroups = [
         {
@@ -232,14 +272,12 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                                             <p className="text-sm font-semibold text-neutral-900">{n.title}</p>
                                             <p className="text-xs text-neutral-500 mt-0.5 leading-relaxed">{n.message}</p>
                                             {n.type === 'email_unverified' && (
-                                                <Link
-                                                    href={route('verification.send')}
-                                                    method="post"
-                                                    as="button"
-                                                    className="text-xs font-semibold text-amber-700 hover:text-amber-800 mt-1.5 cursor-pointer"
+                                                <button
+                                                    onClick={() => setIsVerifyModalOpen(true)}
+                                                    className="text-xs font-semibold text-amber-700 hover:text-amber-800 mt-1.5 cursor-pointer flex items-center gap-1"
                                                 >
                                                     Enviar verificação →
-                                                </Link>
+                                                </button>
                                             )}
                                             {(n.type === 'org_unverified' || n.type === 'org_rejected') && (
                                                 <Link
@@ -263,6 +301,48 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                 </div>
                 <AppFooter />
             </main>
+
+            {/* Toaster global da Sonner */}
+            <Toaster position="top-right" richColors expand={false} />
+
+            {/* Modal de Confirmação de E-mail */}
+            <Dialog open={isVerifyModalOpen} onOpenChange={setIsVerifyModalOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4 border border-blue-100">
+                            <MailCheck className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <DialogTitle className="text-center text-xl">Verifique seu e-mail</DialogTitle>
+                        <DialogDescription className="text-center pt-2">
+                            Para garantir a segurança da sua conta, enviaremos um link de confirmação para <strong>{auth.user?.email}</strong>.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="text-center text-sm text-neutral-500 my-4">
+                        Por favor, clique no link que enviaremos para confirmar seu endereço. Se não encontrar, verifique sua pasta de spam.
+                    </div>
+                    <DialogFooter className="sm:justify-center flex-col sm:flex-row gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsVerifyModalOpen(false)}
+                            disabled={isSendingEmail}
+                            className="w-full sm:w-auto"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleSendVerification}
+                            disabled={isSendingEmail}
+                            className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 cursor-pointer"
+                        >
+                            {isSendingEmail ? (
+                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
+                            ) : 'Enviar E-mail agora'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
