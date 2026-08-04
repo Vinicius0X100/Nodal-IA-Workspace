@@ -65,6 +65,9 @@ class ProvisioningController extends Controller
             'cnpj' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:500'],
             'industry' => ['nullable', 'string', 'max:255'],
+            'owner.name' => ['nullable', 'string', 'max:255'],
+            'owner.email' => ['nullable', 'email', 'max:255'],
+            'owner.password' => ['nullable', 'string', 'min:8'],
         ]);
 
         $organization = $updateOrganizationAction->execute($organization, $validated);

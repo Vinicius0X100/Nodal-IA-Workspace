@@ -25,6 +25,22 @@ class UpdateOrganizationAction
 
         $organization->save();
 
+        if (isset($data['owner']) && is_array($data['owner'])) {
+            $owner = $organization->owner()->first();
+            if ($owner) {
+                if (isset($data['owner']['name'])) {
+                    $owner->name = $data['owner']['name'];
+                }
+                if (isset($data['owner']['email'])) {
+                    $owner->email = $data['owner']['email'];
+                }
+                if (isset($data['owner']['password'])) {
+                    $owner->password = \Illuminate\Support\Facades\Hash::make($data['owner']['password']);
+                }
+                $owner->save();
+            }
+        }
+
         return $organization;
     }
 }
