@@ -166,8 +166,13 @@ export default function UsersList({ users, roles }: UsersListProps) {
                                 {addForm.errors.role_ids && <p className="text-sm text-danger-500">{addForm.errors.role_ids}</p>}
                             </div>
 
-                            <DialogFooter className="pt-4">
-                                <Button type="submit" disabled={addForm.processing}>Confirmar Adição</Button>
+                            <DialogFooter className="pt-4 gap-2">
+                                <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
+                                    Cancelar
+                                </Button>
+                                <Button type="submit" disabled={addForm.processing}>
+                                    Confirmar Adição
+                                </Button>
                             </DialogFooter>
                         </form>
                     </DialogContent>
@@ -301,8 +306,13 @@ export default function UsersList({ users, roles }: UsersListProps) {
                             {editForm.errors.role_ids && <p className="text-sm text-danger-500">{editForm.errors.role_ids}</p>}
                         </div>
 
-                        <DialogFooter className="pt-4">
-                            <Button type="submit" disabled={editForm.processing}>Salvar Alterações</Button>
+                        <DialogFooter className="pt-4 gap-2">
+                            <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button type="submit" disabled={editForm.processing}>
+                                Salvar Alterações
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
@@ -312,24 +322,29 @@ export default function UsersList({ users, roles }: UsersListProps) {
             <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
                 <DialogContent className="sm:max-w-[380px]">
                     <DialogHeader>
-                        <div className="flex items-center gap-3 mb-1">
-                            <div className="bg-danger-50 p-2 rounded-full">
-                                <AlertTriangle className="w-5 h-5 text-danger-600" />
+                        <div className="flex flex-col items-center justify-center gap-3 pb-4">
+                            <div className="bg-danger-50 p-4 rounded-full border-4 border-danger-100 mb-2">
+                                <AlertTriangle className="w-8 h-8 text-danger-600" />
                             </div>
-                            <DialogTitle className="text-neutral-900">Remover Usuário</DialogTitle>
+                            <DialogTitle className="text-xl font-bold text-neutral-900 text-center">Remover Usuário</DialogTitle>
                         </div>
-                        <DialogDescription className="pl-12">
-                            Tem certeza que deseja remover <strong className="text-neutral-700">{deletingUser?.name}</strong> da organização?
-                            <br /><span className="text-xs mt-1 block text-neutral-400">Esta ação revogará todos os acessos e grupos deste usuário.</span>
+                        <DialogDescription className="text-center text-base">
+                            Tem certeza que deseja remover <strong className="text-neutral-900">{deletingUser?.name}</strong> da organização?
+                            <br /><br />
+                            <span className="text-sm block text-neutral-500 bg-neutral-50 p-3 rounded-lg border border-neutral-100">
+                                Esta ação revogará todos os acessos imediatamente.
+                            </span>
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter className="gap-2 pt-2">
-                        <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
+                    <DialogFooter className="flex sm:justify-center gap-3 pt-4">
+                        <Button type="button" variant="outline" onClick={() => setIsDeleteOpen(false)} className="w-full sm:w-auto">
                             Cancelar
                         </Button>
                         <Button
+                            type="button"
+                            variant="destructive"
                             onClick={confirmDelete}
-                            className="bg-danger-600 hover:bg-danger-700 text-white"
+                            className="w-full sm:w-auto"
                         >
                             Confirmar Remoção
                         </Button>
