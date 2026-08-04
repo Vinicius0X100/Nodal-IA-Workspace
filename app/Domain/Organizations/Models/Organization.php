@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable(['name', 'slug', 'logo', 'settings', 'cnpj', 'address', 'industry'])]
@@ -59,6 +60,11 @@ class Organization extends Model
     public function settings(): HasMany
     {
         return $this->hasMany(Setting::class);
+    }
+
+    public function verification(): HasOne
+    {
+        return $this->hasOne(CompanyVerification::class);
     }
 
     // ─── Helpers ──────────────────────────────────────────

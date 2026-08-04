@@ -34,6 +34,10 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+    // Verificação de E-mail
+    Route::post('/email/verification-notification', [\App\Http\Controllers\Auth\EmailVerificationController::class, 'send'])->name('verification.send');
+    Route::get('/email/verify/{id}/{hash}', [\App\Http\Controllers\Auth\EmailVerificationController::class, 'verify'])->name('verification.verify');
+
     // Requer acesso à organização ativa
     Route::middleware(['org.access'])->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -54,6 +58,7 @@ Route::middleware(['auth'])->group(function () {
         // Settings da Organização
         Route::get('/settings', [\App\Http\Controllers\Settings\SettingsController::class, 'index'])->name('settings.index');
         Route::post('/settings', [\App\Http\Controllers\Settings\SettingsController::class, 'update'])->name('settings.update');
+        Route::post('/settings/verification', [\App\Http\Controllers\Settings\SettingsController::class, 'storeVerification'])->name('settings.verification.store');
 
         // As demais rotas serão implementadas nos respectivos controllers depois:
         // Integrations, Audit

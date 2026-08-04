@@ -7,7 +7,7 @@ export default function AppFooter() {
                 <p className="text-xs text-neutral-400">
                     © {year}{' '}
                     <a
-                        href="https://sacratech.com.br"
+                        href="https://sacratech.com"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:text-neutral-600 transition-colors underline underline-offset-2"
@@ -19,7 +19,7 @@ export default function AppFooter() {
                 <p className="text-xs text-neutral-400 text-center sm:text-right">
                     <strong className="font-medium text-neutral-500">Nodal</strong> é um serviço oferecido pela{' '}
                     <a
-                        href="https://sacratech.com.br"
+                        href="https://sacratech.com"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:text-neutral-600 transition-colors underline underline-offset-2"

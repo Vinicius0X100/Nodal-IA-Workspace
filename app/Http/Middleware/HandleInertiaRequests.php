@@ -51,10 +51,54 @@ class HandleInertiaRequests extends Middleware
                 : null,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
-                'error' => fn () => $request->session()->get('error'),
+                'error'   => fn () => $request->session()->get('error'),
                 'warning' => fn () => $request->session()->get('warning'),
-                'info' => fn () => $request->session()->get('info'),
+                'info'    => fn () => $request->session()->get('info'),
             ],
+            // Alertas globais para navbar/notificações
+            'notifications' => fn () => $this->buildNotifications($request),
         ];
     }
+
+    private function buildNotifications(Request $request): array
+    {
+        $user = $request->user();
+        if (!$user) return [];
+
+        $notifications = [];
+
+        if (!$user->hasVerifiedEmail()) {
+            $notifications[] = [
+                'type'    => 'email_unverified',
+                'level'   => 'warning',
+                'title'   => 'E-mail não verificado',
+                'message' => 'Verifique seu e-mail para garantir a segurança da sua conta.',
+            ];
+        }
+
+        $orgId = session('active_organization_id');
+        if ($orgId) {
+            $org = \App\Domain\Organizations\Models\Organization::with('verification')->find($orgId);
+            $status = $org?->verification?->verification_status ?? 'pending';
+
+            if ($status === 'pending') {
+                $notifications[] = [
+                    'type'    => 'org_unverified',
+                    'level'   => 'info',
+                    'title'   => 'Empresa não verificada',
+                    'message' => 'Solicite a verificação para ter acesso a todos os recursos.',
+                ];
+            } elseif ($status === 'rejected') {
+                $notifications[] = [
+                    'type'    => 'org_rejected',
+                    'level'   => 'error',
+                    'title'   => 'Verificação reprovada',
+                    'message' => 'Sua solicitação foi reprovada. Revise os documentos e reenvie.',
+                ];
+            }
+        }
+
+        return $notifications;
+    }
 }
+

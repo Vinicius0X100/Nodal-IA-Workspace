@@ -8,6 +8,10 @@ import {
     LogOut,
     ChevronDown,
     UserCircle,
+    Bell,
+    ShieldAlert,
+    MailWarning,
+    X,
 } from 'lucide-react';
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -29,7 +33,7 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children, title }: AppLayoutProps) {
-    const { auth, organization } = usePage().props;
+    const { auth, organization, notifications } = usePage().props as any;
 
     const navigationGroups = [
         {
@@ -187,10 +191,70 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
 
             {/* Main content */}
             <main className="flex-1 ml-64 flex flex-col min-h-screen">
-                <header className="h-16 border-b border-neutral-200 bg-white/50 backdrop-blur-md sticky top-0 z-40 flex items-center px-8">
-                    <h1 className="text-lg font-semibold text-neutral-900 tracking-tight">
+                <header className="h-16 border-b border-neutral-100 bg-white/80 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between px-8">
+                    <h1 className="text-base font-semibold text-neutral-900 tracking-tight">
                         {title || 'Dashboard'}
                     </h1>
+                    {/* Notifications bell */}
+                    <div className="relative">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="relative p-2 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-all cursor-pointer">
+                                    <Bell className="w-5 h-5" />
+                                    {notifications?.length > 0 && (
+                                        <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                                    )}
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-80 p-0 overflow-hidden">
+                                <div className="px-4 py-3 border-b border-neutral-100">
+                                    <p className="text-sm font-semibold text-neutral-900">Notificações</p>
+                                    {notifications?.length === 0 && (
+                                        <p className="text-xs text-neutral-500 mt-0.5">Tudo em ordem por aqui 🎉</p>
+                                    )}
+                                </div>
+                                {notifications?.length === 0 && (
+                                    <div className="px-4 py-8 text-center">
+                                        <Bell className="w-8 h-8 text-neutral-200 mx-auto mb-2" />
+                                        <p className="text-sm text-neutral-400">Nenhuma notificação</p>
+                                    </div>
+                                )}
+                                {(notifications ?? []).map((n: any) => (
+                                    <div key={n.type} className={cn(
+                                        'flex items-start gap-3 px-4 py-3 border-b border-neutral-50 last:border-0',
+                                        n.level === 'error'   && 'bg-red-50/50',
+                                        n.level === 'warning' && 'bg-amber-50/50',
+                                        n.level === 'info'    && 'bg-blue-50/50',
+                                    )}>
+                                        {n.type === 'email_unverified' && <MailWarning className="w-4 h-4 mt-0.5 text-amber-600 shrink-0" />}
+                                        {n.type !== 'email_unverified' && <ShieldAlert className="w-4 h-4 mt-0.5 text-blue-600 shrink-0" />}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-neutral-900">{n.title}</p>
+                                            <p className="text-xs text-neutral-500 mt-0.5 leading-relaxed">{n.message}</p>
+                                            {n.type === 'email_unverified' && (
+                                                <Link
+                                                    href={route('verification.send')}
+                                                    method="post"
+                                                    as="button"
+                                                    className="text-xs font-semibold text-amber-700 hover:text-amber-800 mt-1.5 cursor-pointer"
+                                                >
+                                                    Enviar verificação →
+                                                </Link>
+                                            )}
+                                            {(n.type === 'org_unverified' || n.type === 'org_rejected') && (
+                                                <Link
+                                                    href={route('settings.index')}
+                                                    className="text-xs font-semibold text-blue-700 hover:text-blue-800 mt-1.5 inline-block"
+                                                >
+                                                    Ir para Verificação →
+                                                </Link>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </header>
                 <div className="p-8 flex-1">
                     <div className="max-w-6xl mx-auto">
