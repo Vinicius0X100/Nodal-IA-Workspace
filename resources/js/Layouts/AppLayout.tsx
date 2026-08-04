@@ -21,6 +21,7 @@ import {
 } from '@/Components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/Components/ui/avatar';
 import { ScrollArea } from '@/Components/ui/scroll-area';
+import AppFooter from '@/Components/AppFooter';
 
 interface AppLayoutProps {
     children: ReactNode;
@@ -196,6 +197,7 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                         {children}
                     </div>
                 </div>
+                <AppFooter />
             </main>
         </div>
     );

@@ -13,11 +13,13 @@ use App\Http\Controllers\Dashboard\DashboardController;
 |--------------------------------------------------------------------------
 */
 
+// Landing page (pública)
+Route::get('/', function () {
+    return Inertia::render('Welcome');
+})->name('home');
+
 // Public
 Route::middleware('guest')->group(function () {
-    Route::get('/', function () {
-        return Inertia::render('Welcome');
-    });
 
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
