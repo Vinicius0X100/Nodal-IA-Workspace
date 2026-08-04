@@ -19,6 +19,7 @@ class DashboardController extends Controller
         return Inertia::render('Dashboard/Index', [
             'organization' => [
                 'name' => $organization->name,
+                'logo' => $organization->logo,
                 'users_count' => $organization->users_count,
                 'integrations_count' => $organization->integrations_count,
             ],

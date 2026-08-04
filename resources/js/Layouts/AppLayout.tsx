@@ -20,6 +20,7 @@ import {
     DropdownMenuTrigger,
 } from '@/Components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/Components/ui/avatar';
+import { ScrollArea } from '@/Components/ui/scroll-area';
 
 interface AppLayoutProps {
     children: ReactNode;
@@ -106,35 +107,37 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
-                    {navigationGroups.map((group) => (
-                        <div key={group.title}>
-                            <h3 className="px-3 text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
-                                {group.title}
-                            </h3>
-                            <div className="space-y-1">
-                                {group.items.map((item) => (
-                                    <Link
-                                        key={item.name}
-                                        href={item.href}
-                                        className={cn(
-                                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group",
-                                            item.active
-                                                ? "bg-neutral-100 text-neutral-900"
-                                                : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
-                                        )}
-                                    >
-                                        <item.icon className={cn(
-                                            "w-4 h-4 flex-shrink-0 transition-colors",
-                                            item.active ? "text-neutral-900" : "text-neutral-400 group-hover:text-neutral-600"
-                                        )} />
-                                        {item.name}
-                                    </Link>
-                                ))}
+                <ScrollArea className="flex-1 w-full">
+                    <nav className="px-3 py-4 space-y-6">
+                        {navigationGroups.map((group) => (
+                            <div key={group.title}>
+                                <h3 className="px-3 text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
+                                    {group.title}
+                                </h3>
+                                <div className="space-y-1">
+                                    {group.items.map((item) => (
+                                        <Link
+                                            key={item.name}
+                                            href={item.href}
+                                            className={cn(
+                                                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group",
+                                                item.active
+                                                    ? "bg-neutral-100 text-neutral-900"
+                                                    : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                                            )}
+                                        >
+                                            <item.icon className={cn(
+                                                "w-4 h-4 flex-shrink-0 transition-colors",
+                                                item.active ? "text-neutral-900" : "text-neutral-400 group-hover:text-neutral-600"
+                                            )} />
+                                            {item.name}
+                                        </Link>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                </nav>
+                        ))}
+                    </nav>
+                </ScrollArea>
 
                 {/* User Menu */}
                 <div className="p-4 border-t border-neutral-100">
