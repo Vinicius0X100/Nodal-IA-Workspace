@@ -2,32 +2,43 @@
 
 namespace App\Domain\Integrations\Models;
 
-use App\Domain\Integrations\Enums\IntegrationProvider;
-use App\Domain\Integrations\Enums\IntegrationStatus;
-use App\Domain\Organizations\Models\Organization;
-use App\Support\Traits\Auditable;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Domain\Organizations\Models\Organization;
 
-#[Fillable(['organization_id', 'provider', 'status', 'config', 'connected_by', 'connected_at', 'last_sync_at'])]
 class Integration extends Model
 {
-    use Auditable;
+    use HasFactory;
 
-    protected function casts(): array
-    {
-        return [
-            'provider' => IntegrationProvider::class,
-            'status' => IntegrationStatus::class,
-            'config' => 'encrypted:json', // O Laravel cuida da encriptação via APP_KEY
-            'connected_at' => 'datetime',
-            'last_sync_at' => 'datetime',
-        ];
-    }
+    protected $fillable = [
+        'organization_id',
+        'provider',
+        'status',
+        'display_name',
+        'description',
+        'icon',
+        'is_enabled',
+    ];
+
+    protected $casts = [
+        'is_enabled' => 'boolean',
+    ];
 
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function config(): HasOne
+    {
+        return $this->hasOne(IntegrationConfig::class);
+    }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(IntegrationLog::class);
     }
 }

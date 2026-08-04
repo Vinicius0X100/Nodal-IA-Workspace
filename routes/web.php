@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Dashboard\DashboardController;
+use App\Http\Controllers\Integrations\IntegrationsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,8 +16,17 @@ use App\Http\Controllers\Dashboard\DashboardController;
 
 // Landing page (pública)
 Route::get('/', function () {
-    return Inertia::render('Welcome');
-})->name('home');
+    return Inertia::render('Welcome', [
+        'canLogin' => Route::has('login'),
+        'canRegister' => Route::has('register'),
+        'laravelVersion' => Application::VERSION,
+        'phpVersion' => PHP_VERSION,
+    ]);
+});
+
+// Legal (Público)
+Route::inertia('/termos-de-uso', 'Legal/Terms')->name('terms');
+Route::inertia('/politica-de-privacidade', 'Legal/Privacy')->name('privacy');
 
 // Public
 Route::middleware('guest')->group(function () {
@@ -50,6 +60,12 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/directory/roles', [\App\Http\Controllers\Directory\DirectoryController::class, 'createRole'])->name('directory.roles.store');
         Route::post('/directory/roles/{role}/permissions', [\App\Http\Controllers\Directory\DirectoryController::class, 'syncPermissions'])->name('directory.roles.permissions.sync');
         
+        // Integrações
+        Route::prefix('integrations')->name('integrations.')->group(function () {
+            Route::get('/', [IntegrationsController::class, 'index'])->name('index');
+            Route::get('/google-workspace', [IntegrationsController::class, 'googleWorkspace'])->name('google-workspace');
+        });
+
         // Perfil do Usuário
         Route::get('/profile', [\App\Http\Controllers\Profile\ProfileController::class, 'index'])->name('profile.index');
         Route::post('/profile', [\App\Http\Controllers\Profile\ProfileController::class, 'update'])->name('profile.update');

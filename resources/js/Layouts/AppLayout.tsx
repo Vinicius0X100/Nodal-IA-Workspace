@@ -86,7 +86,7 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
             title: 'Administração',
             items: [
                 { name: 'Diretório', href: route('directory.index'), icon: Users, active: route().current('directory.*') },
-                // { name: 'Integrações', href: route('integrations.index'), icon: Blocks, active: route().current('integrations.*') },
+                { name: 'Integrações', href: route('integrations.index'), icon: Blocks, active: route().current('integrations.*') },
                 // { name: 'Auditoria', href: route('audit.index'), icon: Activity, active: route().current('audit.*') },
                 { name: 'Configurações da Organização', href: route('settings.index'), icon: Settings, active: route().current('settings.*') },
             ]
