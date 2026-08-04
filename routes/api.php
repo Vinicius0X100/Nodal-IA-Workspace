@@ -16,5 +16,7 @@ use App\Http\Controllers\Api\ProvisioningController;
 Route::prefix('v1')->group(function () {
     Route::middleware('system.api')->group(function () {
         Route::post('/provision/organization', [ProvisioningController::class, 'provisionOrganization']);
+        Route::put('/organizations/{id}', [ProvisioningController::class, 'updateOrganization']);
+        Route::delete('/organizations/{id}', [ProvisioningController::class, 'deleteOrganization']);
     });
 });

@@ -31,6 +31,9 @@ class CreateOrganizationAction
                 'name' => $data->name,
                 'slug' => $data->slug,
                 'logo' => $data->logo,
+                'cnpj' => $data->cnpj,
+                'address' => $data->address,
+                'industry' => $data->industry,
                 'settings' => $data->settings ?? $this->defaultSettings(),
             ]);
 

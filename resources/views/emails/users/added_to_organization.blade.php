@@ -18,7 +18,7 @@
         
         <!-- Logo do Nodal Embutida -->
         <div style="text-align: center; margin-bottom: 24px;">
-            <img src="{{ $message->embed(public_path('images/Nodal-Icon.png')) }}" alt="Nodal" style="height: 48px; width: auto;">
+            <img src="{{ asset('images/Nodal-Logo.png') }}" alt="Nodal" style="height: 48px; width: auto;">
         </div>
 
         <h2 style="color: #111827; margin-top: 0; font-weight: 600;">Olá, {{ $userName }}</h2>

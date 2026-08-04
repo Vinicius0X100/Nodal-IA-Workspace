@@ -19,6 +19,9 @@ class ProvisioningController extends Controller
         $validated = $request->validate([
             'organization.name' => ['required', 'string', 'max:255'],
             'organization.slug' => ['nullable', 'string', 'max:255'],
+            'organization.cnpj' => ['nullable', 'string', 'max:255'],
+            'organization.address' => ['nullable', 'string', 'max:500'],
+            'organization.industry' => ['nullable', 'string', 'max:255'],
             'owner.name' => ['required', 'string', 'max:255'],
             'owner.email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'owner.password' => ['required', 'string', 'min:8'],
@@ -34,13 +37,13 @@ class ProvisioningController extends Controller
         // 2. Cria organização
         $orgData = new CreateOrganizationData(
             name: $validated['organization']['name'],
-            slug: $validated['organization']['slug'] ?? Str::slug($validated['organization']['name'])
+            slug: $validated['organization']['slug'] ?? Str::slug($validated['organization']['name']),
+            cnpj: $validated['organization']['cnpj'] ?? null,
+            address: $validated['organization']['address'] ?? null,
+            industry: $validated['organization']['industry'] ?? null,
         );
         
         $organization = $createOrganizationAction->execute($orgData, $user);
-
-        // TODO: Em uma fase futura, poderíamos disparar um e-mail de "Bem-vindo" caso desejado,
-        // mas o usuário indicou que outro SaaS pode fazer isso, ou podemos usar o Brevo se necessário.
 
         return response()->json([
             'message' => 'Organization provisioned successfully.',
@@ -48,5 +51,40 @@ class ProvisioningController extends Controller
             'user_id' => $user->id,
             'login_url' => route('login'),
         ], 201);
+    }
+
+    public function updateOrganization(
+        Request $request,
+        $id,
+        \App\Domain\Organizations\Actions\UpdateOrganizationAction $updateOrganizationAction
+    ) {
+        $organization = \App\Domain\Organizations\Models\Organization::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'cnpj' => ['nullable', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'industry' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $organization = $updateOrganizationAction->execute($organization, $validated);
+
+        return response()->json([
+            'message' => 'Organization updated successfully.',
+            'organization' => $organization,
+        ]);
+    }
+
+    public function deleteOrganization(
+        $id,
+        \App\Domain\Organizations\Actions\DeleteOrganizationAction $deleteOrganizationAction
+    ) {
+        $organization = \App\Domain\Organizations\Models\Organization::findOrFail($id);
+        
+        $deleteOrganizationAction->execute($organization);
+
+        return response()->json([
+            'message' => 'Organization deleted successfully.',
+        ]);
     }
 }

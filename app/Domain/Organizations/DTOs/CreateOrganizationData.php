@@ -13,6 +13,9 @@ final readonly class CreateOrganizationData
         public ?string $slug = null,
         public ?string $logo = null,
         public ?array $settings = null,
+        public ?string $cnpj = null,
+        public ?string $address = null,
+        public ?string $industry = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -22,6 +25,9 @@ final readonly class CreateOrganizationData
             slug: $data['slug'] ?? null,
             logo: $data['logo'] ?? null,
             settings: $data['settings'] ?? null,
+            cnpj: $data['cnpj'] ?? null,
+            address: $data['address'] ?? null,
+            industry: $data['industry'] ?? null,
         );
     }
 }
