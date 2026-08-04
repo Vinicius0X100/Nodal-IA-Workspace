@@ -53,7 +53,7 @@ export default function Login() {
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="password">Senha</Label>
-                                <Link href="#" className="text-sm font-medium text-primary-600 hover:text-primary-500 transition-colors">
+                                <Link href={route('password.request')} className="text-sm font-medium text-primary-600 hover:text-primary-500 transition-colors">
                                     Esqueceu a senha?
                                 </Link>
                             </div>

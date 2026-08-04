@@ -60,11 +60,10 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                 <div className="flex items-center h-16 px-6 border-b border-neutral-100">
                     <Link href={route('dashboard')} className="flex items-center gap-3">
                         <img
-                            src="/images/Nodal-Icon.png"
+                            src="/images/Nodal-Logo.png"
                             alt="Nodal"
-                            className="w-8 h-8 object-contain"
+                            className="w-24 h-auto object-contain"
                         />
-                        <span className="font-semibold text-neutral-900 tracking-tight text-lg">Nodal</span>
                     </Link>
                 </div>
 
