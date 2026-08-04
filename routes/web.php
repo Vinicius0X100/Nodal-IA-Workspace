@@ -34,10 +34,21 @@ Route::middleware(['auth'])->group(function () {
         // Diretório (RBAC)
         Route::get('/directory', [\App\Http\Controllers\Directory\DirectoryController::class, 'index'])->name('directory.index');
         Route::post('/directory/users', [\App\Http\Controllers\Directory\DirectoryController::class, 'addUser'])->name('directory.users.store');
+        Route::post('/directory/users/{user}', [\App\Http\Controllers\Directory\DirectoryController::class, 'updateUser'])->name('directory.users.update');
+        Route::delete('/directory/users/{user}', [\App\Http\Controllers\Directory\DirectoryController::class, 'removeUser'])->name('directory.users.destroy');
         Route::post('/directory/roles', [\App\Http\Controllers\Directory\DirectoryController::class, 'createRole'])->name('directory.roles.store');
         Route::post('/directory/roles/{role}/permissions', [\App\Http\Controllers\Directory\DirectoryController::class, 'syncPermissions'])->name('directory.roles.permissions.sync');
         
+        // Perfil do Usuário
+        Route::get('/profile', [\App\Http\Controllers\Profile\ProfileController::class, 'index'])->name('profile.index');
+        Route::post('/profile', [\App\Http\Controllers\Profile\ProfileController::class, 'update'])->name('profile.update');
+        Route::post('/profile/password', [\App\Http\Controllers\Profile\ProfileController::class, 'updatePassword'])->name('profile.password');
+
+        // Settings da Organização
+        Route::get('/settings', [\App\Http\Controllers\Settings\SettingsController::class, 'index'])->name('settings.index');
+        Route::post('/settings', [\App\Http\Controllers\Settings\SettingsController::class, 'update'])->name('settings.update');
+
         // As demais rotas serão implementadas nos respectivos controllers depois:
-        // Integrations, Settings, Audit
+        // Integrations, Audit
     });
 });

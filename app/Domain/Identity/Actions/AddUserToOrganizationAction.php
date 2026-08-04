@@ -18,10 +18,13 @@ class AddUserToOrganizationAction
             
             // 1. Verifica se usuário já existe globalmente no Nodal
             $user = User::where('email', $data['email'])->first();
-            $temporaryPassword = Str::password(12);
+            $isNewUser = !$user;
+            $temporaryPassword = null;
 
-            if (!$user) {
-                // Cria usuário novo
+            if ($isNewUser) {
+                // Gera senha temporária somente para usuários novos
+                $temporaryPassword = Str::password(12);
+
                 $user = User::create([
                     'name' => $data['name'],
                     'email' => $data['email'],
@@ -42,13 +45,14 @@ class AddUserToOrganizationAction
                 $user->roles()->syncWithPivotValues($roleIds, ['organization_id' => $organization->id]);
             }
 
-            // 4. Envia o E-mail via Brevo API
-            // (Como o Mail_MAILER=brevo, o Laravel Mail Facade já usa a ponte Symfony Brevo)
-            Mail::to($user->email)->send(new UserAddedToOrganizationMail(
-                user: $user,
-                organization: $organization,
-                temporaryPassword: $temporaryPassword
-            ));
+            // 4. Envia o E-mail SOMENTE para usuários recém-criados com senha temporária
+            if ($isNewUser && $temporaryPassword) {
+                Mail::to($user->email)->send(new UserAddedToOrganizationMail(
+                    user: $user,
+                    organization: $organization,
+                    temporaryPassword: $temporaryPassword
+                ));
+            }
 
             return $user;
         });

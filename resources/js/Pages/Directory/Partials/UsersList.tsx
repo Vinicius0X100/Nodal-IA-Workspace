@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { useForm } from '@inertiajs/react';
+import { useState, useRef } from 'react';
+import { useForm, router } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/Components/ui/dialog';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/Components/ui/avatar';
+import { Pencil, Trash2, Camera, AlertTriangle } from 'lucide-react';
 
 interface UsersListProps {
     users: any[];
@@ -13,30 +14,106 @@ interface UsersListProps {
 }
 
 export default function UsersList({ users, roles }: UsersListProps) {
-    const [isOpen, setIsOpen] = useState(false);
+    const [isAddOpen, setIsAddOpen] = useState(false);
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<any>(null);
+    const [deletingUser, setDeletingUser] = useState<any>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const addForm = useForm({
         name: '',
         email: '',
         role_ids: [] as number[],
     });
 
-    const submit = (e: React.FormEvent) => {
+    const editForm = useForm({
+        name: '',
+        role_ids: [] as number[],
+        avatar: null as File | null,
+    });
+
+    const submitAdd = (e: React.FormEvent) => {
         e.preventDefault();
-        post(route('directory.users.store'), {
+        addForm.post(route('directory.users.store'), {
             onSuccess: () => {
-                setIsOpen(false);
-                reset();
+                setIsAddOpen(false);
+                addForm.reset();
             },
         });
     };
 
-    const toggleRole = (roleId: number) => {
-        const current = [...data.role_ids];
+    const submitEdit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingUser) return;
+
+        // Ao enviar arquivos em forms com Inertia, POST deve ser usado.
+        // O Laravel pode fingir o PUT via parâmetro _method, mas é mais simples o Inertia cuidar disso via post com forceFormData
+        editForm.post(route('directory.users.update', editingUser.id), {
+            forceFormData: true,
+            onSuccess: () => {
+                setIsEditOpen(false);
+                setEditingUser(null);
+                setAvatarPreview(null);
+                editForm.reset();
+            },
+        });
+    };
+
+    const deleteUser = (user: any) => {
+        setDeletingUser(user);
+        setIsDeleteOpen(true);
+    };
+
+    const confirmDelete = () => {
+        if (!deletingUser) return;
+        router.delete(route('directory.users.destroy', deletingUser.id), {
+            onSuccess: () => {
+                setIsDeleteOpen(false);
+                setDeletingUser(null);
+            },
+        });
+    };
+
+    const openEdit = (user: any) => {
+        setEditingUser(user);
+        editForm.setData({
+            name: user.name,
+            role_ids: user.roles.map((r: any) => r.id),
+            avatar: null,
+        });
+        setAvatarPreview(user.avatar ? `/storage/${user.avatar}` : null);
+        setIsEditOpen(true);
+    };
+
+    const toggleRoleAdd = (roleId: number) => {
+        const current = [...addForm.data.role_ids];
         if (current.includes(roleId)) {
-            setData('role_ids', current.filter(id => id !== roleId));
+            addForm.setData('role_ids', current.filter(id => id !== roleId));
         } else {
-            setData('role_ids', [...current, roleId]);
+            addForm.setData('role_ids', [...current, roleId]);
+        }
+    };
+
+    const toggleRoleEdit = (roleId: number) => {
+        const current = [...editForm.data.role_ids];
+        if (current.includes(roleId)) {
+            editForm.setData('role_ids', current.filter(id => id !== roleId));
+        } else {
+            editForm.setData('role_ids', [...current, roleId]);
+        }
+    };
+
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            editForm.setData('avatar', file);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setAvatarPreview(e.target?.result as string);
+            };
+            reader.readAsDataURL(file);
         }
     };
 
@@ -45,7 +122,7 @@ export default function UsersList({ users, roles }: UsersListProps) {
             <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium text-neutral-900">Membros da Equipe</h3>
                 
-                <Dialog open={isOpen} onOpenChange={setIsOpen}>
+                <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
                     <DialogTrigger asChild>
                         <Button>Adicionar Usuário</Button>
                     </DialogTrigger>
@@ -57,40 +134,40 @@ export default function UsersList({ users, roles }: UsersListProps) {
                             </DialogDescription>
                         </DialogHeader>
                         
-                        <form onSubmit={submit} className="space-y-4 pt-4">
+                        <form onSubmit={submitAdd} className="space-y-4 pt-4">
                             <div className="space-y-2">
                                 <Label htmlFor="name">Nome Completo</Label>
-                                <Input id="name" value={data.name} onChange={e => setData('name', e.target.value)} required />
-                                {errors.name && <p className="text-sm text-danger-500">{errors.name}</p>}
+                                <Input id="name" value={addForm.data.name} onChange={e => addForm.setData('name', e.target.value)} required />
+                                {addForm.errors.name && <p className="text-sm text-danger-500">{addForm.errors.name}</p>}
                             </div>
                             
                             <div className="space-y-2">
                                 <Label htmlFor="email">E-mail de Acesso</Label>
-                                <Input id="email" type="email" value={data.email} onChange={e => setData('email', e.target.value)} required />
-                                {errors.email && <p className="text-sm text-danger-500">{errors.email}</p>}
+                                <Input id="email" type="email" value={addForm.data.email} onChange={e => addForm.setData('email', e.target.value)} required />
+                                {addForm.errors.email && <p className="text-sm text-danger-500">{addForm.errors.email}</p>}
                             </div>
 
                             <div className="space-y-3 pt-2">
                                 <Label>Grupos de Acesso</Label>
-                                <div className="space-y-2 border border-neutral-100 rounded-lg p-3 bg-neutral-50/50">
+                                <div className="space-y-2 border border-neutral-100 rounded-lg p-3 bg-neutral-50/50 max-h-48 overflow-y-auto">
                                     {roles.map(role => (
                                         <div key={role.id} className="flex items-center space-x-2">
                                             <Checkbox 
-                                                id={`role-${role.id}`} 
-                                                checked={data.role_ids.includes(role.id)}
-                                                onCheckedChange={() => toggleRole(role.id)}
+                                                id={`role-add-${role.id}`} 
+                                                checked={addForm.data.role_ids.includes(role.id)}
+                                                onCheckedChange={() => toggleRoleAdd(role.id)}
                                             />
-                                            <Label htmlFor={`role-${role.id}`} className="font-normal cursor-pointer leading-none">
+                                            <Label htmlFor={`role-add-${role.id}`} className="font-normal cursor-pointer leading-none">
                                                 {role.name}
                                             </Label>
                                         </div>
                                     ))}
                                 </div>
-                                {errors.role_ids && <p className="text-sm text-danger-500">{errors.role_ids}</p>}
+                                {addForm.errors.role_ids && <p className="text-sm text-danger-500">{addForm.errors.role_ids}</p>}
                             </div>
 
                             <DialogFooter className="pt-4">
-                                <Button type="submit" disabled={processing}>Confirmar Adição</Button>
+                                <Button type="submit" disabled={addForm.processing}>Confirmar Adição</Button>
                             </DialogFooter>
                         </form>
                     </DialogContent>
@@ -104,6 +181,7 @@ export default function UsersList({ users, roles }: UsersListProps) {
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Usuário</th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Status</th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Grupos</th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-neutral-200">
@@ -112,9 +190,13 @@ export default function UsersList({ users, roles }: UsersListProps) {
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="flex items-center">
                                         <Avatar className="h-9 w-9 border border-neutral-200">
-                                            <AvatarFallback className="bg-primary-50 text-primary-700 font-medium">
-                                                {user.name.substring(0, 2).toUpperCase()}
-                                            </AvatarFallback>
+                                            {user.avatar ? (
+                                                <AvatarImage src={`/storage/${user.avatar}`} alt={user.name} className="object-cover" />
+                                            ) : (
+                                                <AvatarFallback className="bg-primary-50 text-primary-700 font-medium">
+                                                    {user.name.substring(0, 2).toUpperCase()}
+                                                </AvatarFallback>
+                                            )}
                                         </Avatar>
                                         <div className="ml-3">
                                             <div className="text-sm font-medium text-neutral-900">{user.name}</div>
@@ -136,11 +218,125 @@ export default function UsersList({ users, roles }: UsersListProps) {
                                         ))}
                                     </div>
                                 </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div className="flex justify-end gap-2">
+                                        <Button variant="outline" size="sm" onClick={() => openEdit(user)} className="h-8 px-2 text-neutral-600 hover:text-primary-600">
+                                            <Pencil className="w-4 h-4" />
+                                        </Button>
+                                        <Button variant="outline" size="sm" onClick={() => deleteUser(user)} className="h-8 px-2 text-neutral-600 hover:text-danger-600 hover:bg-danger-50">
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
+
+            {/* Modal de Edição */}
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Editar Usuário</DialogTitle>
+                        <DialogDescription>
+                            Atualize o perfil e as permissões de acesso deste usuário.
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <form onSubmit={submitEdit} className="space-y-4 pt-4">
+                        
+                        <div className="flex flex-col items-center justify-center space-y-3 mb-6">
+                            <div className="relative group">
+                                <Avatar className="h-20 w-20 border-2 border-neutral-200">
+                                    {avatarPreview ? (
+                                        <AvatarImage src={avatarPreview} className="object-cover" />
+                                    ) : (
+                                        <AvatarFallback className="bg-primary-50 text-primary-700 text-xl font-medium">
+                                            {editingUser?.name.substring(0, 2).toUpperCase()}
+                                        </AvatarFallback>
+                                    )}
+                                </Avatar>
+                                <button 
+                                    type="button" 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="absolute bottom-0 right-0 bg-primary-600 text-white p-1.5 rounded-full shadow-sm hover:bg-primary-700 transition"
+                                >
+                                    <Camera className="w-4 h-4" />
+                                </button>
+                                <input 
+                                    type="file" 
+                                    className="hidden" 
+                                    ref={fileInputRef} 
+                                    onChange={handleAvatarChange} 
+                                    accept="image/*"
+                                />
+                            </div>
+                            <span className="text-xs text-neutral-500">Clique no ícone para alterar a foto</span>
+                            {editForm.errors.avatar && <p className="text-sm text-danger-500">{editForm.errors.avatar}</p>}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-name">Nome Completo</Label>
+                            <Input id="edit-name" value={editForm.data.name} onChange={e => editForm.setData('name', e.target.value)} required />
+                            {editForm.errors.name && <p className="text-sm text-danger-500">{editForm.errors.name}</p>}
+                        </div>
+
+                        <div className="space-y-3 pt-2">
+                            <Label>Grupos de Acesso</Label>
+                            <div className="space-y-2 border border-neutral-100 rounded-lg p-3 bg-neutral-50/50 max-h-48 overflow-y-auto">
+                                {roles.map(role => (
+                                    <div key={role.id} className="flex items-center space-x-2">
+                                        <Checkbox 
+                                            id={`role-edit-${role.id}`} 
+                                            checked={editForm.data.role_ids.includes(role.id)}
+                                            onCheckedChange={() => toggleRoleEdit(role.id)}
+                                        />
+                                        <Label htmlFor={`role-edit-${role.id}`} className="font-normal cursor-pointer leading-none">
+                                            {role.name}
+                                        </Label>
+                                    </div>
+                                ))}
+                            </div>
+                            {editForm.errors.role_ids && <p className="text-sm text-danger-500">{editForm.errors.role_ids}</p>}
+                        </div>
+
+                        <DialogFooter className="pt-4">
+                            <Button type="submit" disabled={editForm.processing}>Salvar Alterações</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal de Confirmação de Exclusão */}
+            <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+                <DialogContent className="sm:max-w-[380px]">
+                    <DialogHeader>
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="bg-danger-50 p-2 rounded-full">
+                                <AlertTriangle className="w-5 h-5 text-danger-600" />
+                            </div>
+                            <DialogTitle className="text-neutral-900">Remover Usuário</DialogTitle>
+                        </div>
+                        <DialogDescription className="pl-12">
+                            Tem certeza que deseja remover <strong className="text-neutral-700">{deletingUser?.name}</strong> da organização?
+                            <br /><span className="text-xs mt-1 block text-neutral-400">Esta ação revogará todos os acessos e grupos deste usuário.</span>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 pt-2">
+                        <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={confirmDelete}
+                            className="bg-danger-600 hover:bg-danger-700 text-white"
+                        >
+                            Confirmar Remoção
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }

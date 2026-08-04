@@ -2,23 +2,27 @@
 
 namespace App\Domain\Organizations\Actions;
 
-use App\Domain\Organizations\DTOs\UpdateOrganizationData;
 use App\Domain\Organizations\Models\Organization;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 class UpdateOrganizationAction
 {
-    public function execute(Organization $organization, UpdateOrganizationData $data): Organization
+    public function execute(Organization $organization, array $data, ?UploadedFile $logo = null): Organization
     {
-        $updateData = array_filter([
-            'name' => $data->name,
-            'logo' => $data->logo,
-            'settings' => $data->settings,
-        ], fn ($value) => $value !== null);
-
-        if (!empty($updateData)) {
-            $organization->update($updateData);
+        $organization->name = $data['name'] ?? $organization->name;
+        
+        if ($logo) {
+            if ($organization->logo) {
+                Storage::disk('public')->delete($organization->logo);
+            }
+            
+            $path = $logo->store('logos', 'public');
+            $organization->logo = $path;
         }
 
-        return $organization->fresh();
+        $organization->save();
+
+        return $organization;
     }
 }

@@ -49,6 +49,14 @@ class DirectoryController extends Controller
         $organizationId = session('active_organization_id');
         $organization = Organization::find($organizationId);
 
+        // Barreira: e-mail já pertence a esta organização?
+        $existingUser = \App\Domain\Identity\Models\User::where('email', $validated['email'])->first();
+        if ($existingUser && $organization->hasMember($existingUser)) {
+            return back()->withErrors([
+                'email' => 'Este e-mail já pertence a um membro desta organização.',
+            ])->onlyInput('name', 'email');
+        }
+
         $action->execute($organization, $validated, $validated['role_ids'] ?? []);
 
         return back()->with('success', 'Usuário adicionado com sucesso. Ele receberá um e-mail em breve.');
@@ -84,5 +92,47 @@ class DirectoryController extends Controller
         $action->execute($role, $validated['permission_ids'] ?? []);
 
         return back()->with('success', 'Permissões salvas com sucesso.');
+    }
+
+    public function updateUser(Request $request, \App\Domain\Identity\Models\User $user, \App\Domain\Identity\Actions\UpdateUserAction $action)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'role_ids' => ['array'],
+            'role_ids.*' => ['exists:roles,id'],
+            'avatar' => ['nullable', 'image', 'max:10240'], // Max 10MB
+        ]);
+
+        $organizationId = session('active_organization_id');
+        $organization = Organization::find($organizationId);
+
+        // Verifica se o usuário pertence à organização
+        if (!$organization->hasMember($user)) {
+            abort(403);
+        }
+
+        $action->execute($user, $organization, $validated, $validated['role_ids'] ?? [], $request->file('avatar'));
+
+        return back()->with('success', 'Usuário atualizado com sucesso.');
+    }
+
+    public function removeUser(Request $request, \App\Domain\Identity\Models\User $user, \App\Domain\Identity\Actions\RemoveUserFromOrganizationAction $action)
+    {
+        $organizationId = session('active_organization_id');
+        $organization = Organization::find($organizationId);
+
+        if (!$organization->hasMember($user)) {
+            abort(403);
+        }
+
+        // Regra: O Owner principal não pode se remover ou ser removido pelo painel (precisaria transferir o ownership primeiro)
+        $isOwner = $organization->users()->wherePivot('user_id', $user->id)->first()->pivot->is_owner;
+        if ($isOwner) {
+            return back()->withErrors(['error' => 'Não é possível remover o dono da organização.']);
+        }
+
+        $action->execute($user, $organization);
+
+        return back()->with('success', 'Usuário removido da organização.');
     }
 }
