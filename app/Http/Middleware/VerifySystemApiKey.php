@@ -16,7 +16,7 @@ class VerifySystemApiKey
             abort(500, 'SYSTEM_API_KEY is not configured on the server.');
         }
 
-        $providedKey = $request->bearerToken();
+        $providedKey = $request->header('X-System-Api-Key') ?? $request->bearerToken();
 
         if (!hash_equals($apiKey, (string) $providedKey)) {
             return response()->json(['message' => 'Unauthorized. Invalid API Key.'], 401);
