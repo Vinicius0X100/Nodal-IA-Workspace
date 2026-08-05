@@ -30,7 +30,7 @@
                         <table width="100%" cellpadding="0" cellspacing="0">
                             <tr>
                                 <td>
-                                    <img src="{{ rtrim(config('app.url'), '/') }}/images/nodal-logo.png"
+                                    <img src="{{ asset('images/Nodal-Logo.png') }}"
                                          alt="Nodal"
                                          height="28"
                                          style="display:block; height:28px; width:auto;">
