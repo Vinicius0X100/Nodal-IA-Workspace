@@ -1,5 +1,6 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head, Link, useForm, router } from '@inertiajs/react';
+import React, { useState } from 'react';
 import { ArrowLeft, ExternalLink, KeySquare, ShieldCheck, FileText, Settings2, Users, Activity, CheckCircle2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
 import { Input } from '@/Components/ui/input';
@@ -21,6 +22,14 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
         client_secret: config?.client_secret || '',
         tenant: config?.tenant || '',
     });
+
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(redirectUri);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     const handleSaveConfig = (e: React.FormEvent) => {
         e.preventDefault();
@@ -181,7 +190,10 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                                                 <code className="flex-1 bg-neutral-100 text-neutral-600 px-3 py-2 rounded-lg text-sm border border-neutral-200 truncate">
                                                     {redirectUri}
                                                 </code>
-                                                <Button type="button" variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(redirectUri)}>Copiar</Button>
+                                                <Button type="button" variant="outline" size="sm" onClick={handleCopy} className={copied ? "text-green-600 border-green-200 bg-green-50 hover:bg-green-100 hover:text-green-700" : ""}>
+                                                    {copied ? <CheckCircle2 className="w-4 h-4 mr-1" /> : null}
+                                                    {copied ? 'Copiado!' : 'Copiar'}
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>
@@ -231,9 +243,16 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                                         </AccordionContent>
                                     </AccordionItem>
                                     <AccordionItem value="item-2">
-                                        <AccordionTrigger className="text-left font-semibold">2. Ativar a API do Admin SDK</AccordionTrigger>
+                                        <AccordionTrigger className="text-left font-semibold">2. Ativar as APIs Necessárias</AccordionTrigger>
                                         <AccordionContent className="text-neutral-600 leading-relaxed pt-2 pb-4">
-                                            No menu lateral esquerdo, vá em "APIs e Serviços" &gt; "Biblioteca". Busque por <strong>Admin SDK API</strong> e clique em "Ativar".
+                                            No menu lateral esquerdo, vá em "APIs e Serviços" &gt; "Biblioteca". Busque e clique em "Ativar" para cada uma das seguintes APIs:
+                                            <ul className="list-disc ml-5 mt-2 space-y-1">
+                                                <li><strong>Admin SDK API</strong></li>
+                                                <li><strong>Google Drive API</strong></li>
+                                                <li><strong>Google Docs API</strong></li>
+                                                <li><strong>Google Sheets API</strong></li>
+                                                <li><strong>Google Calendar API</strong></li>
+                                            </ul>
                                         </AccordionContent>
                                     </AccordionItem>
                                     <AccordionItem value="item-3">
@@ -258,24 +277,50 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                         {/* TAB: PERMISSÕES */}
                         <TabsContent value="permissions" className="space-y-6">
                             <div className="bg-white border border-neutral-200 rounded-2xl p-8">
-                                <h3 className="text-lg font-bold text-neutral-900 mb-2">Escopos de Acesso</h3>
-                                <p className="text-neutral-600 mb-6">O Nodal solicita apenas os acessos estritamente necessários para operar. Nenhum dado é modificado no seu Workspace.</p>
+                                <h3 className="text-lg font-bold text-neutral-900 mb-2">Escopos e APIs Necessárias</h3>
+                                <p className="text-neutral-600 mb-6">O Nodal solicita os acessos abaixo para integrar sua organização de ponta a ponta.</p>
+                                
+                                {integration?.status === 'connected' && (
+                                    <div className="mb-6 bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-sm flex items-center gap-3">
+                                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                                        <strong>Integração ativa:</strong> O sistema confirmou o acesso a todas as APIs abaixo.
+                                    </div>
+                                )}
                                 
                                 <div className="space-y-4">
                                     <div className="flex items-start gap-4 p-4 rounded-xl border border-neutral-100 bg-neutral-50/50">
-                                        <ShieldCheck className="w-5 h-5 text-neutral-500 mt-0.5" />
+                                        {integration?.status === 'connected' ? <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" /> : <ShieldCheck className="w-5 h-5 text-neutral-500 mt-0.5" />}
                                         <div>
-                                            <p className="font-semibold text-neutral-900 text-sm">Leitura de Usuários</p>
-                                            <p className="text-xs text-neutral-500 mt-1"><code>https://www.googleapis.com/auth/admin.directory.user.readonly</code></p>
-                                            <p className="text-sm text-neutral-600 mt-2">Permite ler informações de perfil (nome, cargo, e-mail) para provisionar contas no Nodal.</p>
+                                            <p className="font-semibold text-neutral-900 text-sm">Google Drive API</p>
+                                            <p className="text-sm text-neutral-600 mt-2">Vai permitir: pesquisar arquivos, listar arquivos, abrir PDFs e localizar documentos.</p>
                                         </div>
                                     </div>
                                     <div className="flex items-start gap-4 p-4 rounded-xl border border-neutral-100 bg-neutral-50/50">
-                                        <ShieldCheck className="w-5 h-5 text-neutral-500 mt-0.5" />
+                                        {integration?.status === 'connected' ? <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" /> : <ShieldCheck className="w-5 h-5 text-neutral-500 mt-0.5" />}
                                         <div>
-                                            <p className="font-semibold text-neutral-900 text-sm">Leitura de Organizações/Departamentos</p>
-                                            <p className="text-xs text-neutral-500 mt-1"><code>https://www.googleapis.com/auth/admin.directory.orgunit.readonly</code></p>
-                                            <p className="text-sm text-neutral-600 mt-2">Permite estruturar os departamentos no Nodal refletindo a hierarquia do Google Workspace.</p>
+                                            <p className="font-semibold text-neutral-900 text-sm">Google Docs API</p>
+                                            <p className="text-sm text-neutral-600 mt-2">Vai permitir: ler documentos Google Docs e futuramente editar documentos.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-4 p-4 rounded-xl border border-neutral-100 bg-neutral-50/50">
+                                        {integration?.status === 'connected' ? <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" /> : <ShieldCheck className="w-5 h-5 text-neutral-500 mt-0.5" />}
+                                        <div>
+                                            <p className="font-semibold text-neutral-900 text-sm">Google Sheets API</p>
+                                            <p className="text-sm text-neutral-600 mt-2">Vai permitir: ler planilhas, consultar células e obter relatórios.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-4 p-4 rounded-xl border border-neutral-100 bg-neutral-50/50">
+                                        {integration?.status === 'connected' ? <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" /> : <ShieldCheck className="w-5 h-5 text-neutral-500 mt-0.5" />}
+                                        <div>
+                                            <p className="font-semibold text-neutral-900 text-sm">Google Calendar API</p>
+                                            <p className="text-sm text-neutral-600 mt-2">Vai permitir: consultar agendas, listar eventos e criar eventos futuramente.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-4 p-4 rounded-xl border border-neutral-100 bg-neutral-50/50">
+                                        {integration?.status === 'connected' ? <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" /> : <ShieldCheck className="w-5 h-5 text-neutral-500 mt-0.5" />}
+                                        <div>
+                                            <p className="font-semibold text-neutral-900 text-sm">Admin SDK API</p>
+                                            <p className="text-sm text-neutral-600 mt-2">Vai permitir: ler informações do diretório e sincronizar usuários da organização.</p>
                                         </div>
                                     </div>
                                 </div>

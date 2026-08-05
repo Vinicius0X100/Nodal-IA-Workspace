@@ -69,7 +69,15 @@ const integrations = [
     }
 ];
 
-export default function IntegrationsIndex() {
+export default function IntegrationsIndex({ dbIntegrations = [] }: { dbIntegrations?: any[] }) {
+    const finalIntegrations = integrations.map(int => {
+        const dbInt = dbIntegrations.find(d => d.provider === int.id.replace('-', '_'));
+        if (dbInt) {
+            return { ...int, status: dbInt.status };
+        }
+        return int;
+    });
+
     return (
         <AppLayout title="Integrações">
             <Head title="Integrações" />
@@ -112,7 +120,7 @@ export default function IntegrationsIndex() {
 
                     {/* Grid */}
                     <div className="flex-1 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {integrations.map(integration => (
+                        {finalIntegrations.map(integration => (
                             <div key={integration.id} className="group flex flex-col bg-white border border-neutral-200 rounded-2xl hover:border-neutral-300 transition-all p-5 hover:shadow-sm">
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="w-12 h-12 rounded-xl border border-neutral-100 bg-neutral-50/50 p-2.5 flex items-center justify-center">
@@ -121,10 +129,13 @@ export default function IntegrationsIndex() {
                                     <span className={cn(
                                         'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider',
                                         integration.status === 'not_connected' && 'bg-neutral-100 text-neutral-600',
+                                        integration.status === 'configuring' && 'bg-amber-50 text-amber-600',
                                         integration.status === 'coming_soon' && 'bg-blue-50 text-blue-600',
                                         integration.status === 'connected' && 'bg-green-100 text-green-700',
                                     )}>
-                                        {integration.status === 'coming_soon' ? 'Em breve' : 'Não conectado'}
+                                        {integration.status === 'coming_soon' ? 'Em breve' : 
+                                         integration.status === 'connected' ? 'Conectado' :
+                                         integration.status === 'configuring' ? 'Configurando' : 'Não conectado'}
                                     </span>
                                 </div>
                                 <h4 className="text-base font-semibold text-neutral-900">{integration.name}</h4>

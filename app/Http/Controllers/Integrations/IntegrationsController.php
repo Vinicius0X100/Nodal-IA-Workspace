@@ -13,7 +13,12 @@ class IntegrationsController extends Controller
      */
     public function index(Request $request)
     {
-        return Inertia::render('Integrations/Index');
+        $organizationId = session('active_organization_id');
+        $dbIntegrations = \App\Domain\Integrations\Models\Integration::where('organization_id', $organizationId)->get();
+
+        return Inertia::render('Integrations/Index', [
+            'dbIntegrations' => $dbIntegrations
+        ]);
     }
 
     /**
