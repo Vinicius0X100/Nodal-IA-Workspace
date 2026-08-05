@@ -38,6 +38,8 @@ class GoogleWorkspaceConnector implements ConnectorInterface
         $scopes = [
             'https://www.googleapis.com/auth/admin.directory.user.readonly',
             'https://www.googleapis.com/auth/admin.directory.orgunit.readonly',
+            'https://www.googleapis.com/auth/admin.directory.domain.readonly', // Para listar domínios
+            'https://www.googleapis.com/auth/admin.directory.group.readonly', // Para listar grupos
             'https://www.googleapis.com/auth/drive.readonly', // Pesquisar/Listar arquivos, PDFs
             'https://www.googleapis.com/auth/documents.readonly', // Ler Docs
             'https://www.googleapis.com/auth/spreadsheets.readonly', // Ler Sheets

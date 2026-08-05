@@ -183,7 +183,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                                             <Button variant="outline" onClick={() => setActiveTab('logs')}>
                                                 Ver logs
                                             </Button>
-                                            <Button variant="outline" onClick={() => setActiveTab('config')}>
+                                            <Button variant="outline" onClick={handleConnect}>
                                                 Reconectar
                                             </Button>
                                             <Button onClick={handleSyncOrganization} className="bg-primary-600 hover:bg-primary-700">
@@ -368,8 +368,10 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                                         </div>
                                     </div>
                                     <div className="pt-4 border-t border-neutral-100 mt-4 flex justify-between items-center">
-                                        {integration?.status === 'configuring' ? (
-                                            <Button type="button" variant="outline" onClick={handleConnect}>Conectar (OAuth)</Button>
+                                        {integration?.status !== 'not_connected' ? (
+                                            <Button type="button" variant="outline" onClick={handleConnect}>
+                                                {integration?.status === 'connected' ? 'Reconectar (OAuth)' : 'Conectar (OAuth)'}
+                                            </Button>
                                         ) : <div/>}
                                         
                                         <Button type="submit" disabled={processing}>Salvar Configuração</Button>
