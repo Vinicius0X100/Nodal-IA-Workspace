@@ -47,7 +47,7 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
             ],
             'organization' => fn () => $request->user() 
-                ? \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'))
+                ? \App\Domain\Organizations\Models\Organization::with('verification')->find(session('active_organization_id'))
                 : null,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

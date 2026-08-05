@@ -100,8 +100,21 @@ class SettingsController extends Controller
         if ($existing && $existing->isRejected()) {
             // Reenvio após reprovação: atualiza o registro
             $existing->update(array_merge($verificationData, ['review_notes' => null]));
+            $verificationRecord = $existing;
         } else {
-            CompanyVerification::create($verificationData);
+            $verificationRecord = CompanyVerification::create($verificationData);
+        }
+
+        // Send email to Sacratech Support
+        $supportEmail = config('app.support_email', 'suporte@sacratech.com');
+        if ($supportEmail) {
+            \Illuminate\Support\Facades\Mail::to($supportEmail)->queue(
+                new \App\Mail\NewVerificationSubmittedEmail(
+                    $verificationRecord->organization->name ?? $verificationData['company_name'],
+                    $verificationRecord->documentTypeLabel,
+                    $verificationData['responsible_name']
+                )
+            );
         }
 
         return back()->with('success', 'Documentos enviados com sucesso. Aguarde a análise da Sacratech.');

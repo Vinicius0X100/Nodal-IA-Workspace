@@ -17,6 +17,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Support Email
+    |--------------------------------------------------------------------------
+    |
+    | This is the email address that will receive system alerts like new KYC
+    | submissions.
+    |
+    */
+
+    'support_email' => env('SACRATECH_SUPPORT_EMAIL', 'suporte@sacratech.com'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

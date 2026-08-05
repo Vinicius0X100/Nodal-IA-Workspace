@@ -13,7 +13,8 @@ import {
     MailWarning,
     X,
     MailCheck,
-    Loader2
+    Loader2,
+    BadgeCheck
 } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -38,6 +39,12 @@ import {
 } from '@/Components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/Components/ui/avatar';
 import { ScrollArea } from '@/Components/ui/scroll-area';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/Components/ui/tooltip';
 import AppFooter from '@/Components/AppFooter';
 
 interface AppLayoutProps {
@@ -98,58 +105,87 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
     const user = (auth as any)?.user;
 
     return (
-        <div className="min-h-screen bg-neutral-50 flex">
-            {/* Sidebar */}
-            <aside className="w-64 border-r border-neutral-200 bg-white flex flex-col fixed inset-y-0 z-50">
+        <TooltipProvider>
+            <div className="min-h-screen bg-neutral-50 flex">
+                {/* Sidebar */}
+                <aside className="w-64 border-r border-neutral-200 bg-white flex flex-col fixed inset-y-0 z-50">
 
-                {/* Logo Nodal */}
-                <div className="flex items-center h-16 px-6 border-b border-neutral-100">
-                    <Link href={route('dashboard')} className="flex items-center gap-3">
-                        <img
-                            src="/images/Nodal-Logo.png"
-                            alt="Nodal"
-                            className="w-24 h-auto object-contain"
-                        />
-                    </Link>
-                </div>
+                    {/* Logo Nodal */}
+                    <div className="flex items-center h-16 px-6 border-b border-neutral-100">
+                        <Link href={route('dashboard')} className="flex items-center gap-3">
+                            <img
+                                src="/images/Nodal-Logo.png"
+                                alt="Nodal"
+                                className="w-24 h-auto object-contain"
+                            />
+                        </Link>
+                    </div>
 
-                {/* Organization Switcher */}
-                <div className="p-4 border-b border-neutral-100">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger className="w-full flex items-center justify-between p-2 hover:bg-neutral-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20">
-                            <div className="flex items-center gap-3 truncate min-w-0">
-                                <Avatar className="h-8 w-8 rounded-md border border-neutral-200 flex-shrink-0">
-                                    {orgLogo ? (
-                                        <AvatarImage src={`/storage/${orgLogo}`} className="object-cover rounded-md" />
-                                    ) : (
-                                        <AvatarFallback className="rounded-md bg-neutral-100 text-neutral-600 text-xs font-semibold">
-                                            {orgName?.substring(0, 2).toUpperCase() || 'ORG'}
-                                        </AvatarFallback>
-                                    )}
-                                </Avatar>
-                                <div className="flex flex-col items-start min-w-0">
-                                    <span className="text-sm font-medium text-neutral-900 truncate max-w-[120px]">{orgName || 'Workspace'}</span>
-                                    <span className="text-xs text-neutral-500">Plano Enterprise</span>
+                    {/* Organization Switcher */}
+                    <div className="p-4 border-b border-neutral-100">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger className="w-full flex items-center justify-between p-2 hover:bg-neutral-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20">
+                                <div className="flex items-center gap-3 truncate min-w-0">
+                                    <div className="relative inline-block">
+                                        <Avatar className="h-8 w-8 rounded-md border border-neutral-200 flex-shrink-0">
+                                            {orgLogo ? (
+                                                <AvatarImage src={`/storage/${orgLogo}`} className="object-cover rounded-md" />
+                                            ) : (
+                                                <AvatarFallback className="rounded-md bg-neutral-100 text-neutral-600 text-xs font-semibold">
+                                                    {orgName?.substring(0, 2).toUpperCase() || 'ORG'}
+                                                </AvatarFallback>
+                                            )}
+                                        </Avatar>
+                                        {organization?.verification?.verification_status === 'verified' && (
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <div className="absolute -bottom-1 -right-1 bg-white rounded-full">
+                                                        <BadgeCheck className="w-4 h-4 text-blue-500" />
+                                                    </div>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="right">
+                                                    <p>Verificada</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col items-start min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-sm font-medium text-neutral-900 truncate max-w-[120px]">{orgName || 'Workspace'}</span>
+                                        </div>
+                                        <span className="text-xs text-neutral-500">Plano Enterprise</span>
+                                    </div>
                                 </div>
-                            </div>
-                            <ChevronDown className="h-4 w-4 text-neutral-400 flex-shrink-0 ml-1" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-56">
-                            <DropdownMenuLabel className="text-neutral-500 text-xs font-normal">Seus Workspaces</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="cursor-pointer font-medium text-neutral-900">
-                                <div className="flex items-center gap-2">
-                                    <Avatar className="h-5 w-5 rounded-sm border border-neutral-200">
-                                        <AvatarFallback className="rounded-sm text-[9px] bg-primary-50 text-primary-700">
-                                            {orgName?.substring(0, 2).toUpperCase()}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    {orgName || 'Workspace Atual'}
-                                </div>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
+                                <ChevronDown className="h-4 w-4 text-neutral-400 flex-shrink-0 ml-1" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-56">
+                                <DropdownMenuLabel className="text-neutral-500 text-xs font-normal">Seus Workspaces</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="cursor-pointer font-medium text-neutral-900">
+                                    <div className="flex items-center gap-2">
+                                        <Avatar className="h-5 w-5 rounded-sm border border-neutral-200">
+                                            <AvatarFallback className="rounded-sm text-[9px] bg-primary-50 text-primary-700">
+                                                {orgName?.substring(0, 2).toUpperCase()}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex items-center gap-1.5">
+                                            <span>{orgName || 'Workspace Atual'}</span>
+                                            {organization?.verification?.verification_status === 'verified' && (
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <BadgeCheck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="right">
+                                                        <p>Verificada</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            )}
+                                        </div>
+                                    </div>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
 
                 {/* Navigation */}
                 <ScrollArea className="flex-1 w-full">
@@ -344,5 +380,6 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                 </DialogContent>
             </Dialog>
         </div>
+        </TooltipProvider>
     );
 }

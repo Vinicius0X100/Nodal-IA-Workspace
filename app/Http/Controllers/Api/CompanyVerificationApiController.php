@@ -96,7 +96,7 @@ class CompanyVerificationApiController extends Controller
      */
     public function approve(Request $request, $uuid)
     {
-        $verification = CompanyVerification::findByUuidOrFail($uuid);
+        $verification = CompanyVerification::with('organization.users')->findByUuidOrFail($uuid);
 
         if ($verification->verification_status !== 'under_review') {
             return response()->json(['message' => 'Verification is not pending.'], 400);
@@ -107,6 +107,15 @@ class CompanyVerificationApiController extends Controller
             'verified_at' => now(),
             'review_notes' => $request->input('notes'),
         ]);
+
+        // Send email to all owners/admins of the organization
+        $owners = $verification->organization->users()->wherePivot('is_owner', true)->get();
+        
+        foreach ($owners as $owner) {
+            \Illuminate\Support\Facades\Mail::to($owner->email)->queue(
+                new \App\Mail\VerificationApprovedEmail($verification->organization->name)
+            );
+        }
 
         return response()->json([
             'message' => 'Verification approved successfully.',
