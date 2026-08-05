@@ -18,7 +18,7 @@ class CompanyVerificationApiController extends Controller
     public function pending(Request $request)
     {
         $verifications = CompanyVerification::with('organization')
-            ->where('status', 'pending')
+            ->where('verification_status', 'under_review')
             ->orderBy('created_at', 'asc')
             ->get();
 
@@ -60,10 +60,10 @@ class CompanyVerificationApiController extends Controller
             'organization_name' => $verification->organization->name,
             'document_type' => $verification->document_type,
             'document_url' => $documentUrl,
-            'status' => $verification->status,
-            'notes' => $verification->notes,
+            'status' => $verification->verification_status,
+            'notes' => $verification->review_notes,
             'submitted_at' => $verification->submitted_at,
-            'reviewed_at' => $verification->reviewed_at,
+            'reviewed_at' => $verification->verified_at,
         ]);
     }
 
@@ -74,14 +74,14 @@ class CompanyVerificationApiController extends Controller
     {
         $verification = CompanyVerification::findByUuidOrFail($uuid);
 
-        if ($verification->status !== 'pending') {
+        if ($verification->verification_status !== 'under_review') {
             return response()->json(['message' => 'Verification is not pending.'], 400);
         }
 
         $verification->update([
-            'status' => 'approved',
-            'reviewed_at' => now(),
-            'notes' => $request->input('notes'),
+            'verification_status' => 'verified',
+            'verified_at' => now(),
+            'review_notes' => $request->input('notes'),
         ]);
 
         return response()->json([
@@ -101,16 +101,16 @@ class CompanyVerificationApiController extends Controller
 
         $verification = CompanyVerification::with('organization.users')->findByUuidOrFail($uuid);
 
-        if ($verification->status !== 'pending') {
+        if ($verification->verification_status !== 'under_review') {
             return response()->json(['message' => 'Verification is not pending.'], 400);
         }
 
         $reason = $request->input('reason');
 
         $verification->update([
-            'status' => 'rejected',
-            'reviewed_at' => now(),
-            'notes' => $reason,
+            'verification_status' => 'rejected',
+            'verified_at' => now(),
+            'review_notes' => $reason,
         ]);
 
         // Send email to all owners/admins of the organization
