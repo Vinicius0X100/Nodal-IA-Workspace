@@ -13,6 +13,7 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from '@/Components/ui/accordion';
+import ImportWizard from './Components/ImportWizard';
 
 export default function GoogleWorkspaceConfig({ app_url, integration, config }: { app_url?: string, integration?: any, config?: any }) {
     const redirectUri = `${app_url || 'https://nodal.app'}/oauth/google_workspace/callback`;
@@ -25,6 +26,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
 
     const [activeTab, setActiveTab] = useState('general');
     const [copied, setCopied] = useState(false);
+    const [wizardOpen, setWizardOpen] = useState(false);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(redirectUri);
@@ -186,9 +188,14 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                                             <Button variant="outline" onClick={handleConnect}>
                                                 Reconectar
                                             </Button>
-                                            <Button onClick={handleSyncOrganization} className="bg-primary-600 hover:bg-primary-700">
-                                                <RefreshCcw className="w-4 h-4 mr-2" /> Sincronizar agora
+                                            <Button onClick={handleSyncOrganization} variant="outline">
+                                                <RefreshCcw className="w-4 h-4 mr-2" /> Sincronizar
                                             </Button>
+                                            {integration.organization_data && (
+                                                <Button onClick={() => setWizardOpen(true)} className="bg-primary-600 hover:bg-primary-700">
+                                                    <Users className="w-4 h-4 mr-2" /> Importar Diretório
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
 
@@ -496,20 +503,68 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
 
                         {/* TAB: LOGS */}
                         <TabsContent value="logs" className="space-y-6">
-                            <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center">
-                                <div className="w-16 h-16 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center mx-auto mb-4">
-                                    <Activity className="w-8 h-8 text-neutral-300" />
+                            {integration?.logs && integration.logs.length > 0 ? (
+                                <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-neutral-50 text-neutral-500 font-medium border-b border-neutral-200">
+                                            <tr>
+                                                <th className="px-6 py-4">Data/Hora</th>
+                                                <th className="px-6 py-4">Status</th>
+                                                <th className="px-6 py-4">Evento</th>
+                                                <th className="px-6 py-4">Mensagem</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-200">
+                                            {integration.logs.map((log: any) => (
+                                                <tr key={log.id} className="hover:bg-neutral-50">
+                                                    <td className="px-6 py-4 text-neutral-500 whitespace-nowrap">
+                                                        {new Date(log.created_at).toLocaleString('pt-BR')}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={cn(
+                                                            "px-2.5 py-1 text-xs font-semibold rounded-full border",
+                                                            log.status === 'success' ? "bg-green-50 text-green-700 border-green-200" :
+                                                            log.status === 'error' ? "bg-red-50 text-red-700 border-red-200" :
+                                                            "bg-neutral-100 text-neutral-700 border-neutral-200"
+                                                        )}>
+                                                            {log.status === 'success' ? 'Sucesso' : log.status === 'error' ? 'Erro' : log.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 font-medium text-neutral-900">
+                                                        {log.event}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-neutral-600">
+                                                        {log.message}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <h3 className="text-lg font-semibold text-neutral-900 mb-1">Sem registros recentes</h3>
-                                <p className="text-neutral-500 max-w-sm mx-auto">
-                                    Assim que a integração estiver ativa, todos os eventos de sincronização e erros de conexão aparecerão aqui.
-                                </p>
-                            </div>
+                            ) : (
+                                <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center">
+                                    <div className="w-16 h-16 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center mx-auto mb-4">
+                                        <Activity className="w-8 h-8 text-neutral-300" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-neutral-900 mb-1">Sem registros recentes</h3>
+                                    <p className="text-neutral-500 max-w-sm mx-auto">
+                                        Assim que a integração estiver ativa, todos os eventos de sincronização e erros de conexão aparecerão aqui.
+                                    </p>
+                                </div>
+                            )}
                         </TabsContent>
 
                     </div>
                 </Tabs>
             </div>
+
+            {integration && (
+                <ImportWizard 
+                    isOpen={wizardOpen} 
+                    onClose={() => setWizardOpen(false)} 
+                    integrationId={integration.id} 
+                />
+            )}
         </AppLayout>
     );
 }

@@ -73,6 +73,8 @@ Route::middleware(['auth'])->group(function () {
             
             // Organização Específico (Google Workspace)
             Route::post('/google-workspace/organization/{integrationId}/sync', [\App\Http\Controllers\Integrations\GoogleOrganizationController::class, 'sync'])->name('google-workspace.organization.sync');
+            Route::get('/google-workspace/{integrationId}/import/preview', [\App\Http\Controllers\Integrations\GoogleWorkspaceImportController::class, 'preview'])->name('google-workspace.import.preview');
+            Route::post('/google-workspace/{integrationId}/import/execute', [\App\Http\Controllers\Integrations\GoogleWorkspaceImportController::class, 'import'])->name('google-workspace.import.execute');
         });
 
         // O callback do OAuth fica fora do prefix 'integrations' por clareza (ex: /oauth/google/callback)

@@ -28,7 +28,9 @@ class IntegrationsController extends Controller
     {
         $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
         
-        $integration = \App\Domain\Integrations\Models\Integration::with('organizationData')->firstOrCreate(
+        $integration = \App\Domain\Integrations\Models\Integration::with(['organizationData', 'logs' => function($query) {
+            $query->latest()->limit(50);
+        }])->firstOrCreate(
             ['organization_id' => $organization->id, 'provider' => 'google_workspace'],
             ['display_name' => 'Google Workspace', 'status' => 'not_connected']
         );
