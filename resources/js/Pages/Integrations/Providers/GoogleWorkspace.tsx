@@ -23,6 +23,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
         tenant: config?.tenant || '',
     });
 
+    const [activeTab, setActiveTab] = useState('general');
     const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
@@ -93,7 +94,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                 </div>
 
                 {/* Tabs */}
-                <Tabs defaultValue="general" className="w-full">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="bg-transparent border-b border-neutral-200 w-full justify-start rounded-none h-auto p-0 gap-6">
                         <TabsTrigger value="general" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                             <FileText className="w-4 h-4 mr-2" /> Geral
@@ -157,7 +158,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                                             if (integration?.status === 'configuring') {
                                                 handleConnect();
                                             } else {
-                                                document.querySelector<HTMLElement>('[data-state="inactive"][value="config"]')?.click();
+                                                setActiveTab('config');
                                             }
                                         }}
                                     >
@@ -179,10 +180,10 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                                             </p>
                                         </div>
                                         <div className="flex gap-3">
-                                            <Button variant="outline" onClick={() => document.querySelector<HTMLElement>('[data-state="inactive"][value="logs"]')?.click()}>
+                                            <Button variant="outline" onClick={() => setActiveTab('logs')}>
                                                 Ver logs
                                             </Button>
-                                            <Button variant="outline" onClick={() => document.querySelector<HTMLElement>('[data-state="inactive"][value="config"]')?.click()}>
+                                            <Button variant="outline" onClick={() => setActiveTab('config')}>
                                                 Reconectar
                                             </Button>
                                             <Button onClick={handleSyncOrganization} className="bg-primary-600 hover:bg-primary-700">
@@ -298,7 +299,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                                     <p className="text-neutral-500 max-w-sm mx-auto mb-6">
                                         Conecte sua conta do Google Workspace para visualizar e sincronizar os dados da organização.
                                     </p>
-                                    <Button onClick={() => document.querySelector<HTMLElement>('[data-state="inactive"][value="config"]')?.click()}>
+                                    <Button onClick={() => setActiveTab('config')}>
                                         Ir para Configuração
                                     </Button>
                                 </div>
