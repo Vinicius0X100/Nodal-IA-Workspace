@@ -127,7 +127,7 @@
                     <td style="padding: 20px 0 0; text-align:center;">
                         <p style="margin:0; font-size:12px; color:#80868b; font-family:'Inter',Arial,sans-serif;">
                             &copy; {{ date('Y') }} Sacratech Softwares &bull;
-                            <a href="{{ config('app.url') }}" style="color:#80868b; text-decoration:none;">nodal.app</a>
+                            <a href="{{ config('app.url') }}" style="color:#80868b; text-decoration:none;">Nodal AI Workspace</a>
                         </p>
                     </td>
                 </tr>
