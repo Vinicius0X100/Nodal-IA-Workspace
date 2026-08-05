@@ -65,11 +65,11 @@ class CreateOrganizationAction
     private function createDefaultIntegrations(Organization $organization): void
     {
         $integrations = [
-            ['provider' => IntegrationProvider::GOOGLE_WORKSPACE->value, 'status' => IntegrationStatus::NOT_CONNECTED->value],
-            ['provider' => IntegrationProvider::MICROSOFT_365->value, 'status' => IntegrationStatus::NOT_CONNECTED->value],
-            ['provider' => IntegrationProvider::SLACK->value, 'status' => IntegrationStatus::COMING_SOON->value],
-            ['provider' => IntegrationProvider::GITHUB->value, 'status' => IntegrationStatus::COMING_SOON->value],
-            ['provider' => IntegrationProvider::HUBSPOT->value, 'status' => IntegrationStatus::COMING_SOON->value],
+            ['provider' => IntegrationProvider::GOOGLE_WORKSPACE->value, 'display_name' => 'Google Workspace', 'status' => IntegrationStatus::NOT_CONNECTED->value],
+            ['provider' => IntegrationProvider::MICROSOFT_365->value, 'display_name' => 'Microsoft 365', 'status' => IntegrationStatus::NOT_CONNECTED->value],
+            ['provider' => IntegrationProvider::SLACK->value, 'display_name' => 'Slack', 'status' => IntegrationStatus::COMING_SOON->value],
+            ['provider' => IntegrationProvider::GITHUB->value, 'display_name' => 'GitHub', 'status' => IntegrationStatus::COMING_SOON->value],
+            ['provider' => IntegrationProvider::HUBSPOT->value, 'display_name' => 'HubSpot', 'status' => IntegrationStatus::COMING_SOON->value],
         ];
 
         foreach ($integrations as $integration) {

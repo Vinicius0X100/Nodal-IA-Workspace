@@ -47,18 +47,18 @@ class ProvisioningController extends Controller
 
         return response()->json([
             'message' => 'Organization provisioned successfully.',
-            'organization_id' => $organization->id,
-            'user_id' => $user->id,
+            'organization_uuid' => $organization->uuid,
+            'user_uuid' => $user->uuid,
             'login_url' => route('login'),
         ], 201);
     }
 
     public function updateOrganization(
         Request $request,
-        $id,
+        $uuid,
         \App\Domain\Organizations\Actions\UpdateOrganizationAction $updateOrganizationAction
     ) {
-        $organization = \App\Domain\Organizations\Models\Organization::findOrFail($id);
+        $organization = \App\Domain\Organizations\Models\Organization::findByUuidOrFail($uuid);
 
         $validated = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
@@ -79,10 +79,10 @@ class ProvisioningController extends Controller
     }
 
     public function deleteOrganization(
-        $id,
+        $uuid,
         \App\Domain\Organizations\Actions\DeleteOrganizationAction $deleteOrganizationAction
     ) {
-        $organization = \App\Domain\Organizations\Models\Organization::findOrFail($id);
+        $organization = \App\Domain\Organizations\Models\Organization::findByUuidOrFail($uuid);
         
         $deleteOrganizationAction->execute($organization);
 
