@@ -149,7 +149,7 @@
                             <p>Por favor, acesse o painel da sua empresa e envie novos documentos corrigindo os apontamentos listados acima. Nossa equipe estará à disposição para analisar seu novo envio o mais rápido possível.</p>
                             
                             <div class="button-container">
-                                <a href="{{ config('app.url') }}/settings/verification" class="button">Re-enviar Documentos</a>
+                                <a href="{{ config('app.url') }}/settings" class="button">Re-enviar Documentos</a>
                             </div>
                             
                             <div class="footer">
