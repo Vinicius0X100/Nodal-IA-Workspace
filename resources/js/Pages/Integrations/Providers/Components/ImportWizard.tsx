@@ -253,7 +253,7 @@ export default function ImportWizard({ isOpen, onClose, integrationId }: ImportW
                                 Avançar
                             </Button>
                         ) : (
-                            <Button onClick={handleImport} className="bg-primary-600 hover:bg-primary-700" disabled={importing}>
+                            <Button onClick={handleImport} className="bg-primary-600 hover:bg-primary-700 text-white" disabled={importing}>
                                 {importing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                                 {importing ? 'Importando...' : 'Finalizar Importação'}
                             </Button>
