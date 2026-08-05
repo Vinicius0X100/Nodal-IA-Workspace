@@ -10,6 +10,7 @@ use App\Domain\Settings\Models\Setting;
 use App\Support\Traits\Auditable;
 use App\Support\Traits\HasSlug;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use App\Support\Traits\HasSecondaryUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,7 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable(['name', 'slug', 'logo', 'settings', 'cnpj', 'address', 'industry'])]
 class Organization extends Model
 {
-    use SoftDeletes, Auditable, HasSlug;
+    use SoftDeletes, Auditable, HasSlug, HasSecondaryUuid;
 
     protected function casts(): array
     {

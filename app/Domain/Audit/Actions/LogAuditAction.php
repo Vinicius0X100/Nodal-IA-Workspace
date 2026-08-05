@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Request;
 
 class LogAuditAction
 {
-    public function execute(string $action, string $entityType, ?int $entityId, array $metadata = []): void
+    public function execute(string $action, string $entityType, ?string $entityId, array $metadata = []): void
     {
         $user = Auth::user();
 

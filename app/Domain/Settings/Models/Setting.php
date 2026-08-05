@@ -5,13 +5,14 @@ namespace App\Domain\Settings\Models;
 use App\Domain\Organizations\Models\Organization;
 use App\Support\Traits\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use App\Support\Traits\HasSecondaryUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable(['organization_id', 'key', 'value', 'type'])]
 class Setting extends Model
 {
-    use Auditable;
+    use Auditable, HasSecondaryUuid;
 
     public function organization(): BelongsTo
     {

@@ -15,16 +15,16 @@ return new class extends Migration
     {
         Schema::create('integrations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('organization_id')->constrained('organizations')->cascadeOnDelete();
-            $table->string('provider')->index();
-            $table->enum('status', ['not_connected', 'connected', 'error', 'coming_soon'])->default('not_connected');
-            $table->json('config')->nullable(); // Encriptado via cast no Model
-            $table->string('connected_by')->nullable(); // Email de quem conectou
-            $table->timestamp('connected_at')->nullable();
-            $table->timestamp('last_sync_at')->nullable();
+            $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
+            $table->string('provider'); // google_workspace, slack, etc
+            $table->string('status')->default('not_connected');
+            $table->string('display_name')->nullable();
+            $table->string('description')->nullable();
+            $table->string('icon')->nullable();
+            $table->boolean('is_enabled')->default(true);
             $table->timestamps();
-
-            // Cada organização só pode ter uma integração por provider
+            
+            // Uma organização pode ter apenas uma integração de cada provider
             $table->unique(['organization_id', 'provider']);
         });
     }

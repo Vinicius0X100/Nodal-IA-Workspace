@@ -22,7 +22,7 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('action')->index(); // Ex: "user.created", "role.updated", "integration.connected"
             $table->string('entity_type')->nullable()->index(); // Ex: "App\Domain\Identity\Models\User"
-            $table->unsignedBigInteger('entity_id')->nullable();
+            $table->uuid('entity_id')->nullable();
             $table->json('metadata')->nullable(); // Dados adicionais (old_values, new_values, etc.)
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();

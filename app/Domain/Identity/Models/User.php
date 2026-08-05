@@ -8,6 +8,7 @@ use App\Domain\Roles\Models\Role;
 use App\Support\Traits\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use App\Support\Traits\HasSecondaryUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,7 +22,7 @@ use Laravel\Sanctum\HasApiTokens;
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, Auditable;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, Auditable, HasSecondaryUuid;
 
     protected function casts(): array
     {

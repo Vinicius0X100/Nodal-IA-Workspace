@@ -15,8 +15,8 @@ return new class extends Migration
     {
         Schema::create('organization_users', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('organization_id')->constrained('organizations')->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->boolean('is_owner')->default(false);
             $table->timestamp('joined_at')->useCurrent();
             $table->timestamps();

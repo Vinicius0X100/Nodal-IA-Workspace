@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Domain\Organizations\Models\Organization;
+use App\Support\Traits\HasSecondaryUuid;
 
 class Integration extends Model
 {
-    use HasFactory;
+    use HasFactory, HasSecondaryUuid;
 
     protected $fillable = [
         'organization_id',
@@ -21,10 +22,22 @@ class Integration extends Model
         'description',
         'icon',
         'is_enabled',
+        'access_token',
+        'refresh_token',
+        'token_expires_at',
+        'scope',
+        'last_sync_at',
+        'last_health_check',
     ];
 
     protected $casts = [
         'is_enabled' => 'boolean',
+        'scope' => 'array',
+        'access_token' => 'encrypted',
+        'refresh_token' => 'encrypted',
+        'token_expires_at' => 'datetime',
+        'last_sync_at' => 'datetime',
+        'last_health_check' => 'datetime',
     ];
 
     public function organization(): BelongsTo

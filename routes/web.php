@@ -65,7 +65,15 @@ Route::middleware(['auth'])->group(function () {
         Route::prefix('integrations')->name('integrations.')->group(function () {
             Route::get('/', [IntegrationsController::class, 'index'])->name('index');
             Route::get('/google-workspace', [IntegrationsController::class, 'googleWorkspace'])->name('google-workspace');
+            
+            // OAuth Genérico (Connect, Callback, Disconnect, Config)
+            Route::post('/{provider}/config', [IntegrationsController::class, 'saveConfig'])->name('config');
+            Route::get('/{provider}/connect', [IntegrationsController::class, 'connect'])->name('connect');
+            Route::post('/{provider}/disconnect', [IntegrationsController::class, 'disconnect'])->name('disconnect');
         });
+
+        // O callback do OAuth fica fora do prefix 'integrations' por clareza (ex: /oauth/google/callback)
+        Route::get('/oauth/{provider}/callback', [IntegrationsController::class, 'callback'])->name('oauth.callback');
 
         // Perfil do Usuário
         Route::get('/profile', [\App\Http\Controllers\Profile\ProfileController::class, 'index'])->name('profile.index');

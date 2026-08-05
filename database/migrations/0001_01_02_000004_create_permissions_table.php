@@ -15,11 +15,13 @@ return new class extends Migration
     {
         Schema::create('permissions', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('slug')->unique();
+            $table->string('module'); // Ex: users, roles, integrations
+            $table->string('action'); // Ex: create, read, update, delete
             $table->string('description')->nullable();
-            $table->string('group')->index();
             $table->timestamps();
+
+            // Uma permissão é a combinação de módulo e ação (ex: users.create)
+            $table->unique(['module', 'action']);
         });
     }
 

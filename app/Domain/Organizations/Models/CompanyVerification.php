@@ -3,11 +3,14 @@
 namespace App\Domain\Organizations\Models;
 
 use App\Domain\Identity\Models\User;
+use App\Support\Traits\HasSecondaryUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CompanyVerification extends Model
 {
+    use HasSecondaryUuid;
+
     protected $fillable = [
         'organization_id',
         'company_name',

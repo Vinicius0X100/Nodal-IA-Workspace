@@ -1,10 +1,11 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import { ArrowLeft, ExternalLink, KeySquare, ShieldCheck, FileText, Settings2, Users, Activity, CheckCircle2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Button } from '@/Components/ui/button';
+import { cn } from '@/lib/utils';
 import {
     Accordion,
     AccordionContent,
@@ -12,8 +13,41 @@ import {
     AccordionTrigger,
 } from '@/Components/ui/accordion';
 
-export default function GoogleWorkspaceConfig({ app_url }: { app_url?: string }) {
-    const redirectUri = `${app_url || 'https://nodal.app'}/oauth/google/callback`;
+export default function GoogleWorkspaceConfig({ app_url, integration, config }: { app_url?: string, integration?: any, config?: any }) {
+    const redirectUri = `${app_url || 'https://nodal.app'}/oauth/google_workspace/callback`;
+
+    const { data, setData, post, processing, errors } = useForm({
+        client_id: config?.client_id || '',
+        client_secret: config?.client_secret || '',
+        tenant: config?.tenant || '',
+    });
+
+    const handleSaveConfig = (e: React.FormEvent) => {
+        e.preventDefault();
+        post(route('integrations.config', { provider: 'google_workspace' }));
+    };
+
+    const handleConnect = () => {
+        window.location.href = route('integrations.connect', { provider: 'google_workspace' });
+    };
+
+    const handleDisconnect = () => {
+        if(confirm('Tem certeza que deseja desconectar? Todos os usuários sincronizados perderão o vínculo e os tokens serão apagados.')) {
+            router.post(route('integrations.disconnect', { provider: 'google_workspace' }));
+        }
+    };
+
+    const statusBadge = () => {
+        if (!integration || integration.status === 'not_connected') {
+            return <span className="px-3 py-1 bg-neutral-100 text-neutral-600 rounded-full text-xs font-bold uppercase tracking-widest border border-neutral-200">Não conectado</span>;
+        }
+        if (integration.status === 'configuring') {
+            return <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold uppercase tracking-widest border border-yellow-200">Configurando</span>;
+        }
+        if (integration.status === 'connected') {
+            return <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase tracking-widest border border-green-200">Conectado</span>;
+        }
+    };
 
     return (
         <AppLayout title="Google Workspace">
@@ -35,9 +69,7 @@ export default function GoogleWorkspaceConfig({ app_url }: { app_url?: string })
                                 <p className="text-neutral-500 text-sm">Sincronização de diretório, usuários e permissões corporativas.</p>
                             </div>
                         </div>
-                        <span className="px-3 py-1 bg-neutral-100 text-neutral-600 rounded-full text-xs font-bold uppercase tracking-widest border border-neutral-200">
-                            Não conectado
-                        </span>
+                        {statusBadge()}
                     </div>
                 </div>
 
@@ -92,15 +124,30 @@ export default function GoogleWorkspaceConfig({ app_url }: { app_url?: string })
                                     </li>
                                 </ul>
 
-                                <Button className="bg-primary-600 hover:bg-primary-700">
-                                    Iniciar Configuração
-                                </Button>
+                                {integration?.status === 'connected' ? (
+                                    <Button variant="destructive" onClick={handleDisconnect}>
+                                        Desconectar
+                                    </Button>
+                                ) : (
+                                    <Button 
+                                        className="bg-primary-600 hover:bg-primary-700"
+                                        onClick={() => {
+                                            if (integration?.status === 'configuring') {
+                                                handleConnect();
+                                            } else {
+                                                document.querySelector<HTMLElement>('[data-state="inactive"][value="config"]')?.click();
+                                            }
+                                        }}
+                                    >
+                                        {integration?.status === 'configuring' ? 'Conectar via OAuth' : 'Iniciar Configuração'}
+                                    </Button>
+                                )}
                             </div>
                         </TabsContent>
 
                         {/* TAB: CONFIGURAÇÃO */}
                         <TabsContent value="config" className="space-y-6">
-                            <div className="grid gap-6 md:grid-cols-2">
+                            <form onSubmit={handleSaveConfig} className="grid gap-6 md:grid-cols-2">
                                 <div className="bg-white border border-neutral-200 rounded-2xl p-6">
                                     <div className="flex items-center gap-2 mb-6">
                                         <KeySquare className="w-5 h-5 text-neutral-500" />
@@ -109,44 +156,62 @@ export default function GoogleWorkspaceConfig({ app_url }: { app_url?: string })
                                     <div className="space-y-4">
                                         <div className="space-y-2">
                                             <Label htmlFor="client_id">Client ID</Label>
-                                            <Input id="client_id" placeholder="Ex: 123456789-abcde.apps.googleusercontent.com" disabled />
+                                            <Input 
+                                                id="client_id" 
+                                                value={data.client_id}
+                                                onChange={e => setData('client_id', e.target.value)}
+                                                placeholder="Ex: 123456789-abcde.apps.googleusercontent.com" 
+                                            />
+                                            {errors.client_id && <p className="text-red-500 text-xs mt-1">{errors.client_id}</p>}
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="client_secret">Client Secret</Label>
-                                            <Input id="client_secret" type="password" placeholder="••••••••••••••••" disabled />
+                                            <Input 
+                                                id="client_secret" 
+                                                type="password" 
+                                                value={data.client_secret}
+                                                onChange={e => setData('client_secret', e.target.value)}
+                                                placeholder="••••••••••••••••" 
+                                            />
+                                            {errors.client_secret && <p className="text-red-500 text-xs mt-1">{errors.client_secret}</p>}
                                         </div>
                                         <div className="space-y-2 pt-2">
                                             <Label>Redirect URI (Copie isto para o Google Cloud)</Label>
                                             <div className="flex items-center gap-2">
-                                                <code className="flex-1 bg-neutral-100 text-neutral-600 px-3 py-2 rounded-lg text-sm border border-neutral-200">
+                                                <code className="flex-1 bg-neutral-100 text-neutral-600 px-3 py-2 rounded-lg text-sm border border-neutral-200 truncate">
                                                     {redirectUri}
                                                 </code>
-                                                <Button variant="outline" size="sm" disabled>Copiar</Button>
+                                                <Button type="button" variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(redirectUri)}>Copiar</Button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="bg-white border border-neutral-200 rounded-2xl p-6">
+                                <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col">
                                     <div className="flex items-center gap-2 mb-6">
                                         <Settings2 className="w-5 h-5 text-neutral-500" />
                                         <h3 className="text-lg font-bold text-neutral-900">Configurações do Tenant</h3>
                                     </div>
-                                    <div className="space-y-4">
+                                    <div className="space-y-4 flex-1">
                                         <div className="space-y-2">
-                                            <Label htmlFor="domain">Domínio Principal</Label>
-                                            <Input id="domain" placeholder="Ex: sacratech.com" disabled />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="admin_email">E-mail do Administrador (Workspace)</Label>
-                                            <Input id="admin_email" type="email" placeholder="admin@suaempresa.com" disabled />
-                                        </div>
-                                        <div className="pt-4 border-t border-neutral-100 mt-4 flex justify-end">
-                                            <Button disabled>Salvar e Conectar</Button>
+                                            <Label htmlFor="tenant">Domínio Principal</Label>
+                                            <Input 
+                                                id="tenant" 
+                                                value={data.tenant}
+                                                onChange={e => setData('tenant', e.target.value)}
+                                                placeholder="Ex: sacratech.com" 
+                                            />
                                         </div>
                                     </div>
+                                    <div className="pt-4 border-t border-neutral-100 mt-4 flex justify-between items-center">
+                                        {integration?.status === 'configuring' ? (
+                                            <Button type="button" variant="outline" onClick={handleConnect}>Conectar (OAuth)</Button>
+                                        ) : <div/>}
+                                        
+                                        <Button type="submit" disabled={processing}>Salvar Configuração</Button>
+                                    </div>
                                 </div>
-                            </div>
+                            </form>
                         </TabsContent>
 
                         {/* TAB: DOCUMENTAÇÃO */}
