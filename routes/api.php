@@ -22,8 +22,12 @@ Route::prefix('v1')->group(function () {
         // Endpoints de Verificação de Empresas
         Route::get('/verifications/pending', [\App\Http\Controllers\Api\CompanyVerificationApiController::class, 'pending']);
         Route::get('/verifications/{uuid}', [\App\Http\Controllers\Api\CompanyVerificationApiController::class, 'show']);
-        Route::get('/verifications/{uuid}/document', [\App\Http\Controllers\Api\CompanyVerificationApiController::class, 'downloadDocument']);
         Route::post('/verifications/{uuid}/approve', [\App\Http\Controllers\Api\CompanyVerificationApiController::class, 'approve']);
         Route::post('/verifications/{uuid}/reject', [\App\Http\Controllers\Api\CompanyVerificationApiController::class, 'reject']);
     });
+
+    // Rota pública e temporária de download (autenticada por assinatura na URL)
+    Route::get('/verifications/{uuid}/document', [\App\Http\Controllers\Api\CompanyVerificationApiController::class, 'downloadDocument'])
+        ->middleware('signed')
+        ->name('api.verifications.document');
 });

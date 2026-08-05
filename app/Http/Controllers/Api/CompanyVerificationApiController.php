@@ -46,13 +46,26 @@ class CompanyVerificationApiController extends Controller
         // URL segura que passa pela mesma API para garantir que o SaaS envie o Header X-System-Api-Key
         $documentUrl = null;
         if ($verification->document_path) {
-            $documentUrl = url("/api/v1/verifications/{$verification->uuid}/document");
+            $documentUrl = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                'api.verifications.document', 
+                now()->addMinutes(60), 
+                ['uuid' => $verification->uuid]
+            );
         }
 
         return response()->json([
             'uuid' => $verification->uuid,
             'organization_uuid' => $verification->organization->uuid,
             'organization_name' => $verification->organization->name,
+            'company_name' => $verification->company_name,
+            'trade_name' => $verification->trade_name,
+            'cnpj' => $verification->cnpj,
+            'website' => $verification->website,
+            'linkedin' => $verification->linkedin,
+            'responsible_name' => $verification->responsible_name,
+            'responsible_position' => $verification->responsible_position,
+            'corporate_email' => $verification->corporate_email,
+            'phone' => $verification->phone,
             'document_type' => $verification->document_type,
             'document_url' => $documentUrl,
             'status' => $verification->verification_status,
