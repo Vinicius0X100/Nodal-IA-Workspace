@@ -40,7 +40,8 @@ class CompanyVerificationApiController extends Controller
      */
     public function show($uuid)
     {
-        $verification = CompanyVerification::with('organization')->findByUuidOrFail($uuid);
+        $verification = CompanyVerification::findByUuidOrFail($uuid);
+        $verification->load('organization');
 
         // Generate a temporary signed URL if using S3, or a full URL if local
         $documentUrl = null;
@@ -99,7 +100,8 @@ class CompanyVerificationApiController extends Controller
             'reason' => 'required|string|max:1000'
         ]);
 
-        $verification = CompanyVerification::with('organization.users')->findByUuidOrFail($uuid);
+        $verification = CompanyVerification::findByUuidOrFail($uuid);
+        $verification->load('organization.users');
 
         if ($verification->verification_status !== 'under_review') {
             return response()->json(['message' => 'Verification is not pending.'], 400);
