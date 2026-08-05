@@ -21,7 +21,7 @@ class IntegrationsController extends Controller
      */
     public function googleWorkspace(Request $request)
     {
-        $organization = $request->user()->organizations()->first();
+        $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
         
         $integration = \App\Domain\Integrations\Models\Integration::firstOrCreate(
             ['organization_id' => $organization->id, 'provider' => 'google_workspace'],
@@ -45,7 +45,7 @@ class IntegrationsController extends Controller
             'tenant' => 'nullable|string',
         ]);
 
-        $organization = $request->user()->organizations()->first();
+        $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
         
         $integration = \App\Domain\Integrations\Models\Integration::firstOrCreate(
             ['organization_id' => $organization->id, 'provider' => $provider],
@@ -75,7 +75,7 @@ class IntegrationsController extends Controller
      */
     public function connect(Request $request, string $provider, \App\Domain\Integrations\Services\IntegrationManager $manager)
     {
-        $organization = $request->user()->organization;
+        $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
 
         // Aqui nós buscaríamos da tabela `integration_configs` a configuração da organização
         $configModel = \App\Domain\Integrations\Models\IntegrationConfig::whereHas('integration', function ($query) use ($organization, $provider) {
@@ -105,7 +105,7 @@ class IntegrationsController extends Controller
      */
     public function callback(Request $request, string $provider, \App\Domain\Integrations\Services\IntegrationManager $manager)
     {
-        $organization = $request->user()->organization;
+        $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
 
         $configModel = \App\Domain\Integrations\Models\IntegrationConfig::whereHas('integration', function ($query) use ($organization, $provider) {
             $query->where('organization_id', $organization->id)->where('provider', $provider);
@@ -138,7 +138,7 @@ class IntegrationsController extends Controller
      */
     public function disconnect(Request $request, string $provider, \App\Domain\Integrations\Services\IntegrationManager $manager)
     {
-        $organization = $request->user()->organization;
+        $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
 
         try {
             $connector = $manager->getConnector($provider);
