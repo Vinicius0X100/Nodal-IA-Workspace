@@ -130,4 +130,106 @@ class GoogleWorkspaceConnector implements ConnectorInterface
         // Tenta fazer um hit simples numa API base do Google para ver se o token é válido
         return $this->getStatus($organization) === 'connected';
     }
+
+    /**
+     * Busca informações da organização no Google Workspace.
+     * 
+     * @param \App\Domain\Integrations\Models\Integration $integration
+     * @return array
+     */
+    public function getOrganizationData(\App\Domain\Integrations\Models\Integration $integration): array
+    {
+        if (!$integration->access_token) {
+            throw new Exception("Integração não possui token de acesso válido.");
+        }
+
+        $token = $integration->access_token;
+        
+        // As APIs do Directory geralmente requerem o parâmetro customer=my_customer
+        // quando chamado pelo próprio administrador autenticado.
+        
+        // 1. Obter domínios
+        $domainsResponse = \Illuminate\Support\Facades\Http::withToken($token)
+            ->get('https://admin.googleapis.com/admin/directory/v1/customer/my_customer/domains');
+            
+        if (!$domainsResponse->successful()) {
+            throw new Exception("Falha ao buscar domínios da organização: " . $domainsResponse->body());
+        }
+        
+        $domains = $domainsResponse->json('domains', []);
+        $primaryDomain = null;
+        
+        foreach ($domains as $domain) {
+            if (isset($domain['isPrimary']) && $domain['isPrimary']) {
+                $primaryDomain = $domain['domainName'];
+                break;
+            }
+        }
+        if (!$primaryDomain && count($domains) > 0) {
+            $primaryDomain = $domains[0]['domainName'];
+        }
+
+        // 2. Obter usuários
+        $usersResponse = \Illuminate\Support\Facades\Http::withToken($token)
+            ->get('https://admin.googleapis.com/admin/directory/v1/users', [
+                'customer' => 'my_customer',
+                'maxResults' => 500, // Ajustar depois para paginação se necessário
+            ]);
+            
+        if (!$usersResponse->successful()) {
+            throw new Exception("Falha ao buscar usuários: " . $usersResponse->body());
+        }
+        
+        $users = $usersResponse->json('users', []);
+        $totalUsers = count($users);
+        
+        // Descobrir o customerId através do primeiro usuário, se disponível
+        $customerId = $users[0]['customerId'] ?? null;
+        
+        // Descobrir o administrador autenticado
+        // Podemos descobrir pelas claims do token se usarmos o oauth2/v3/userinfo
+        $adminInfoResponse = \Illuminate\Support\Facades\Http::withToken($token)
+            ->get('https://www.googleapis.com/oauth2/v3/userinfo');
+            
+        $adminEmail = null;
+        $adminName = null;
+        
+        if ($adminInfoResponse->successful()) {
+            $adminData = $adminInfoResponse->json();
+            $adminEmail = $adminData['email'] ?? null;
+            $adminName = $adminData['name'] ?? null;
+        }
+
+        // 3. Obter grupos
+        $groupsResponse = \Illuminate\Support\Facades\Http::withToken($token)
+            ->get('https://admin.googleapis.com/admin/directory/v1/groups', [
+                'customer' => 'my_customer',
+                'maxResults' => 500,
+            ]);
+            
+        $totalGroups = 0;
+        if ($groupsResponse->successful()) {
+            $totalGroups = count($groupsResponse->json('groups', []));
+        }
+        
+        // Nome da organização
+        $organizationName = $primaryDomain ? ucfirst(explode('.', $primaryDomain)[0]) : 'Google Workspace Organization';
+
+        return [
+            'customer_id' => $customerId,
+            'organization_name' => $organizationName,
+            'primary_domain' => $primaryDomain,
+            'customer_type' => 'google_workspace',
+            'admin_email' => $adminEmail,
+            'admin_name' => $adminName,
+            'total_users' => $totalUsers,
+            'total_groups' => $totalGroups,
+            'original_response' => [
+                'domains' => $domainsResponse->json(),
+                'users' => $usersResponse->json(),
+                'groups' => $groupsResponse->json(),
+                'admin_info' => $adminInfoResponse->json(),
+            ]
+        ];
+    }
 }

@@ -1,7 +1,7 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import React, { useState } from 'react';
-import { ArrowLeft, ExternalLink, KeySquare, ShieldCheck, FileText, Settings2, Users, Activity, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, KeySquare, ShieldCheck, FileText, Settings2, Users, Activity, CheckCircle2, Building2, Globe, Clock, UserCircle, RefreshCcw } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
@@ -46,6 +46,16 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
         }
     };
 
+    const handleSyncOrganization = () => {
+        if (!integration?.id) return;
+        router.post(route('integrations.google-workspace.organization.sync', { integrationId: integration.id }), {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                // Notificação de sucesso pode ser lidada por um toast genérico do layout, se houver
+            }
+        });
+    };
+
     const statusBadge = () => {
         if (!integration || integration.status === 'not_connected') {
             return <span className="px-3 py-1 bg-neutral-100 text-neutral-600 rounded-full text-xs font-bold uppercase tracking-widest border border-neutral-200">Não conectado</span>;
@@ -87,6 +97,9 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                     <TabsList className="bg-transparent border-b border-neutral-200 w-full justify-start rounded-none h-auto p-0 gap-6">
                         <TabsTrigger value="general" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                             <FileText className="w-4 h-4 mr-2" /> Geral
+                        </TabsTrigger>
+                        <TabsTrigger value="organization" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                            <Building2 className="w-4 h-4 mr-2" /> Organização
                         </TabsTrigger>
                         <TabsTrigger value="config" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                             <Settings2 className="w-4 h-4 mr-2" /> Configuração
@@ -152,6 +165,144 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                                     </Button>
                                 )}
                             </div>
+                        </TabsContent>
+
+                        {/* TAB: ORGANIZAÇÃO */}
+                        <TabsContent value="organization" className="space-y-6">
+                            {integration?.status === 'connected' ? (
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between bg-white border border-neutral-200 rounded-2xl p-6">
+                                        <div>
+                                            <h3 className="text-lg font-bold text-neutral-900">Dados da Organização</h3>
+                                            <p className="text-neutral-500 text-sm mt-1">
+                                                Informações importadas do Google Workspace.
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <Button variant="outline" onClick={() => document.querySelector<HTMLElement>('[data-state="inactive"][value="logs"]')?.click()}>
+                                                Ver logs
+                                            </Button>
+                                            <Button variant="outline" onClick={() => document.querySelector<HTMLElement>('[data-state="inactive"][value="config"]')?.click()}>
+                                                Reconectar
+                                            </Button>
+                                            <Button onClick={handleSyncOrganization} className="bg-primary-600 hover:bg-primary-700">
+                                                <RefreshCcw className="w-4 h-4 mr-2" /> Sincronizar agora
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {integration.organization_data ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            {/* Organização */}
+                                            <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col justify-between">
+                                                <div className="flex items-center gap-3 text-neutral-500 mb-4">
+                                                    <Building2 className="w-5 h-5" />
+                                                    <span className="font-semibold text-sm uppercase tracking-wide">Organização</span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-2xl font-bold text-neutral-900 truncate">
+                                                        {integration.organization_data.organization_name || 'N/A'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Domínio */}
+                                            <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col justify-between">
+                                                <div className="flex items-center gap-3 text-neutral-500 mb-4">
+                                                    <Globe className="w-5 h-5" />
+                                                    <span className="font-semibold text-sm uppercase tracking-wide">Domínio Principal</span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-2xl font-bold text-neutral-900 truncate">
+                                                        {integration.organization_data.primary_domain || 'N/A'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Usuários */}
+                                            <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col justify-between">
+                                                <div className="flex items-center gap-3 text-neutral-500 mb-4">
+                                                    <Users className="w-5 h-5" />
+                                                    <span className="font-semibold text-sm uppercase tracking-wide">Usuários</span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-2xl font-bold text-neutral-900">
+                                                        {integration.organization_data.total_users ?? 0}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Grupos */}
+                                            <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col justify-between">
+                                                <div className="flex items-center gap-3 text-neutral-500 mb-4">
+                                                    <Users className="w-5 h-5" />
+                                                    <span className="font-semibold text-sm uppercase tracking-wide">Grupos</span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-2xl font-bold text-neutral-900">
+                                                        {integration.organization_data.total_groups ?? 0}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Administrador */}
+                                            <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col justify-between">
+                                                <div className="flex items-center gap-3 text-neutral-500 mb-4">
+                                                    <UserCircle className="w-5 h-5" />
+                                                    <span className="font-semibold text-sm uppercase tracking-wide">Administrador</span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-lg font-bold text-neutral-900 truncate">
+                                                        {integration.organization_data.admin_name || 'N/A'}
+                                                    </p>
+                                                    <p className="text-sm text-neutral-500 truncate mt-1">
+                                                        {integration.organization_data.admin_email || 'N/A'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Última Sincronização */}
+                                            <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col justify-between">
+                                                <div className="flex items-center gap-3 text-neutral-500 mb-4">
+                                                    <Clock className="w-5 h-5" />
+                                                    <span className="font-semibold text-sm uppercase tracking-wide">Última Sincronização</span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-lg font-bold text-neutral-900 truncate">
+                                                        {integration.organization_data.last_synced_at ? new Date(integration.organization_data.last_synced_at).toLocaleString('pt-BR') : 'Nunca sincronizado'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center">
+                                            <div className="w-16 h-16 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center mx-auto mb-4">
+                                                <Building2 className="w-8 h-8 text-neutral-300" />
+                                            </div>
+                                            <h3 className="text-lg font-semibold text-neutral-900 mb-1">Nenhum dado sincronizado</h3>
+                                            <p className="text-neutral-500 max-w-sm mx-auto mb-6">
+                                                A conexão com o Google Workspace está ativa, mas a organização ainda não foi sincronizada.
+                                            </p>
+                                            <Button onClick={handleSyncOrganization} className="bg-primary-600 hover:bg-primary-700">
+                                                <RefreshCcw className="w-4 h-4 mr-2" /> Sincronizar agora
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center">
+                                    <div className="w-16 h-16 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center mx-auto mb-4">
+                                        <Building2 className="w-8 h-8 text-neutral-300" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-neutral-900 mb-1">Integração não conectada</h3>
+                                    <p className="text-neutral-500 max-w-sm mx-auto mb-6">
+                                        Conecte sua conta do Google Workspace para visualizar e sincronizar os dados da organização.
+                                    </p>
+                                    <Button onClick={() => document.querySelector<HTMLElement>('[data-state="inactive"][value="config"]')?.click()}>
+                                        Ir para Configuração
+                                    </Button>
+                                </div>
+                            )}
                         </TabsContent>
 
                         {/* TAB: CONFIGURAÇÃO */}

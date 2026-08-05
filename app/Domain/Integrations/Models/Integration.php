@@ -54,4 +54,9 @@ class Integration extends Model
     {
         return $this->hasMany(IntegrationLog::class);
     }
+
+    public function organizationData(): HasOne
+    {
+        return $this->hasOne(IntegrationOrganization::class);
+    }
 }

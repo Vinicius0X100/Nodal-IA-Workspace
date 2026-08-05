@@ -70,6 +70,9 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/{provider}/config', [IntegrationsController::class, 'saveConfig'])->name('config');
             Route::get('/{provider}/connect', [IntegrationsController::class, 'connect'])->name('connect');
             Route::post('/{provider}/disconnect', [IntegrationsController::class, 'disconnect'])->name('disconnect');
+            
+            // Organização Específico (Google Workspace)
+            Route::post('/google-workspace/organization/{integrationId}/sync', [\App\Http\Controllers\Integrations\GoogleOrganizationController::class, 'sync'])->name('google-workspace.organization.sync');
         });
 
         // O callback do OAuth fica fora do prefix 'integrations' por clareza (ex: /oauth/google/callback)
