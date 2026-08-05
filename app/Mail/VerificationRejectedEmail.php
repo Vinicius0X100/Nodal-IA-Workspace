@@ -42,7 +42,7 @@ class VerificationRejectedEmail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.verifications.rejected',
+            view: 'emails.verifications.rejected',
             with: [
                 'reason' => $this->reason,
                 'organizationName' => $this->organizationName,
