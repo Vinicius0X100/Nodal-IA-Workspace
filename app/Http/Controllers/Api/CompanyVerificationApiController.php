@@ -43,16 +43,10 @@ class CompanyVerificationApiController extends Controller
         $verification = CompanyVerification::findByUuidOrFail($uuid);
         $verification->load('organization');
 
-        // Generate a temporary signed URL if using S3, or a full URL if local
+        // URL segura que passa pela mesma API para garantir que o SaaS envie o Header X-System-Api-Key
         $documentUrl = null;
         if ($verification->document_path) {
-            $disk = Storage::disk(config('filesystems.default'));
-            if (config('filesystems.default') === 's3') {
-                $documentUrl = $disk->temporaryUrl($verification->document_path, now()->addMinutes(60));
-            } else {
-                // If local, we return the direct url (assuming it's symlinked to public)
-                $documentUrl = url(Storage::url($verification->document_path));
-            }
+            $documentUrl = url("/api/v1/verifications/{$verification->uuid}/document");
         }
 
         return response()->json([
@@ -66,6 +60,22 @@ class CompanyVerificationApiController extends Controller
             'submitted_at' => $verification->submitted_at,
             'reviewed_at' => $verification->verified_at,
         ]);
+    }
+
+    /**
+     * Download a secure document from the private storage.
+     */
+    public function downloadDocument($uuid)
+    {
+        $verification = CompanyVerification::findByUuidOrFail($uuid);
+
+        if (!$verification->document_path || !Storage::disk('private')->exists($verification->document_path)) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+
+        $originalName = $verification->document_original_name ?? 'document.pdf';
+        
+        return Storage::disk('private')->download($verification->document_path, $originalName);
     }
 
     /**
