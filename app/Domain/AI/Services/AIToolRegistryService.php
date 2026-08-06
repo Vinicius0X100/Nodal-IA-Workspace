@@ -46,9 +46,9 @@ class AIToolRegistryService
     {
         $slugs = [];
 
-        if ($integration->provider === 'google') {
+        if ($integration->provider === 'google_workspace') {
             $slugs = array_merge($slugs, $this->registerGoogleWorkspaceTools($organization, $integration));
-        } elseif ($integration->provider === 'microsoft') {
+        } elseif ($integration->provider === 'microsoft_365' || $integration->provider === 'microsoft') {
             $slugs = array_merge($slugs, $this->registerMicrosoft365Tools($organization, $integration));
         }
         
