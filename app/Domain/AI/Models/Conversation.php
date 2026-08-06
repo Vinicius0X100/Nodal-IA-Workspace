@@ -19,6 +19,7 @@ class Conversation extends Model
 
     protected $casts = [
         'status' => ConversationStatus::class,
+        'is_pinned' => 'boolean',
     ];
 
     public function organization(): BelongsTo

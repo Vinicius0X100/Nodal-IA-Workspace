@@ -31,7 +31,7 @@ class ConversationService
             ->where('user_id', $userId)
             ->where('status', ConversationStatus::ACTIVE)
             ->orderByDesc('updated_at')
-            ->get(['id', 'uuid', 'title', 'created_at', 'updated_at']);
+            ->get(['id', 'uuid', 'title', 'is_pinned', 'created_at', 'updated_at']);
 
         return $this->groupByPeriod($conversations);
     }
@@ -65,13 +65,14 @@ class ConversationService
     }
 
     /**
-     * Agrupa as conversas por período de tempo (Hoje, Ontem, Últimos 7 dias, Últimos 30 dias).
+     * Agrupa as conversas por período de tempo (Fixados, Hoje, Ontem, etc).
      */
     private function groupByPeriod(Collection $conversations): array
     {
         $now = Carbon::now();
 
         $groups = [
+            'pinned' => ['label' => 'Fixados', 'items' => []],
             'today' => ['label' => 'Hoje', 'items' => []],
             'yesterday' => ['label' => 'Ontem', 'items' => []],
             'last_7_days' => ['label' => 'Últimos 7 dias', 'items' => []],
@@ -82,7 +83,9 @@ class ConversationService
         foreach ($conversations as $conversation) {
             $updatedAt = Carbon::parse($conversation->updated_at);
 
-            if ($updatedAt->isToday()) {
+            if ($conversation->is_pinned) {
+                $groups['pinned']['items'][] = $conversation;
+            } elseif ($updatedAt->isToday()) {
                 $groups['today']['items'][] = $conversation;
             } elseif ($updatedAt->isYesterday()) {
                 $groups['yesterday']['items'][] = $conversation;

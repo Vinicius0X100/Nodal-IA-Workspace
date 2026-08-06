@@ -98,15 +98,27 @@ class ConversationController extends Controller
     }
 
     /**
-     * Renomeia uma conversa.
+     * Atualiza uma conversa (Renomear ou Fixar).
      */
     public function update(Request $request, string $uuid): RedirectResponse
     {
-        $request->validate(['title' => 'required|string|max:255']);
+        $request->validate([
+            'title' => 'sometimes|required|string|max:255',
+            'is_pinned' => 'sometimes|required|boolean',
+        ]);
 
         $organizationId = session('active_organization_id');
+        $conversation = $this->conversationService->findOrFail($organizationId, $uuid);
 
-        $this->conversationService->rename($organizationId, $uuid, $request->input('title'));
+        if ($request->has('title')) {
+            $conversation->title = $request->input('title');
+        }
+
+        if ($request->has('is_pinned')) {
+            $conversation->is_pinned = $request->input('is_pinned');
+        }
+
+        $conversation->save();
 
         return back();
     }

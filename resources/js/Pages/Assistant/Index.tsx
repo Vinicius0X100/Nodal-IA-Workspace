@@ -8,9 +8,25 @@ import {
     Send, Paperclip, Mic, MessageSquare, ArrowLeft,
     FileText, FileSpreadsheet, BarChart3, Search as SearchIcon,
     FileSearch, PresentationIcon, X, Check, Loader2,
-    Sparkles, Menu, Edit
+    Sparkles, Menu, Edit, MoreHorizontal, Pin, PinOff, Edit2, Trash
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/Components/ui/dropdown-menu';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/Components/ui/dialog';
+import { Button } from '@/Components/ui/button';
+import { Input } from '@/Components/ui/input';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +48,7 @@ interface Conversation {
 interface ConversationItem {
     uuid: string;
     title: string;
+    is_pinned?: boolean;
     updated_at: string;
 }
 
@@ -345,6 +362,42 @@ function ConversationSidebar({
     onClose: () => void;
 }) {
     const [search, setSearch] = useState('');
+    const [editingUuid, setEditingUuid] = useState<string | null>(null);
+    const [editTitle, setEditTitle] = useState('');
+    const [conversationToDelete, setConversationToDelete] = useState<ConversationItem | null>(null);
+    const editInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (editingUuid) {
+            editInputRef.current?.focus();
+        }
+    }, [editingUuid]);
+
+    const handleRename = (uuid: string) => {
+        if (!editTitle.trim()) {
+            setEditingUuid(null);
+            return;
+        }
+        router.patch(route('assistant.update', uuid), { title: editTitle }, { preserveScroll: true });
+        setEditingUuid(null);
+    };
+
+    const handleTogglePin = (uuid: string, currentPin: boolean) => {
+        router.patch(route('assistant.update', uuid), { is_pinned: !currentPin }, { preserveScroll: true });
+    };
+
+    const handleDelete = () => {
+        if (!conversationToDelete) return;
+        router.delete(route('assistant.destroy', conversationToDelete.uuid), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setConversationToDelete(null);
+                if (activeUuid === conversationToDelete.uuid) {
+                    router.visit(route('assistant.index'));
+                }
+            }
+        });
+    };
 
     const filteredGroups = search
         ? groups.map((g) => ({
@@ -408,21 +461,69 @@ function ConversationSidebar({
                                         </p>
                                         <div className="space-y-1">
                                             {group.items.map((item) => (
-                                                <button
-                                                    key={item.uuid}
-                                                    onClick={() => {
-                                                        router.visit(route('assistant.show', item.uuid));
-                                                        onClose();
-                                                    }}
-                                                    className={`w-full text-left px-4 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-                                                        item.uuid === activeUuid
-                                                            ? 'bg-blue-50 text-blue-700'
-                                                            : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-                                                    }`}
-                                                >
-                                                    <MessageSquare className={`w-4 h-4 flex-shrink-0 ${item.uuid === activeUuid ? 'text-blue-500' : 'text-neutral-400'}`} />
-                                                    <span className="truncate flex-1">{item.title || 'Nova Conversa'}</span>
-                                                </button>
+                                                <div key={item.uuid} className="group/item relative flex items-center">
+                                                    {editingUuid === item.uuid ? (
+                                                        <div className="w-full px-2 py-1.5 flex items-center gap-2">
+                                                            <Input
+                                                                ref={editInputRef}
+                                                                value={editTitle}
+                                                                onChange={(e) => setEditTitle(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') handleRename(item.uuid);
+                                                                    if (e.key === 'Escape') setEditingUuid(null);
+                                                                }}
+                                                                onBlur={() => handleRename(item.uuid)}
+                                                                className="h-8 text-[13px]"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                onClick={() => {
+                                                                    router.visit(route('assistant.show', item.uuid));
+                                                                    onClose();
+                                                                }}
+                                                                className={`w-full text-left pl-4 pr-10 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                                                                    item.uuid === activeUuid
+                                                                        ? 'bg-blue-50 text-blue-700'
+                                                                        : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+                                                                }`}
+                                                            >
+                                                                <MessageSquare className={`w-4 h-4 flex-shrink-0 ${item.uuid === activeUuid ? 'text-blue-500' : 'text-neutral-400'}`} />
+                                                                <span className="truncate flex-1">{item.title || 'Nova Conversa'}</span>
+                                                                {item.is_pinned && <Pin className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" />}
+                                                            </button>
+
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <button className="absolute right-2 opacity-0 group-hover/item:opacity-100 p-1.5 rounded-lg hover:bg-neutral-200 text-neutral-500 transition-all focus:opacity-100">
+                                                                        <MoreHorizontal className="w-4 h-4" />
+                                                                    </button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end" className="w-48">
+                                                                    <DropdownMenuItem onClick={() => {
+                                                                        setEditingUuid(item.uuid);
+                                                                        setEditTitle(item.title);
+                                                                    }}>
+                                                                        <Edit2 className="w-4 h-4 mr-2" />
+                                                                        Renomear
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={() => handleTogglePin(item.uuid, item.is_pinned ?? false)}>
+                                                                        {item.is_pinned ? (
+                                                                            <><PinOff className="w-4 h-4 mr-2" /> Desafixar</>
+                                                                        ) : (
+                                                                            <><Pin className="w-4 h-4 mr-2" /> Fixar</>
+                                                                        )}
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem className="text-red-600 focus:bg-red-50 focus:text-red-700" onClick={() => setConversationToDelete(item)}>
+                                                                        <Trash className="w-4 h-4 mr-2" />
+                                                                        Excluir
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </>
+                                                    )}
+                                                </div>
                                             ))}
                                         </div>
                                     </div>
@@ -430,6 +531,22 @@ function ConversationSidebar({
                             )}
                         </div>
                     </motion.div>
+
+                    {/* Delete Confirmation Dialog */}
+                    <Dialog open={!!conversationToDelete} onOpenChange={(open) => !open && setConversationToDelete(null)}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Excluir conversa?</DialogTitle>
+                                <DialogDescription>
+                                    Tem certeza que deseja excluir "{conversationToDelete?.title}"? Esta ação não pode ser desfeita.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setConversationToDelete(null)}>Cancelar</Button>
+                                <Button variant="destructive" onClick={handleDelete}>Excluir</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </>
             )}
         </AnimatePresence>
