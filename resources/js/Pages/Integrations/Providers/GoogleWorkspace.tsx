@@ -82,13 +82,13 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config }: 
                         <ArrowLeft className="w-4 h-4" /> Voltar para integrações
                     </Link>
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-2xl border border-neutral-200 bg-white p-3 flex items-center justify-center shadow-sm">
-                                <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google Workspace" className="w-full h-full object-contain" />
+                        <div className="flex items-center gap-5">
+                            <div className="w-20 h-20 rounded-[1.25rem] border border-neutral-200 bg-white p-4 flex items-center justify-center shadow-sm">
+                                <img src="/images/google-logo.svg" alt="Google Workspace" className="w-full h-full object-contain drop-shadow-sm" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold tracking-tight text-neutral-900">Google Workspace</h2>
-                                <p className="text-neutral-500 text-sm">Sincronização de diretório, usuários e permissões corporativas.</p>
+                                <h2 className="text-3xl font-bold tracking-tight text-neutral-900">Google Workspace</h2>
+                                <p className="text-neutral-500 text-[15px] mt-1.5">Sincronização de diretório, usuários e permissões corporativas.</p>
                             </div>
                         </div>
                         {statusBadge()}
