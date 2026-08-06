@@ -1,0 +1,41 @@
+<?php
+
+namespace App\Domain\Resources\Enums;
+
+enum ResourceType: string
+{
+    case FOLDER = 'folder';
+    case SHARED_DRIVE = 'shared_drive';
+    case DOCUMENT = 'document';
+    case SPREADSHEET = 'spreadsheet';
+    case PRESENTATION = 'presentation';
+    case PDF = 'pdf';
+    case IMAGE = 'image';
+    case VIDEO = 'video';
+    case AUDIO = 'audio';
+    case CALENDAR = 'calendar';
+    case FORM = 'form';
+    case DRAWING = 'drawing';
+    case SHORTCUT = 'shortcut';
+    case OTHER = 'other';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::FOLDER => 'Pasta',
+            self::SHARED_DRIVE => 'Drive Compartilhado',
+            self::DOCUMENT => 'Documento',
+            self::SPREADSHEET => 'Planilha',
+            self::PRESENTATION => 'Apresentação',
+            self::PDF => 'PDF',
+            self::IMAGE => 'Imagem',
+            self::VIDEO => 'Vídeo',
+            self::AUDIO => 'Áudio',
+            self::CALENDAR => 'Calendário',
+            self::FORM => 'Formulário',
+            self::DRAWING => 'Desenho',
+            self::SHORTCUT => 'Atalho',
+            self::OTHER => 'Outro',
+        };
+    }
+}

@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'n8n' => [
+        'webhook_url' => env('N8N_WEBHOOK_URL'),
+    ],
+
+    'ai_gateway' => [
+        'token' => env('AI_GATEWAY_TOKEN'),
+    ],
+
 ];

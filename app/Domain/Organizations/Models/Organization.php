@@ -63,6 +63,11 @@ class Organization extends Model
         return $this->hasMany(Setting::class);
     }
 
+    public function groups(): HasMany
+    {
+        return $this->hasMany(\App\Domain\Directory\Models\Group::class);
+    }
+
     public function verification(): HasOne
     {
         return $this->hasOne(CompanyVerification::class);

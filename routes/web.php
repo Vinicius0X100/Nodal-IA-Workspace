@@ -90,7 +90,21 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/settings', [\App\Http\Controllers\Settings\SettingsController::class, 'update'])->name('settings.update');
         Route::post('/settings/verification', [\App\Http\Controllers\Settings\SettingsController::class, 'storeVerification'])->name('settings.verification.store');
 
+        // Resources
+        Route::get('/resources', [\App\Http\Controllers\Resources\ResourceExplorerController::class, 'index'])->name('resources.index');
+        Route::post('/resources/sync', [\App\Http\Controllers\Resources\ResourceExplorerController::class, 'sync'])->name('resources.sync');
+
+        // AI Assistant
+        Route::prefix('assistant')->name('assistant.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\AI\ConversationController::class, 'index'])->name('index');
+            Route::post('/conversations', [\App\Http\Controllers\AI\ConversationController::class, 'store'])->name('store');
+            Route::get('/{uuid}', [\App\Http\Controllers\AI\ConversationController::class, 'show'])->name('show');
+            Route::patch('/{uuid}', [\App\Http\Controllers\AI\ConversationController::class, 'update'])->name('update');
+            Route::delete('/{uuid}', [\App\Http\Controllers\AI\ConversationController::class, 'destroy'])->name('destroy');
+            Route::post('/{uuid}/messages', [\App\Http\Controllers\AI\MessageController::class, 'store'])->name('messages.store');
+        });
+
         // As demais rotas serão implementadas nos respectivos controllers depois:
-        // Integrations, Audit
+        // Audit
     });
 });

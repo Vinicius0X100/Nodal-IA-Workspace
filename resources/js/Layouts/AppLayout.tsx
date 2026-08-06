@@ -5,6 +5,8 @@ import {
     Settings,
     Blocks,
     Activity,
+    Files,
+    BotMessageSquare,
     LogOut,
     ChevronDown,
     UserCircle,
@@ -86,7 +88,9 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
         {
             title: 'Geral',
             items: [
+                { name: 'IA', href: route('assistant.index'), icon: BotMessageSquare, active: route().current('assistant.*') },
                 { name: 'Dashboard', href: route('dashboard'), icon: LayoutDashboard, active: route().current('dashboard') },
+                { name: 'Resources', href: route('resources.index'), icon: Files, active: route().current('resources.*') },
             ]
         },
         {

@@ -11,7 +11,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(
+            \App\Domain\AI\Contracts\AIProviderInterface::class,
+            \App\Domain\AI\Providers\N8nProvider::class
+        );
     }
 
     /**

@@ -31,3 +31,12 @@ Route::prefix('v1')->group(function () {
         ->middleware('signed')
         ->name('api.verifications.document');
 });
+
+// AI Gateway API (n8n)
+Route::prefix('ai')->middleware('ai.gateway')->group(function () {
+    Route::get('/organization', [\App\Domain\AI\Api\Controllers\AIOrganizationController::class, 'index']);
+    Route::get('/users', [\App\Domain\AI\Api\Controllers\AIUsersController::class, 'index']);
+    Route::get('/groups', [\App\Domain\AI\Api\Controllers\AIGroupsController::class, 'index']);
+    Route::get('/resources/search', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'search']);
+    Route::get('/resources/{uuid}', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'show']);
+});

@@ -46,6 +46,16 @@ class User extends Authenticatable implements MustVerifyEmail
             ->withTimestamps();
     }
 
+    public function verifications(): HasMany
+    {
+        return $this->hasMany(\App\Domain\Identity\Models\Verification::class);
+    }
+
+    public function groups(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(\App\Domain\Directory\Models\Group::class);
+    }
+
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class);
