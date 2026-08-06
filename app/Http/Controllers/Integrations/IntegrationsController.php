@@ -110,8 +110,12 @@ class IntegrationsController extends Controller
     /**
      * Callback do OAuth (retorno após o consentimento do usuário)
      */
-    public function callback(Request $request, string $provider, \App\Domain\Integrations\Services\IntegrationManager $manager)
-    {
+    public function callback(
+        Request $request,
+        string $provider,
+        \App\Domain\Integrations\Services\IntegrationManager $manager,
+        \App\Domain\AI\Services\AIToolRegistryService $aiToolRegistry
+    ) {
         $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
 
         $configModel = \App\Domain\Integrations\Models\IntegrationConfig::whereHas('integration', function ($query) use ($organization, $provider) {
@@ -133,6 +137,9 @@ class IntegrationsController extends Controller
                 ->where('provider', $provider)
                 ->update(['status' => 'connected']);
 
+            // Sincroniza as ferramentas de IA
+            $aiToolRegistry->syncIntegrationTools($organization);
+
             return redirect()->route("integrations." . str_replace('_', '-', $provider))->with('success', 'Integração conectada com sucesso!');
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Erro OAuth Callback {$provider}: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
@@ -143,8 +150,12 @@ class IntegrationsController extends Controller
     /**
      * Desconecta e revoga os tokens
      */
-    public function disconnect(Request $request, string $provider, \App\Domain\Integrations\Services\IntegrationManager $manager)
-    {
+    public function disconnect(
+        Request $request,
+        string $provider,
+        \App\Domain\Integrations\Services\IntegrationManager $manager,
+        \App\Domain\AI\Services\AIToolRegistryService $aiToolRegistry
+    ) {
         $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
 
         try {
@@ -152,9 +163,16 @@ class IntegrationsController extends Controller
             $connector->disconnect($organization);
 
             // Atualiza status na tabela principal
-            \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
                 ->where('provider', $provider)
-                ->update(['status' => 'not_connected']);
+                ->first();
+
+            if ($integration) {
+                $integration->update(['status' => 'not_connected']);
+                
+                // Remove as ferramentas da IA para essa integração
+                $aiToolRegistry->unregisterIntegrationTools($integration);
+            }
 
             return back()->with('success', 'Integração desconectada com sucesso.');
         } catch (\Exception $e) {
