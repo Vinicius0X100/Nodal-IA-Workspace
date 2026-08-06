@@ -32,6 +32,12 @@ class AIToolsController extends Controller
 
         $tools = $this->toolService->getActiveToolsForOrganization($organization->id);
 
+        // Auto-sync fallback para organizações que conectaram antes da funcionalidade de tools existir
+        if ($tools->isEmpty() && $organization->integrations()->where('status', 'connected')->exists()) {
+            app(\App\Domain\AI\Services\AIToolRegistryService::class)->syncIntegrationTools($organization);
+            $tools = $this->toolService->getActiveToolsForOrganization($organization->id);
+        }
+
         return response()->json([
             'success' => true,
             'data' => AIToolResource::collection($tools)

@@ -21,6 +21,13 @@ class DashboardController extends Controller
         $verification = $organization->verification;
         $verificationStatus = $verification?->verification_status ?? 'pending';
 
+        // Auto-sync AI Tools (Retro-compatibility for orgs that connected before AI Tools existed)
+        if ($organization->integrations()->where('status', 'connected')->exists()) {
+            if (\App\Domain\AI\Models\AITool::where('organization_id', $organization->id)->count() === 0) {
+                app(\App\Domain\AI\Services\AIToolRegistryService::class)->syncIntegrationTools($organization);
+            }
+        }
+
         // Alertas para o dashboard e navbar
         $alerts = [];
 
