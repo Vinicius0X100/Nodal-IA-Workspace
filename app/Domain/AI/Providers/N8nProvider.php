@@ -27,9 +27,6 @@ class N8nProvider implements AIProviderInterface
 
         $user = Auth::user();
         $organization = Organization::find($conversation->organization_id);
-        
-        // Em um cenário real, buscaríamos as integrações ativas dinamicamente
-        $activeIntegrations = ['google_workspace']; // Stub
 
         // Montar Histórico
         $history = $conversation->messages()
@@ -43,29 +40,13 @@ class N8nProvider implements AIProviderInterface
             })
             ->toArray();
 
-        // Adicionar uma mensagem de sistema injetada
-        $systemMessage = [
-            'role' => 'system',
-            'content' => "Você é o assistente inteligente do sistema Nodal. O usuário atual é {$user->name} ({$user->email}) e pertence à organização {$organization->name}. Você tem acesso às ferramentas associadas às seguintes integrações ativas: " . implode(', ', $activeIntegrations) . ". Ajude o usuário de forma clara e objetiva.",
-        ];
-
-        array_unshift($history, $systemMessage);
-
+        // Agora enviamos um payload super leve, apenas com os UUIDs.
+        // O n8n usará as Tools (nós HTTP conectando na AI API do Nodal)
+        // para buscar o contexto da organização e do usuário sob demanda.
         $payload = [
-            'context' => [
-                'organization' => [
-                    'id' => $organization->id,
-                    'name' => $organization->name,
-                    'active_integrations' => $activeIntegrations,
-                ],
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                ],
-                'conversation_uuid' => $conversation->uuid,
-                'current_date' => now()->toIso8601String(),
-            ],
+            'organization_uuid' => $organization->uuid,
+            'conversation_uuid' => $conversation->uuid,
+            'user_uuid' => $user->uuid,
             'messages' => $history,
         ];
 
