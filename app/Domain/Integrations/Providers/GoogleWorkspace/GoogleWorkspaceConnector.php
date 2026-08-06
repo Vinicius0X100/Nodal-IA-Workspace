@@ -88,24 +88,87 @@ class GoogleWorkspaceConnector implements ConnectorInterface
 
     public function disconnect(Organization $organization): void
     {
-        // Remove os tokens da base
-        \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+        $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
             ->where('provider', $this->getProviderName())
-            ->update([
+            ->first();
+
+        if ($integration && $integration->access_token) {
+            // Revogar na API do Google
+            $response = \Illuminate\Support\Facades\Http::post('https://oauth2.googleapis.com/revoke', [
+                'token' => $integration->access_token,
+            ]);
+
+            \App\Domain\Integrations\Models\IntegrationLog::create([
+                'integration_id' => $integration->id,
+                'event' => 'disconnect',
+                'status' => $response->successful() ? 'success' : 'warning',
+                'message' => $response->successful() ? 'Token revogado com sucesso no Google.' : 'Falha ao revogar token no Google: ' . $response->body(),
+            ]);
+
+            // Remove os tokens da base
+            $integration->update([
                 'access_token' => null,
                 'refresh_token' => null,
                 'token_expires_at' => null,
                 'scope' => null,
+                'status' => 'not_connected'
             ]);
-
-        // Poderia acionar a API do Google para revogar o token lá também:
-        // Http::post('https://oauth2.googleapis.com/revoke', ['token' => $token->access_token]);
+        }
     }
 
     public function refreshToken(Organization $organization): bool
     {
-        // Aqui irá a lógica de refresh usando Guzzle ou HTTP facade
-        // Passando client_id, client_secret e refresh_token para a url token do google
+        $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+            ->where('provider', $this->getProviderName())
+            ->first();
+
+        if (!$integration || !$integration->refresh_token) {
+            return false;
+        }
+
+        $config = $integration->config;
+        if (!$config || !$config->client_id || !$config->client_secret) {
+            \App\Domain\Integrations\Models\IntegrationLog::create([
+                'integration_id' => $integration->id,
+                'event' => 'token_refresh',
+                'status' => 'error',
+                'message' => 'Faltam credenciais (client_id, client_secret) para renovar o token.',
+            ]);
+            return false;
+        }
+
+        $response = \Illuminate\Support\Facades\Http::post('https://oauth2.googleapis.com/token', [
+            'client_id' => $config->client_id,
+            'client_secret' => $config->client_secret,
+            'refresh_token' => $integration->refresh_token,
+            'grant_type' => 'refresh_token',
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            $integration->update([
+                'access_token' => $data['access_token'],
+                'token_expires_at' => now()->addSeconds($data['expires_in']),
+                'status' => 'connected'
+            ]);
+            
+            \App\Domain\Integrations\Models\IntegrationLog::create([
+                'integration_id' => $integration->id,
+                'event' => 'token_refresh',
+                'status' => 'success',
+                'message' => 'Token renovado com sucesso.',
+            ]);
+
+            return true;
+        }
+
+        \App\Domain\Integrations\Models\IntegrationLog::create([
+            'integration_id' => $integration->id,
+            'event' => 'token_refresh',
+            'status' => 'error',
+            'message' => 'Falha ao renovar token: ' . $response->body(),
+        ]);
+
         return false;
     }
 
@@ -129,7 +192,6 @@ class GoogleWorkspaceConnector implements ConnectorInterface
 
     public function health(Organization $organization): bool
     {
-        // Tenta fazer um hit simples numa API base do Google para ver se o token é válido
         return $this->getStatus($organization) === 'connected';
     }
 
@@ -147,91 +209,117 @@ class GoogleWorkspaceConnector implements ConnectorInterface
 
         $token = $integration->access_token;
         
-        // As APIs do Directory geralmente requerem o parâmetro customer=my_customer
-        // quando chamado pelo próprio administrador autenticado.
-        
-        // 1. Obter domínios
-        $domainsResponse = \Illuminate\Support\Facades\Http::withToken($token)
-            ->get('https://admin.googleapis.com/admin/directory/v1/customer/my_customer/domains');
-            
-        if (!$domainsResponse->successful()) {
-            throw new Exception("Falha ao buscar domínios da organização: " . $domainsResponse->body());
-        }
-        
-        $domains = $domainsResponse->json('domains', []);
-        $primaryDomain = null;
-        
-        foreach ($domains as $domain) {
-            if (isset($domain['isPrimary']) && $domain['isPrimary']) {
-                $primaryDomain = $domain['domainName'];
-                break;
+        try {
+            // 1. Obter domínios
+            $domainsResponse = \Illuminate\Support\Facades\Http::withToken($token)
+                ->get('https://admin.googleapis.com/admin/directory/v1/customer/my_customer/domains');
+                
+            if (!$domainsResponse->successful()) {
+                throw new Exception("Falha ao buscar domínios da organização: " . $domainsResponse->body());
             }
-        }
-        if (!$primaryDomain && count($domains) > 0) {
-            $primaryDomain = $domains[0]['domainName'];
-        }
+            
+            $domains = $domainsResponse->json('domains', []);
+            $primaryDomain = null;
+            
+            foreach ($domains as $domain) {
+                if (isset($domain['isPrimary']) && $domain['isPrimary']) {
+                    $primaryDomain = $domain['domainName'];
+                    break;
+                }
+            }
+            if (!$primaryDomain && count($domains) > 0) {
+                $primaryDomain = $domains[0]['domainName'];
+            }
 
-        // 2. Obter usuários
-        $usersResponse = \Illuminate\Support\Facades\Http::withToken($token)
-            ->get('https://admin.googleapis.com/admin/directory/v1/users', [
-                'customer' => 'my_customer',
-                'maxResults' => 500, // Ajustar depois para paginação se necessário
+            // 2. Obter usuários (Com paginação)
+            $totalUsers = 0;
+            $pageToken = null;
+            $customerId = null;
+
+            do {
+                $usersResponse = \Illuminate\Support\Facades\Http::withToken($token)
+                    ->get('https://admin.googleapis.com/admin/directory/v1/users', [
+                        'customer' => 'my_customer',
+                        'maxResults' => 500,
+                        'pageToken' => $pageToken,
+                    ]);
+                    
+                if (!$usersResponse->successful()) {
+                    throw new Exception("Falha ao buscar usuários: " . $usersResponse->body());
+                }
+                
+                $data = $usersResponse->json();
+                $users = $data['users'] ?? [];
+                
+                $totalUsers += count($users);
+                
+                if (!$customerId && !empty($users)) {
+                    $customerId = $users[0]['customerId'] ?? null;
+                }
+
+                $pageToken = $data['nextPageToken'] ?? null;
+            } while ($pageToken);
+            
+            // Descobrir o administrador autenticado
+            $adminInfoResponse = \Illuminate\Support\Facades\Http::withToken($token)
+                ->get('https://www.googleapis.com/oauth2/v3/userinfo');
+                
+            $adminEmail = null;
+            $adminName = null;
+            
+            if ($adminInfoResponse->successful()) {
+                $adminData = $adminInfoResponse->json();
+                $adminEmail = $adminData['email'] ?? null;
+                $adminName = $adminData['name'] ?? null;
+            }
+
+            // 3. Obter grupos (Com Paginação)
+            $totalGroups = 0;
+            $groupPageToken = null;
+            do {
+                $groupsResponse = \Illuminate\Support\Facades\Http::withToken($token)
+                    ->get('https://admin.googleapis.com/admin/directory/v1/groups', [
+                        'customer' => 'my_customer',
+                        'maxResults' => 500,
+                        'pageToken' => $groupPageToken,
+                    ]);
+                    
+                if ($groupsResponse->successful()) {
+                    $groupData = $groupsResponse->json();
+                    $totalGroups += count($groupData['groups'] ?? []);
+                    $groupPageToken = $groupData['nextPageToken'] ?? null;
+                } else {
+                    $groupPageToken = null;
+                }
+            } while ($groupPageToken);
+            
+            $organizationName = $primaryDomain ? ucfirst(explode('.', $primaryDomain)[0]) : 'Google Workspace Organization';
+
+            \App\Domain\Integrations\Models\IntegrationLog::create([
+                'integration_id' => $integration->id,
+                'event' => 'sync_organization',
+                'status' => 'success',
+                'message' => "Diretório sincronizado: {$totalUsers} usuários e {$totalGroups} grupos.",
             ]);
-            
-        if (!$usersResponse->successful()) {
-            throw new Exception("Falha ao buscar usuários: " . $usersResponse->body());
-        }
-        
-        $users = $usersResponse->json('users', []);
-        $totalUsers = count($users);
-        
-        // Descobrir o customerId através do primeiro usuário, se disponível
-        $customerId = $users[0]['customerId'] ?? null;
-        
-        // Descobrir o administrador autenticado
-        // Podemos descobrir pelas claims do token se usarmos o oauth2/v3/userinfo
-        $adminInfoResponse = \Illuminate\Support\Facades\Http::withToken($token)
-            ->get('https://www.googleapis.com/oauth2/v3/userinfo');
-            
-        $adminEmail = null;
-        $adminName = null;
-        
-        if ($adminInfoResponse->successful()) {
-            $adminData = $adminInfoResponse->json();
-            $adminEmail = $adminData['email'] ?? null;
-            $adminName = $adminData['name'] ?? null;
-        }
 
-        // 3. Obter grupos
-        $groupsResponse = \Illuminate\Support\Facades\Http::withToken($token)
-            ->get('https://admin.googleapis.com/admin/directory/v1/groups', [
-                'customer' => 'my_customer',
-                'maxResults' => 500,
+            return [
+                'customer_id' => $customerId,
+                'organization_name' => $organizationName,
+                'primary_domain' => $primaryDomain,
+                'customer_type' => 'google_workspace',
+                'admin_email' => $adminEmail,
+                'admin_name' => $adminName,
+                'total_users' => $totalUsers,
+                'total_groups' => $totalGroups,
+            ];
+        } catch (\Exception $e) {
+            \App\Domain\Integrations\Models\IntegrationLog::create([
+                'integration_id' => $integration->id,
+                'event' => 'sync_organization',
+                'status' => 'error',
+                'message' => $e->getMessage(),
             ]);
-            
-        $totalGroups = 0;
-        if ($groupsResponse->successful()) {
-            $totalGroups = count($groupsResponse->json('groups', []));
+            throw $e;
         }
-        
-        // Nome da organização
-        $organizationName = $primaryDomain ? ucfirst(explode('.', $primaryDomain)[0]) : 'Google Workspace Organization';
-
-        return [
-            'customer_id' => $customerId,
-            'organization_name' => $organizationName,
-            'primary_domain' => $primaryDomain,
-            'customer_type' => 'google_workspace',
-            'admin_email' => $adminEmail,
-            'admin_name' => $adminName,
-            'total_users' => $totalUsers,
-            'total_groups' => $totalGroups,
-            'original_response' => [
-                'domains' => $domainsResponse->json(),
-                'users' => $usersResponse->json(),
-                'groups' => $groupsResponse->json(),
-                'admin_info' => $adminInfoResponse->json(),
-            ]
-        ];
     }
 }

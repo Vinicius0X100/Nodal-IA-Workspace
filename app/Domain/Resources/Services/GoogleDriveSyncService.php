@@ -20,55 +20,80 @@ class GoogleDriveSyncService
      */
     public function sync(Integration $integration): void
     {
-        // 1. Obter o token de acesso usando as credenciais da integração ($integration->credentials)
-        // 2. Instanciar o Google_Client e Google_Service_Drive
-        
-        // Aqui simulamos as chamadas paginadas à API do Google Drive usando listFiles()
-        // Campos que buscaríamos na API: id, name, mimeType, webViewLink, iconLink, owners, parents, modifiedTime, createdTime, size, shortcutDetails
-        
-        // Exemplo de como transformaríamos os itens para upsert
-        $resourcesToUpsert = [];
-        
-        // --- INÍCIO DO MOCK / BOILERPLATE DE CHAMADA DA API ---
-        $items = $this->fetchFilesFromGoogleApiMock($integration);
+        if (!$integration->access_token) {
+            \Illuminate\Support\Facades\Log::warning("Cannot sync Google Drive: No access token for integration {$integration->id}");
+            return;
+        }
 
-        foreach ($items as $item) {
-            $typeInfo = $this->determineResourceType($item['mimeType'], $item);
-            
-            $resourcesToUpsert[] = [
-                'uuid' => (string) \Illuminate\Support\Str::uuid(),
-                'integration_id' => $integration->id,
-                'provider' => Provider::GOOGLE_WORKSPACE->value,
-                'resource_type' => $typeInfo['type']->value,
-                'external_id' => $item['id'],
-                'parent_external_id' => $item['parents'][0] ?? null,
-                'name' => $item['name'],
-                'description' => $item['description'] ?? null,
-                'mime_type' => $item['mimeType'],
-                'url' => $item['webViewLink'] ?? null,
-                'icon' => $item['iconLink'] ?? null,
-                'owner_name' => $item['owners'][0]['displayName'] ?? null,
-                'owner_email' => $item['owners'][0]['emailAddress'] ?? null,
-                'is_folder' => $typeInfo['is_folder'],
-                'is_shared' => $item['shared'] ?? false,
-                'size' => $item['size'] ?? null,
-                'created_by_provider_at' => isset($item['createdTime']) ? Carbon::parse($item['createdTime']) : null,
-                'updated_by_provider_at' => isset($item['modifiedTime']) ? Carbon::parse($item['modifiedTime']) : null,
-                'last_synced_at' => now(),
-                'metadata_json' => json_encode(['shortcutDetails' => $item['shortcutDetails'] ?? null]),
-            ];
-            
-            // Faz upsert em chunks de 100 para evitar timeout/memória
-            if (count($resourcesToUpsert) >= 100) {
-                $this->resourceRepository->upsertResources($resourcesToUpsert);
-                $resourcesToUpsert = [];
+        $pageToken = null;
+        $fields = 'nextPageToken, files(id, name, mimeType, webViewLink, iconLink, owners, parents, modifiedTime, createdTime, size, shortcutDetails, shared)';
+        
+        do {
+            $response = \Illuminate\Support\Facades\Http::withToken($integration->access_token)
+                ->get('https://www.googleapis.com/drive/v3/files', [
+                    'pageSize' => 100,
+                    'fields' => $fields,
+                    'pageToken' => $pageToken,
+                    'supportsAllDrives' => 'true', // Importante para Shared Drives
+                    'includeItemsFromAllDrives' => 'true',
+                ]);
+
+            if (!$response->successful()) {
+                \Illuminate\Support\Facades\Log::error("Failed to fetch Google Drive files: " . $response->body());
+                \App\Domain\Integrations\Models\IntegrationLog::create([
+                    'integration_id' => $integration->id,
+                    'event' => 'sync_drive',
+                    'status' => 'error',
+                    'message' => 'Falha ao sincronizar Google Drive: ' . $response->body(),
+                ]);
+                break;
             }
-        }
 
-        // Upsert final
-        if (!empty($resourcesToUpsert)) {
-            $this->resourceRepository->upsertResources($resourcesToUpsert);
-        }
+            $data = $response->json();
+            $files = $data['files'] ?? [];
+            $pageToken = $data['nextPageToken'] ?? null;
+
+            $resourcesToUpsert = [];
+
+            foreach ($files as $item) {
+                $typeInfo = $this->determineResourceType($item['mimeType'] ?? '', $item);
+                
+                $resourcesToUpsert[] = [
+                    'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                    'integration_id' => $integration->id,
+                    'provider' => Provider::GOOGLE_WORKSPACE->value,
+                    'resource_type' => $typeInfo['type']->value,
+                    'external_id' => $item['id'],
+                    'parent_external_id' => $item['parents'][0] ?? null,
+                    'name' => $item['name'] ?? 'Untitled',
+                    'description' => null,
+                    'mime_type' => $item['mimeType'] ?? null,
+                    'url' => $item['webViewLink'] ?? null,
+                    'icon' => $item['iconLink'] ?? null,
+                    'owner_name' => $item['owners'][0]['displayName'] ?? null,
+                    'owner_email' => $item['owners'][0]['emailAddress'] ?? null,
+                    'is_folder' => $typeInfo['is_folder'],
+                    'is_shared' => $item['shared'] ?? false,
+                    'size' => $item['size'] ?? null,
+                    'created_by_provider_at' => isset($item['createdTime']) ? Carbon::parse($item['createdTime']) : null,
+                    'updated_by_provider_at' => isset($item['modifiedTime']) ? Carbon::parse($item['modifiedTime']) : null,
+                    'last_synced_at' => now(),
+                    'metadata_json' => json_encode(['shortcutDetails' => $item['shortcutDetails'] ?? null]),
+                ];
+            }
+
+            if (!empty($resourcesToUpsert)) {
+                $this->resourceRepository->upsertResources($resourcesToUpsert);
+            }
+
+        } while ($pageToken);
+        
+        \App\Domain\Integrations\Models\IntegrationLog::create([
+            'integration_id' => $integration->id,
+            'event' => 'sync_drive',
+            'status' => 'success',
+            'message' => 'Sincronização de documentos do Google Drive concluída.',
+        ]);
     }
 
     private function determineResourceType(string $mimeType, array $item): array
@@ -114,39 +139,5 @@ class GoogleDriveSyncService
         }
 
         return ['type' => $type, 'is_folder' => $isFolder];
-    }
-
-    /**
-     * Mock function para simular a busca.
-     * Na implementação real, usaremos o Google_Service_Drive e paginação (pageToken).
-     */
-    private function fetchFilesFromGoogleApiMock(Integration $integration): array
-    {
-        return [
-            [
-                'id' => 'folder_123',
-                'name' => 'Projetos 2026',
-                'mimeType' => 'application/vnd.google-apps.folder',
-                'webViewLink' => 'https://drive.google.com/drive/folders/folder_123',
-                'iconLink' => 'https://example.com/folder_icon.png',
-                'parents' => [],
-                'owners' => [['displayName' => 'Vinicius Aquino', 'emailAddress' => 'vinicius@nodal.com']],
-                'shared' => true,
-                'createdTime' => '2026-01-01T10:00:00Z',
-                'modifiedTime' => '2026-08-01T12:00:00Z',
-            ],
-            [
-                'id' => 'doc_456',
-                'name' => 'Planejamento Q3',
-                'mimeType' => 'application/vnd.google-apps.document',
-                'webViewLink' => 'https://docs.google.com/document/d/doc_456/edit',
-                'iconLink' => 'https://example.com/doc_icon.png',
-                'parents' => ['folder_123'],
-                'owners' => [['displayName' => 'Vinicius Aquino', 'emailAddress' => 'vinicius@nodal.com']],
-                'shared' => false,
-                'createdTime' => '2026-07-01T10:00:00Z',
-                'modifiedTime' => '2026-08-05T12:00:00Z',
-            ]
-        ];
     }
 }
