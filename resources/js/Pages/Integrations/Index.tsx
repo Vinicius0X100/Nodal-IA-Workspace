@@ -19,7 +19,7 @@ const integrations = [
         description: 'Sincronize usuários, permissões e diretórios automaticamente.',
         category: 'productivity',
         status: 'not_connected', // not_connected, configuring, connected, error, coming_soon
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg',
+        logo: '/images/google-logo.svg',
         href: route('integrations.google-workspace')
     },
     {
@@ -28,7 +28,7 @@ const integrations = [
         description: 'Integração completa com Azure AD e ferramentas Office.',
         category: 'productivity',
         status: 'coming_soon',
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg',
+        logo: '/images/microsoft-logo.svg',
         href: '#'
     },
     {
@@ -37,7 +37,7 @@ const integrations = [
         description: 'Notificações e comandos direto no seu canal favorito.',
         category: 'communication',
         status: 'coming_soon',
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg',
+        logo: '/images/slack-logo.svg',
         href: '#'
     },
     {
@@ -46,7 +46,7 @@ const integrations = [
         description: 'Monitore repositórios, PRs e deploys da sua organização.',
         category: 'development',
         status: 'coming_soon',
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg',
+        logo: '/images/github-logo.svg',
         href: '#'
     },
     {
@@ -55,7 +55,7 @@ const integrations = [
         description: 'Sincronize leads, contatos e dados comerciais.',
         category: 'crm',
         status: 'coming_soon',
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/c/c8/HubSpot_Logo.png',
+        logo: '/images/hubspot-logo.svg',
         href: '#'
     },
     {
@@ -64,7 +64,7 @@ const integrations = [
         description: 'Automação de notas fiscais e controle financeiro.',
         category: 'finance',
         status: 'coming_soon',
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/ContaAzul_logo.svg/1200px-ContaAzul_logo.svg.png',
+        logo: '/images/conta-azul-logo.svg',
         href: '#'
     }
 ];
@@ -119,41 +119,41 @@ export default function IntegrationsIndex({ dbIntegrations = [] }: { dbIntegrati
                     </aside>
 
                     {/* Grid */}
-                    <div className="flex-1 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="flex-1 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                         {finalIntegrations.map(integration => (
-                            <div key={integration.id} className="group flex flex-col bg-white border border-neutral-200 rounded-2xl hover:border-neutral-300 transition-all p-5 hover:shadow-sm">
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="w-12 h-12 rounded-xl border border-neutral-100 bg-neutral-50/50 p-2.5 flex items-center justify-center">
+                            <div key={integration.id} className="group flex flex-col bg-white border border-neutral-200 rounded-3xl hover:border-blue-200 transition-all p-6 hover:shadow-md hover:-translate-y-0.5">
+                                <div className="flex items-start justify-between mb-5">
+                                    <div className="w-14 h-14 rounded-2xl border border-neutral-100 bg-white shadow-sm p-3 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
                                         <img src={integration.logo} alt={integration.name} className="w-full h-full object-contain" />
                                     </div>
                                     <span className={cn(
-                                        'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider',
-                                        integration.status === 'not_connected' && 'bg-neutral-100 text-neutral-600',
-                                        integration.status === 'configuring' && 'bg-amber-50 text-amber-600',
-                                        integration.status === 'coming_soon' && 'bg-blue-50 text-blue-600',
-                                        integration.status === 'connected' && 'bg-green-100 text-green-700',
+                                        'px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider',
+                                        integration.status === 'not_connected' && 'bg-white border border-neutral-200 text-neutral-600',
+                                        integration.status === 'configuring' && 'bg-amber-50 border border-amber-100 text-amber-700',
+                                        integration.status === 'coming_soon' && 'bg-blue-50 border border-blue-100 text-blue-700',
+                                        integration.status === 'connected' && 'bg-green-50 border border-green-200 text-green-700',
                                     )}>
                                         {integration.status === 'coming_soon' ? 'Em breve' : 
                                          integration.status === 'connected' ? 'Conectado' :
-                                         integration.status === 'configuring' ? 'Configurando' : 'Não conectado'}
+                                         integration.status === 'configuring' ? 'Configurando' : 'Desconectado'}
                                     </span>
                                 </div>
-                                <h4 className="text-base font-semibold text-neutral-900">{integration.name}</h4>
-                                <p className="text-sm text-neutral-500 mt-1 leading-relaxed line-clamp-2 mb-6 flex-1">
+                                <h4 className="text-[17px] font-bold text-neutral-900 tracking-tight">{integration.name}</h4>
+                                <p className="text-[14px] text-neutral-500 mt-2 leading-relaxed line-clamp-2 mb-8 flex-1">
                                     {integration.description}
                                 </p>
                                 
                                 {integration.status !== 'coming_soon' ? (
                                     <Link
                                         href={integration.href}
-                                        className="inline-flex items-center justify-center w-full bg-neutral-900 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-neutral-800 transition-colors group-hover:bg-primary-600"
+                                        className="inline-flex items-center justify-center w-full bg-white text-neutral-700 border border-neutral-200 rounded-xl py-2.5 text-[14px] font-semibold hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-all group-hover:shadow-sm"
                                     >
-                                        Configurar <ArrowRight className="w-4 h-4 ml-1.5" />
+                                        {integration.status === 'not_connected' ? 'Configurar' : 'Gerenciar'} <ArrowRight className="w-4 h-4 ml-1.5 opacity-70 group-hover:translate-x-0.5 transition-transform" />
                                     </Link>
                                 ) : (
                                     <button
                                         disabled
-                                        className="inline-flex items-center justify-center w-full bg-neutral-50 text-neutral-400 rounded-lg py-2.5 text-sm font-medium border border-neutral-100"
+                                        className="inline-flex items-center justify-center w-full bg-neutral-50/50 text-neutral-400 rounded-xl py-2.5 text-[14px] font-semibold border border-neutral-100 cursor-not-allowed"
                                     >
                                         Disponível em breve
                                     </button>

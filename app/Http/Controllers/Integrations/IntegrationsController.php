@@ -140,6 +140,21 @@ class IntegrationsController extends Controller
             // Sincroniza as ferramentas de IA
             $aiToolRegistry->syncIntegrationTools($organization);
 
+            // Busca as tools cadastradas para esta integração
+            $integrationModel = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', $provider)
+                ->first();
+
+            if ($integrationModel) {
+                $tools = \App\Domain\AI\Models\AITool::where('integration_id', $integrationModel->id)->get();
+                
+                // Envia notificação ao Owner
+                $owner = $organization->users()->wherePivot('is_owner', true)->first();
+                if ($owner && $tools->isNotEmpty()) {
+                    $owner->notify(new \App\Notifications\IntegrationConnectedNotification($organization, $integrationModel, $tools));
+                }
+            }
+
             return redirect()->route("integrations." . str_replace('_', '-', $provider))->with('success', 'Integração conectada com sucesso!');
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Erro OAuth Callback {$provider}: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
