@@ -11,7 +11,8 @@ use Carbon\Carbon;
 class GoogleDriveSyncService
 {
     public function __construct(
-        private ResourceRepository $resourceRepository
+        protected ResourceRepository $resourceRepository,
+        protected \App\Domain\Integrations\Services\IntegrationManager $integrationManager
     ) {
     }
 
@@ -37,6 +38,31 @@ class GoogleDriveSyncService
                     'supportsAllDrives' => 'true', // Importante para Shared Drives
                     'includeItemsFromAllDrives' => 'true',
                 ]);
+
+            if ($response->status() === 401) {
+                // Token expirado ou inválido, tenta renovar
+                \Illuminate\Support\Facades\Log::info("Token expirado para integração {$integration->id}. Tentando renovar...");
+                
+                try {
+                    $connector = $this->integrationManager->getConnector($integration->provider);
+                    if ($connector->refreshToken($integration->organization)) {
+                        // Recarrega o model para pegar o novo access_token
+                        $integration->refresh();
+                        
+                        // Tenta de novo a mesma requisição
+                        $response = \Illuminate\Support\Facades\Http::withToken($integration->access_token)
+                            ->get('https://www.googleapis.com/drive/v3/files', [
+                                'pageSize' => 100,
+                                'fields' => $fields,
+                                'pageToken' => $pageToken,
+                                'supportsAllDrives' => 'true',
+                                'includeItemsFromAllDrives' => 'true',
+                            ]);
+                    }
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Erro ao tentar renovar token: " . $e->getMessage());
+                }
+            }
 
             if (!$response->successful()) {
                 \Illuminate\Support\Facades\Log::error("Failed to fetch Google Drive files: " . $response->body());

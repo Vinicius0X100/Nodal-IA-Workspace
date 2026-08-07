@@ -16,8 +16,9 @@ class AIResourcesController
         try {
             $organization = $request->get('_active_organization');
             $query = $request->query('q', '');
+            $provider = $request->query('provider');
 
-            $resources = $this->service->search($organization, $query);
+            $resources = $this->service->search($organization, $query, $provider);
 
             return response()->json([
                 'success' => true,
@@ -53,6 +54,40 @@ class AIResourcesController
                 'success' => false,
                 'message' => 'Error fetching resource: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function content(Request $request, string $uuid): JsonResponse
+    {
+        try {
+            $organization = $request->get('_active_organization');
+            
+            $contentData = $this->service->getContent($organization, $uuid, auth()->id());
+            
+            return response()->json([
+                'success' => true,
+                'data' => $contentData,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching resource content: ' . $e->getMessage()
+            ], $e->getCode() >= 400 ? $e->getCode() : 500);
+        }
+    }
+
+    public function file(Request $request, string $uuid)
+    {
+        try {
+            $organization = $request->get('_active_organization');
+            
+            return $this->service->getFileStream($organization, $uuid, auth()->id());
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching resource file: ' . $e->getMessage()
+            ], $e->getCode() >= 400 ? $e->getCode() : 500);
         }
     }
 }

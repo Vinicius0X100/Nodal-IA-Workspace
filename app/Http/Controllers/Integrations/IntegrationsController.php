@@ -140,10 +140,15 @@ class IntegrationsController extends Controller
             // Sincroniza as ferramentas de IA
             $aiToolRegistry->syncIntegrationTools($organization);
 
-            // Busca as tools cadastradas para esta integração
+            // Inicia o processo automático de Sincronização de Recursos no servidor
+            // O usuário não precisará apertar nenhum botão, os arquivos começam a baixar agora.
             $integrationModel = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
                 ->where('provider', $provider)
                 ->first();
+            
+            if ($integrationModel) {
+                \App\Domain\Resources\Jobs\SyncProviderResourcesJob::dispatch($integrationModel, auth()->id());
+            }
 
             if ($integrationModel) {
                 $tools = \App\Domain\AI\Models\AITool::where('integration_id', $integrationModel->id)->get();
