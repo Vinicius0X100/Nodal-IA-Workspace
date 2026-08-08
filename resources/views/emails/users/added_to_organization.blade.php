@@ -1,54 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bem-vindo ao Nodal</title>
-    <!-- Importação da fonte Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body, table, td, a, p, h1, h2, h3 {
-            font-family: 'Inter', Arial, sans-serif !important;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f7; color: #1d1d1f; }
+        .wrapper { max-width: 560px; margin: 40px auto; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+        .header { background: #ffffff; padding: 40px 48px 24px; text-align: center; border-bottom: 1px solid #f0f0f5; }
+        .header img { height: 32px; width: auto; margin-bottom: 24px; }
+        .header h1 { font-size: 24px; font-weight: 700; color: #1d1d1f; letter-spacing: -0.03em; line-height: 1.2; }
+        .header p { font-size: 15px; color: #6e6e73; margin-top: 6px; }
+        .body { padding: 40px 48px; }
+        .greeting { font-size: 16px; color: #1d1d1f; margin-bottom: 16px; font-weight: 500; }
+        .text { font-size: 15px; color: #6e6e73; line-height: 1.65; margin-bottom: 24px; }
+        
+        .credentials-box { background: #f8fafc; padding: 24px; border-radius: 12px; margin-bottom: 32px; border: 1px solid #e2e8f0; }
+        .credentials-box p { margin-bottom: 12px; font-size: 14px; color: #334155; }
+        .credentials-box p:last-child { margin-bottom: 0; }
+        .credentials-box strong { color: #0f172a; }
+        .temp-password { background: #e2e8f0; padding: 4px 8px; border-radius: 6px; font-family: monospace; font-size: 16px; font-weight: 600; color: #0f172a; letter-spacing: 1px; display: inline-block; margin-top: 4px; }
+        
+        .warning-text { font-size: 13px; color: #64748b; margin-top: 12px; font-style: italic; line-height: 1.5; }
+
+        .btn-wrap { text-align: center; margin-bottom: 32px; }
+        .btn { display: inline-block; background: #000000; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 36px; border-radius: 980px; letter-spacing: -0.01em; }
+        .divider { border: none; border-top: 1px solid #f0f0f5; margin: 32px 0; }
+        .fallback { font-size: 13px; color: #8e8e93; line-height: 1.6; }
+        .fallback a { color: #000000; word-break: break-all; text-decoration: underline; }
+        .footer { background: #f5f5f7; padding: 24px 48px; text-align: center; }
+        .footer p { font-size: 12px; color: #8e8e93; line-height: 1.6; }
+        .footer a { color: #8e8e93; }
     </style>
 </head>
-<body style="font-family: 'Inter', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
-    <div style="max-width: 600px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 12px; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+<body>
+<div class="wrapper">
+    <div class="header">
+        <img src="{{ asset('images/Nodal-Logo.png') }}" alt="Nodal" />
+        <h1>Bem-vindo ao Nodal</h1>
+        <p>Você acaba de ser adicionado à equipe.</p>
+    </div>
+    <div class="body">
+        <p class="greeting">Olá, {{ $userName }} 👋</p>
         
-        <!-- Logo do Nodal Embutida -->
-        <div style="text-align: center; margin-bottom: 24px;">
-            <img src="{{ asset('images/Nodal-Logo.png') }}" alt="Nodal" style="height: 48px; width: auto;">
-        </div>
-
-        <h2 style="color: #111827; margin-top: 0; font-weight: 600;">Olá, {{ $userName }}</h2>
-        
-        <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-            Você foi adicionado à organização <strong style="color: #111827;">{{ $organizationName }}</strong> no Nodal.
+        <p class="text">
+            É com grande satisfação que informamos que você foi adicionado(a) como membro na organização <strong>{{ $organizationName }}</strong> dentro da plataforma <strong>Nodal</strong>.
         </p>
 
-        <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e5e7eb;">
-            <p style="margin: 0; color: #374151; font-size: 14px;"><strong>E-mail de acesso:</strong> {{ $email }}</p>
-            @if($temporaryPassword)
-                <p style="margin: 12px 0 0 0; color: #374151; font-size: 14px;"><strong>Senha temporária:</strong> <span style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-family: monospace;">{!! $temporaryPassword !!}</span></p>
-            @endif
-        </div>
-
-        <p style="color: #4b5563; font-size: 14px; margin-bottom: 30px;">
-            Recomendamos que você altere sua senha logo após o primeiro acesso.
+        <p class="text">
+            Abaixo estão suas credenciais de acesso exclusivas. Como este é o seu primeiro login, geramos uma senha temporária automática e segura.
         </p>
 
-        <div style="text-align: center;">
-            <a href="{{ $loginUrl }}" style="display: inline-block; background-color: #0048AA; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-                Clique aqui para acessar o Nodal
-            </a>
+        <div class="credentials-box">
+            <p><strong>E-mail de acesso:</strong><br> {{ $email }}</p>
+            <p><strong>Senha temporária:</strong><br> <span class="temp-password">{!! $temporaryPassword !!}</span></p>
+            <p class="warning-text">* Por favor, altere sua senha no painel de perfil logo após realizar o seu primeiro login.</p>
         </div>
 
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-        
-        <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">
-            Se você não esperava por este e-mail, por favor desconsidere.
+        <div class="btn-wrap">
+            <a href="{{ $loginUrl }}" class="btn">Acessar o Painel</a>
+        </div>
+        <hr class="divider">
+        <p class="fallback">
+            Se o botão não funcionar, copie e cole o link abaixo diretamente no seu navegador:<br>
+            <a href="{{ $loginUrl }}">{{ $loginUrl }}</a>
         </p>
     </div>
+    <div class="footer">
+        <p>
+            © {{ date('Y') }} <a href="https://sacratech.com">Sacratech Softwares</a>. Todos os direitos reservados.<br>
+            <strong>Nodal</strong> é um serviço da Sacratech Softwares. Marca e produto registrados.
+        </p>
+    </div>
+</div>
 </body>
 </html>

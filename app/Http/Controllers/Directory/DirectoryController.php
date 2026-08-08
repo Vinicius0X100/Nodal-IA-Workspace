@@ -41,23 +41,17 @@ class DirectoryController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'position' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],
             'role_ids' => ['array'],
             'role_ids.*' => ['exists:roles,id'],
+        ], [
+            'email.unique' => 'Este e-mail já pertence a um usuário de outra organização no sistema.',
         ]);
 
         $organizationId = session('active_organization_id');
         $organization = Organization::find($organizationId);
-
-        // Barreira: e-mail já pertence a esta organização?
-        $existingUser = \App\Domain\Identity\Models\User::where('email', $validated['email'])->first();
-        if ($existingUser && $organization->hasMember($existingUser)) {
-            return back()->withErrors([
-                'email' => 'Este e-mail já pertence a um membro desta organização.',
-            ])->onlyInput('name', 'email');
-        }
 
         $action->execute($organization, $validated, $validated['role_ids'] ?? []);
 

@@ -16,10 +16,15 @@ class DeleteOrganizationAction
                 Storage::disk('public')->delete($organization->logo);
             }
 
-            // Also delete any avatars of users that exclusively belong to this organization?
-            // Actually, for a multi-tenant SaaS, deleting the organization deletes its pivot (organization_users).
-            // But if a user only belongs to this organization, we might want to delete them too.
-            // For now, let's just delete the organization (and its related records via cascades/soft-deletes).
+            // Exclui completamente todos os usuários associados à organização do banco de dados
+            $users = $organization->users()->get();
+            foreach ($users as $user) {
+                // Delete avatar from storage if exists
+                if ($user->avatar) {
+                    Storage::disk('public')->delete($user->avatar);
+                }
+                $user->delete();
+            }
             
             $organization->delete();
         });

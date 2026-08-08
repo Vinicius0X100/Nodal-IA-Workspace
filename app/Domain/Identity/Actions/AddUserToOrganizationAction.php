@@ -16,39 +16,29 @@ class AddUserToOrganizationAction
     {
         return DB::transaction(function () use ($organization, $data, $roleIds) {
             
-            // 1. Verifica se usuário já existe globalmente no Nodal
-            $user = User::where('email', $data['email'])->first();
-            $isNewUser = !$user;
-            $temporaryPassword = null;
+            // Gera senha temporária obrigatória
+            $temporaryPassword = Str::password(12);
 
-            if ($isNewUser) {
-                // Gera senha temporária somente para usuários novos
-                $temporaryPassword = Str::password(12);
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'position' => $data['position'] ?? null,
+                'phone' => $data['phone'] ?? null,
+                'password' => Hash::make($temporaryPassword),
+            ]);
 
-                $user = User::create([
-                    'name' => $data['name'],
-                    'email' => $data['email'],
-                    'position' => $data['position'] ?? null,
-                    'phone' => $data['phone'] ?? null,
-                    'password' => Hash::make($temporaryPassword),
-                ]);
-            }
+            // Vincula à organização
+            $organization->users()->attach($user->id, [
+                'is_owner' => false,
+                'joined_at' => now(),
+            ]);
 
-            // 2. Vincula à organização se ainda não estiver vinculado
-            if (!$organization->hasMember($user)) {
-                $organization->users()->attach($user->id, [
-                    'is_owner' => false,
-                    'joined_at' => now(),
-                ]);
-            }
-
-            // 3. Associa as roles (Grupos) selecionados
+            // Associa as roles (Grupos) selecionados
             if (!empty($roleIds)) {
                 $user->roles()->syncWithPivotValues($roleIds, ['organization_id' => $organization->id]);
             }
 
-            // 4. Envia o E-mail sempre que for adicionado à organização
-            // Se já era usuário do sistema, temporaryPassword vai como null e a blade lida com isso.
+            // Envia o E-mail com a senha temporária
             Mail::to($user->email)->send(new UserAddedToOrganizationMail(
                 user: $user,
                 organization: $organization,
