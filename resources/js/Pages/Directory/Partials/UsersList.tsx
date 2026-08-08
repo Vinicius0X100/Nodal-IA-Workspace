@@ -178,16 +178,16 @@ export default function UsersList({ users, roles }: UsersListProps) {
                                 <Label className="text-xs font-semibold text-neutral-700">Grupos de Acesso (Roles)</Label>
                                 <div className="space-y-2 border border-neutral-200/80 rounded-xl p-3 bg-neutral-50/50 max-h-48 overflow-y-auto">
                                     {roles.map(role => (
-                                        <div key={role.id} className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer" onClick={() => toggleRoleAdd(role.id)}>
-                                            <Label htmlFor={`role-add-${role.id}`} className="font-medium text-sm text-neutral-800 cursor-pointer leading-none">
+                                        <label key={role.id} htmlFor={`role-add-${role.id}`} className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer">
+                                            <span className="font-medium text-sm text-neutral-800 leading-none">
                                                 {role.name}
-                                            </Label>
+                                            </span>
                                             <Switch 
                                                 id={`role-add-${role.id}`} 
                                                 checked={addForm.data.role_ids.includes(role.id)}
                                                 onCheckedChange={() => toggleRoleAdd(role.id)}
                                             />
-                                        </div>
+                                        </label>
                                     ))}
                                 </div>
                                 {addForm.errors.role_ids && <p className="text-xs text-red-500">{addForm.errors.role_ids}</p>}
@@ -356,16 +356,16 @@ export default function UsersList({ users, roles }: UsersListProps) {
                             <Label className="text-xs font-semibold text-neutral-700">Grupos de Acesso (Roles)</Label>
                             <div className="space-y-2 border border-neutral-200/80 rounded-xl p-3 bg-neutral-50/50 max-h-48 overflow-y-auto">
                                 {roles.map(role => (
-                                    <div key={role.id} className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer" onClick={() => toggleRoleEdit(role.id)}>
-                                        <Label htmlFor={`role-edit-${role.id}`} className="font-medium text-sm text-neutral-800 cursor-pointer leading-none">
+                                    <label key={role.id} htmlFor={`role-edit-${role.id}`} className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer">
+                                        <span className="font-medium text-sm text-neutral-800 leading-none">
                                             {role.name}
-                                        </Label>
+                                        </span>
                                         <Switch 
                                             id={`role-edit-${role.id}`} 
                                             checked={editForm.data.role_ids.includes(role.id)}
                                             onCheckedChange={() => toggleRoleEdit(role.id)}
                                         />
-                                    </div>
+                                    </label>
                                 ))}
                             </div>
                             {editForm.errors.role_ids && <p className="text-xs text-red-500">{editForm.errors.role_ids}</p>}
