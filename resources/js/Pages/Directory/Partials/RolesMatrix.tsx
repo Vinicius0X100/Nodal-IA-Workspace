@@ -131,26 +131,22 @@ export default function RolesMatrix({ roles, users, permissionsGrouped }: RolesM
                                     </h4>
                                     <div className="space-y-2 pt-1">
                                         {permissions.map((permission: any) => (
-                                            <div 
+                                            <label 
                                                 key={permission.id} 
-                                                onClick={() => !selectedRole.is_system && togglePermission(permission.id)}
+                                                htmlFor={`perm-${permission.id}`}
                                                 className={`flex items-center justify-between p-3 rounded-xl border border-neutral-100 bg-white transition-all duration-150 ${
                                                     selectedRole.is_system ? 'opacity-75' : 'cursor-pointer hover:border-neutral-200 hover:bg-neutral-50/50 hover:shadow-xs'
                                                 }`}
                                             >
-                                                <div className="space-y-0.5 pr-4">
-                                                    <Label 
-                                                        htmlFor={`perm-${permission.id}`} 
-                                                        className="font-medium text-sm text-neutral-900 cursor-pointer block"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
+                                                <div className="space-y-0.5 pr-4 pointer-events-none">
+                                                    <span className="font-medium text-sm text-neutral-900 block">
                                                         {permission.name}
-                                                    </Label>
+                                                    </span>
                                                     <p className="text-xs text-neutral-500">
                                                         {permission.description}
                                                     </p>
                                                 </div>
-                                                <div onClick={(e) => e.stopPropagation()}>
+                                                <div className="pointer-events-auto">
                                                     <Switch 
                                                         id={`perm-${permission.id}`}
                                                         checked={permissionsForm.data.permission_ids.includes(permission.id)}
@@ -158,7 +154,7 @@ export default function RolesMatrix({ roles, users, permissionsGrouped }: RolesM
                                                         disabled={selectedRole.is_system}
                                                     />
                                                 </div>
-                                            </div>
+                                            </label>
                                         ))}
                                     </div>
                                 </div>
