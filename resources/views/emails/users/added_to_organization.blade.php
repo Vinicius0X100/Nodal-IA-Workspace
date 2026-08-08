@@ -42,11 +42,17 @@
         <p>Você acaba de ser adicionado à equipe.</p>
     </div>
     <div class="body">
-        <p class="greeting">Olá, {{ $userName }} 👋</p>
+        <p class="greeting">Olá, {{ $userName }}</p>
         
         <p class="text">
             É com grande satisfação que informamos que você foi adicionado(a) como membro na organização <strong>{{ $organizationName }}</strong> dentro da plataforma <strong>Nodal</strong>.
         </p>
+
+        @if(isset($groupNames) && count($groupNames) > 0)
+        <p class="text" style="margin-bottom: 24px;">
+            Você foi atribuído ao(s) seguinte(s) grupo(s) de acesso: <strong>{{ implode(', ', $groupNames) }}</strong>.
+        </p>
+        @endif
 
         <p class="text">
             Abaixo estão suas credenciais de acesso exclusivas. Como este é o seu primeiro login, geramos uma senha temporária automática e segura.

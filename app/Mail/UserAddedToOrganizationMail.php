@@ -18,7 +18,8 @@ class UserAddedToOrganizationMail extends Mailable implements ShouldQueue
     public function __construct(
         public User $user,
         public Organization $organization,
-        public ?string $temporaryPassword = null
+        public ?string $temporaryPassword = null,
+        public array $groupNames = []
     ) {}
 
     public function envelope(): Envelope
@@ -37,6 +38,7 @@ class UserAddedToOrganizationMail extends Mailable implements ShouldQueue
                 'organizationName' => $this->organization->name,
                 'email' => $this->user->email,
                 'temporaryPassword' => $this->temporaryPassword,
+                'groupNames' => $this->groupNames,
                 'loginUrl' => route('login'),
             ],
         );

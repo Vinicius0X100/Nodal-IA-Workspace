@@ -39,10 +39,16 @@ class AddUserToOrganizationAction
             }
 
             // Envia o E-mail com a senha temporária
+            $groupNames = [];
+            if (!empty($roleIds)) {
+                $groupNames = \App\Domain\Roles\Models\Role::whereIn('id', $roleIds)->pluck('name')->toArray();
+            }
+
             Mail::to($user->email)->send(new UserAddedToOrganizationMail(
                 user: $user,
                 organization: $organization,
-                temporaryPassword: $temporaryPassword
+                temporaryPassword: $temporaryPassword,
+                groupNames: $groupNames
             ));
 
             return $user;
