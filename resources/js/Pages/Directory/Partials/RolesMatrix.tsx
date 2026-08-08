@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm, router } from '@inertiajs/react';
 import { Settings2, ShieldAlert, Trash2 } from 'lucide-react';
 import { Button } from '@/Components/ui/button';
-import { Checkbox } from '@/Components/ui/checkbox';
+import { Switch } from '@/Components/ui/switch';
 import { Label } from '@/Components/ui/label';
 import CreateRoleWizard from './CreateRoleWizard';
 
@@ -133,7 +133,7 @@ export default function RolesMatrix({ roles, users, permissionsGrouped }: RolesM
                                         {permissions.map((permission: any) => (
                                             <div key={permission.id} className="flex flex-col space-y-1">
                                                 <div className="flex items-center space-x-2">
-                                                    <Checkbox 
+                                                    <Switch 
                                                         id={`perm-${permission.id}`}
                                                         checked={permissionsForm.data.permission_ids.includes(permission.id)}
                                                         onCheckedChange={() => togglePermission(permission.id)}

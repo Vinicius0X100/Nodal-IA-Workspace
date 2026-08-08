@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
-import { Checkbox } from '@/Components/ui/checkbox';
+import { Switch } from '@/Components/ui/switch';
 import { useForm } from '@inertiajs/react';
 import { Loader2, Shield, Users, CheckCircle, ChevronRight, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -161,7 +161,7 @@ export default function CreateRoleWizard({ isOpen, onClose, users, initialData, 
                                                     <div className="space-y-2 pl-2">
                                                         {perms.map((perm: any) => (
                                                             <div key={perm.id} className="flex items-start space-x-3">
-                                                                <Checkbox 
+                                                                <Switch 
                                                                     id={`perm-${perm.id}`}
                                                                     checked={data.permission_ids.includes(perm.id)}
                                                                     onCheckedChange={() => handleTogglePermission(perm.id)}
@@ -195,7 +195,7 @@ export default function CreateRoleWizard({ isOpen, onClose, users, initialData, 
                                         ) : (
                                             users.map(user => (
                                                 <div key={user.id} className="flex items-center space-x-3 p-3 hover:bg-neutral-50 border-b border-neutral-100 last:border-0 transition-colors">
-                                                    <Checkbox 
+                                                    <Switch 
                                                         id={`user-${user.id}`}
                                                         checked={data.user_ids.includes(user.id)}
                                                         onCheckedChange={() => handleToggleUser(user.id)}

@@ -4,7 +4,7 @@ import { Button } from '@/Components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/Components/ui/dialog';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
-import { Checkbox } from '@/Components/ui/checkbox';
+import { Switch } from '@/Components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/Components/ui/avatar';
 import { Pencil, Trash2, Camera, AlertTriangle } from 'lucide-react';
 
@@ -152,7 +152,7 @@ export default function UsersList({ users, roles }: UsersListProps) {
                                 <div className="space-y-2 border border-neutral-100 rounded-lg p-3 bg-neutral-50/50 max-h-48 overflow-y-auto">
                                     {roles.map(role => (
                                         <div key={role.id} className="flex items-center space-x-2">
-                                            <Checkbox 
+                                            <Switch 
                                                 id={`role-add-${role.id}`} 
                                                 checked={addForm.data.role_ids.includes(role.id)}
                                                 onCheckedChange={() => toggleRoleAdd(role.id)}
@@ -292,7 +292,7 @@ export default function UsersList({ users, roles }: UsersListProps) {
                             <div className="space-y-2 border border-neutral-100 rounded-lg p-3 bg-neutral-50/50 max-h-48 overflow-y-auto">
                                 {roles.map(role => (
                                     <div key={role.id} className="flex items-center space-x-2">
-                                        <Checkbox 
+                                        <Switch 
                                             id={`role-edit-${role.id}`} 
                                             checked={editForm.data.role_ids.includes(role.id)}
                                             onCheckedChange={() => toggleRoleEdit(role.id)}
