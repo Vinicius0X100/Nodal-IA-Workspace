@@ -59,7 +59,7 @@ class AuthorizationService
      * Segurança em nível de recurso (granular).
      * Preparado para expansões futuras (ex: verificar se resource pertence a um grupo de TI).
      */
-    public function canAccessResource(User $user, Organization $organization, \App\Domain\Integrations\Models\IntegrationResource $resource): bool
+    public function canAccessResource(User $user, Organization $organization, \App\Domain\Resources\Models\IntegrationResource $resource): bool
     {
         // Por padrão, se chegou até aqui, já exigimos que ele tenha `resources.read` via middleware/controller.
         // Se no futuro houverem tags ou domínios nos recursos (ex: HR, Financeiro), a verificação ficará aqui.
