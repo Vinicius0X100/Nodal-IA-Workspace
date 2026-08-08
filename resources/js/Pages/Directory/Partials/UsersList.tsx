@@ -25,11 +25,15 @@ export default function UsersList({ users, roles }: UsersListProps) {
     const addForm = useForm({
         name: '',
         email: '',
+        position: '',
+        phone: '',
         role_ids: [] as number[],
     });
 
     const editForm = useForm({
         name: '',
+        position: '',
+        phone: '',
         role_ids: [] as number[],
         avatar: null as File | null,
     });
@@ -79,7 +83,9 @@ export default function UsersList({ users, roles }: UsersListProps) {
     const openEdit = (user: any) => {
         setEditingUser(user);
         editForm.setData({
-            name: user.name,
+            name: user.name || '',
+            position: user.position || '',
+            phone: user.phone || '',
             role_ids: user.roles.map((r: any) => r.id),
             avatar: null,
         });
@@ -145,6 +151,19 @@ export default function UsersList({ users, roles }: UsersListProps) {
                                 <Label htmlFor="email">E-mail de Acesso</Label>
                                 <Input id="email" type="email" value={addForm.data.email} onChange={e => addForm.setData('email', e.target.value)} required />
                                 {addForm.errors.email && <p className="text-sm text-danger-500">{addForm.errors.email}</p>}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="position">Cargo / Função</Label>
+                                    <Input id="position" value={addForm.data.position} onChange={e => addForm.setData('position', e.target.value)} placeholder="Ex: Analista de Vendas" />
+                                    {addForm.errors.position && <p className="text-sm text-danger-500">{addForm.errors.position}</p>}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="phone">Telefone</Label>
+                                    <Input id="phone" value={addForm.data.phone} onChange={e => addForm.setData('phone', e.target.value)} placeholder="(11) 90000-0000" />
+                                    {addForm.errors.phone && <p className="text-sm text-danger-500">{addForm.errors.phone}</p>}
+                                </div>
                             </div>
 
                             <div className="space-y-3 pt-2">
@@ -285,6 +304,19 @@ export default function UsersList({ users, roles }: UsersListProps) {
                             <Label htmlFor="edit-name">Nome Completo</Label>
                             <Input id="edit-name" value={editForm.data.name} onChange={e => editForm.setData('name', e.target.value)} required />
                             {editForm.errors.name && <p className="text-sm text-danger-500">{editForm.errors.name}</p>}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-position">Cargo / Função</Label>
+                                <Input id="edit-position" value={editForm.data.position} onChange={e => editForm.setData('position', e.target.value)} placeholder="Ex: Gerente Financeiro" />
+                                {editForm.errors.position && <p className="text-sm text-danger-500">{editForm.errors.position}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-phone">Telefone</Label>
+                                <Input id="edit-phone" value={editForm.data.phone} onChange={e => editForm.setData('phone', e.target.value)} placeholder="(11) 90000-0000" />
+                                {editForm.errors.phone && <p className="text-sm text-danger-500">{editForm.errors.phone}</p>}
+                            </div>
                         </div>
 
                         <div className="space-y-3 pt-2">

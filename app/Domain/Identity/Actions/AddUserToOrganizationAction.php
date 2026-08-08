@@ -28,6 +28,8 @@ class AddUserToOrganizationAction
                 $user = User::create([
                     'name' => $data['name'],
                     'email' => $data['email'],
+                    'position' => $data['position'] ?? null,
+                    'phone' => $data['phone'] ?? null,
                     'password' => Hash::make($temporaryPassword),
                 ]);
             }

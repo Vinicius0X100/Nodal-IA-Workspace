@@ -42,6 +42,8 @@ class DirectoryController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
+            'position' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:20'],
             'role_ids' => ['array'],
             'role_ids.*' => ['exists:roles,id'],
         ]);
@@ -148,6 +150,8 @@ class DirectoryController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'position' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:20'],
             'role_ids' => ['array'],
             'role_ids.*' => ['exists:roles,id'],
             'avatar' => ['nullable', 'image', 'max:10240'], // Max 10MB

@@ -16,6 +16,8 @@ class UpdateUserAction
             
             // 1. Atualizar dados básicos
             $user->name = $data['name'] ?? $user->name;
+            $user->position = $data['position'] ?? $user->position;
+            $user->phone = $data['phone'] ?? $user->phone;
             
             // 2. Upload de Avatar
             if ($avatar) {
