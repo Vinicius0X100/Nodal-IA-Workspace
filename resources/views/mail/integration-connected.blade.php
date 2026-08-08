@@ -1,30 +1,145 @@
-<x-mail::message>
-@if($logoUrl)
-<div style="text-align: center; margin-bottom: 20px;">
-    <img src="{{ $logoUrl }}" alt="{{ $providerName }}" style="max-height: 40px; display: inline-block;">
-</div>
-@endif
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integração Conectada: {{ $providerName }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body, table, td, p, a, li, blockquote {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f1f3f4;
+            font-family: 'Inter', Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#f1f3f4" style="padding: 32px 16px;">
+    <tr>
+        <td align="center">
+            <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;">
 
-# Olá, {{ $notifiable->name ?? 'Administrador' }}!
+                {{-- Header com logo + texto sutil --}}
+                <tr>
+                    <td style="background-color:#ffffff; border-radius:8px 8px 0 0; padding: 20px 32px 0; border-bottom: 0;">
+                        <table width="100%" cellpadding="0" cellspacing="0">
+                            <tr>
+                                <td>
+                                    <img src="{{ asset('images/Nodal-Logo.png') }}"
+                                         alt="Nodal"
+                                         height="28"
+                                         style="display:block; height:28px; width:auto;">
+                                </td>
+                                <td align="right" style="font-size:13px; color:#5f6368; font-family:'Inter',Arial,sans-serif;">
+                                    Nova Integração Conectada
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
 
-Boas notícias! A integração com o **{{ $providerName }}** foi conectada com sucesso à sua organização **{{ $organization->name }}**.
+                {{-- Barra verde para sucesso --}}
+                <tr>
+                    <td style="background-color:#ffffff; padding: 16px 0 0; height:6px;">
+                        <div style="height:6px; background-color:#34a853; width:100%;"></div>
+                    </td>
+                </tr>
 
-Essa conexão permitiu que a Inteligência Artificial do Nodal aprendesse novas habilidades de forma automática.
+                {{-- Corpo principal --}}
+                <tr>
+                    <td style="background-color:#ffffff; padding: 32px 32px 8px; border-radius: 0;">
+                        @if($logoUrl)
+                        <div style="text-align: left; margin-bottom: 24px;">
+                            <img src="{{ $logoUrl }}" alt="{{ $providerName }}" style="max-height: 40px; display: inline-block;">
+                        </div>
+                        @endif
 
-## O que a IA pode fazer agora:
-Nossa Assistente de IA acabou de aprender as seguintes ferramentas graças à sua nova integração:
+                        <p style="margin:0 0 20px; font-size:15px; color:#202124; font-family:'Inter',Arial,sans-serif; line-height:1.6;">
+                            Olá, <strong>{{ explode(' ', trim($notifiable->name ?? 'Administrador'))[0] }}</strong>!
+                        </p>
+                        <p style="margin:0 0 24px; font-size:15px; color:#3c4043; font-family:'Inter',Arial,sans-serif; line-height:1.6;">
+                            Boas notícias! A integração com o <strong>{{ $providerName }}</strong> foi conectada com sucesso à sua organização <strong>{{ $organization->name }}</strong>.
+                        </p>
+                        <p style="margin:0 0 24px; font-size:15px; color:#3c4043; font-family:'Inter',Arial,sans-serif; line-height:1.6;">
+                            Essa conexão permitiu que a Inteligência Artificial do Nodal aprendesse novas habilidades de forma automática e segura.
+                        </p>
+                    </td>
+                </tr>
 
-@foreach($tools as $tool)
-- **{{ $tool->name }}**
-  {{ $tool->description }}
-@endforeach
+                {{-- Card de Habilidades --}}
+                <tr>
+                    <td style="background-color:#ffffff; padding: 0 32px 16px;">
+                        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #dadce0; border-radius:8px; overflow:hidden;">
+                            <tr>
+                                <td width="64" style="vertical-align:top; padding:20px 0 20px 20px;">
+                                    <div style="width:40px; height:40px; background-color:#e8f0fe; border-radius:50%; display:table-cell; text-align:center; vertical-align:middle;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-top: 8px;">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                        </svg>
+                                    </div>
+                                </td>
+                                <td style="padding:20px 20px 20px 12px; vertical-align:top;">
+                                    <p style="margin:0 0 12px; font-size:14px; color:#3c4043; font-family:'Inter',Arial,sans-serif; font-weight:600;">
+                                        O que a IA pode fazer agora:
+                                    </p>
+                                    
+                                    @foreach($tools as $tool)
+                                    <div style="margin-bottom: 12px;">
+                                        <strong style="color:#202124; font-size:13px; font-family:'Inter',Arial,sans-serif;">&bull; {{ $tool->name }}</strong><br>
+                                        <span style="color:#5f6368; font-size:13px; font-family:'Inter',Arial,sans-serif; line-height:1.5;">{{ $tool->description }}</span>
+                                    </div>
+                                    @endforeach
 
-<x-mail::button :url="config('app.url') . '/dashboard'">
-Acessar Meu Dashboard
-</x-mail::button>
+                                    <a href="{{ config('app.url') }}/dashboard"
+                                       style="display:inline-block; background-color:#1a73e8; color:#ffffff; text-decoration:none; font-family:'Inter',Arial,sans-serif; font-size:14px; font-weight:500; padding:10px 22px; border-radius:4px; margin-top:12px;">
+                                        Acessar Meu Dashboard
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
 
-Se você não reconhece essa ação, recomendamos verificar as configurações da sua organização imediatamente.
+                {{-- Aviso de Segurança --}}
+                <tr>
+                    <td style="background-color:#ffffff; padding: 0 32px 24px;">
+                        <p style="margin:0; font-size:12px; color:#80868b; font-family:'Inter',Arial,sans-serif; line-height:1.5;">
+                            Se você não reconhece essa ação, recomendamos verificar as configurações da sua organização imediatamente.
+                        </p>
+                    </td>
+                </tr>
 
-Obrigado,<br>
-Equipe {{ config('app.name') }}
-</x-mail::message>
+                {{-- Assinatura --}}
+                <tr>
+                    <td style="background-color:#ffffff; padding: 0 32px 32px; border-radius:0 0 8px 8px;">
+                        <p style="margin:0; font-size:15px; color:#3c4043; font-family:'Inter',Arial,sans-serif; line-height:1.6;">
+                            Atenciosamente,<br>
+                            <strong style="color:#202124;">Equipe Sacratech Softwares</strong>
+                        </p>
+                    </td>
+                </tr>
+
+                {{-- Rodapé --}}
+                <tr>
+                    <td style="padding: 20px 0 0; text-align:center;">
+                        <p style="margin:0; font-size:12px; color:#80868b; font-family:'Inter',Arial,sans-serif; line-height:1.6;">
+                            &copy; {{ date('Y') }} Sacratech Softwares. Todos os direitos reservados. &bull;
+                            <a href="{{ config('app.url') }}" style="color:#80868b; text-decoration:none;">Nodal AI Workspace</a><br>
+                            <strong>Nodal</strong> é apenas um serviço fornecido pela Sacratech Softwares.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

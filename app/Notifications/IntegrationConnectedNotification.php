@@ -57,7 +57,7 @@ class IntegrationConnectedNotification extends Notification implements ShouldQue
 
         return (new MailMessage)
             ->subject("Integração conectada com sucesso: {$providerName}")
-            ->markdown('mail.integration-connected', [
+            ->view('mail.integration-connected', [
                 'organization' => $this->organization,
                 'integration' => $this->integration,
                 'tools' => $this->tools,
