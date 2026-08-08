@@ -64,9 +64,9 @@ class AIResourcesService
         }
 
         $integration = $resource->integration;
-        $fileId = $resource->metadata_json['id'] ?? null;
-        if (!$fileId) {
-            throw new Exception("File ID not found in resource metadata.", 400);
+        $fileId = $resource->external_id;
+        if (empty($fileId)) {
+            throw new Exception("Resource lacks an external identifier.", 400);
         }
 
         $this->logAuditAction->execute('ai_read_resource_content', 'IntegrationResource', (string) $resource->id, [
@@ -90,9 +90,9 @@ class AIResourcesService
         }
 
         $integration = $resource->integration;
-        $fileId = $resource->metadata_json['id'] ?? null;
-        if (!$fileId) {
-            throw new Exception("File ID not found in resource metadata.", 400);
+        $fileId = $resource->external_id;
+        if (empty($fileId)) {
+            throw new Exception("Resource lacks an external identifier.", 400);
         }
 
         $this->logAuditAction->execute('ai_download_resource_file', 'IntegrationResource', (string) $resource->id, [
