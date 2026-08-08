@@ -6,7 +6,7 @@ import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Switch } from '@/Components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/Components/ui/avatar';
-import { Pencil, Trash2, Camera, AlertTriangle } from 'lucide-react';
+import { Pencil, Trash2, Camera, AlertTriangle, Plus, Loader2, UserPlus, Phone, Briefcase } from 'lucide-react';
 
 interface UsersListProps {
     users: any[];
@@ -126,71 +126,85 @@ export default function UsersList({ users, roles }: UsersListProps) {
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium text-neutral-900">Membros da Equipe</h3>
+                <div>
+                    <h3 className="text-lg font-medium text-neutral-900">Membros da Equipe</h3>
+                    <p className="text-xs text-neutral-500">Gerencie contatos, cargos e permissões dos usuários da organização.</p>
+                </div>
                 
                 <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
                     <DialogTrigger asChild>
-                        <Button>Adicionar Usuário</Button>
+                        <Button className="cursor-pointer shadow-sm">
+                            <UserPlus className="w-4 h-4 mr-1.5" /> Adicionar Usuário
+                        </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
+                    <DialogContent className="sm:max-w-[440px]">
                         <DialogHeader>
-                            <DialogTitle>Adicionar Novo Usuário</DialogTitle>
+                            <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
+                                <UserPlus className="w-5 h-5 text-primary-600" />
+                                Adicionar Novo Usuário
+                            </DialogTitle>
                             <DialogDescription>
-                                O usuário será adicionado à sua organização e receberá um e-mail com a senha temporária para acessar o sistema.
+                                O usuário será vinculado à organização e receberá um e-mail de boas-vindas com o acesso.
                             </DialogDescription>
                         </DialogHeader>
                         
-                        <form onSubmit={submitAdd} className="space-y-4 pt-4">
-                            <div className="space-y-2">
+                        <form onSubmit={submitAdd} className="space-y-4 pt-3">
+                            <div className="space-y-1.5">
                                 <Label htmlFor="name">Nome Completo</Label>
-                                <Input id="name" value={addForm.data.name} onChange={e => addForm.setData('name', e.target.value)} required />
-                                {addForm.errors.name && <p className="text-sm text-danger-500">{addForm.errors.name}</p>}
+                                <Input id="name" value={addForm.data.name} onChange={e => addForm.setData('name', e.target.value)} required placeholder="Ex: Maria Silva" />
+                                {addForm.errors.name && <p className="text-xs text-red-500">{addForm.errors.name}</p>}
                             </div>
                             
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                                 <Label htmlFor="email">E-mail de Acesso</Label>
-                                <Input id="email" type="email" value={addForm.data.email} onChange={e => addForm.setData('email', e.target.value)} required />
-                                {addForm.errors.email && <p className="text-sm text-danger-500">{addForm.errors.email}</p>}
+                                <Input id="email" type="email" value={addForm.data.email} onChange={e => addForm.setData('email', e.target.value)} required placeholder="maria@empresa.com" />
+                                {addForm.errors.email && <p className="text-xs text-red-500">{addForm.errors.email}</p>}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
                                     <Label htmlFor="position">Cargo / Função</Label>
                                     <Input id="position" value={addForm.data.position} onChange={e => addForm.setData('position', e.target.value)} placeholder="Ex: Analista de Vendas" />
-                                    {addForm.errors.position && <p className="text-sm text-danger-500">{addForm.errors.position}</p>}
+                                    {addForm.errors.position && <p className="text-xs text-red-500">{addForm.errors.position}</p>}
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                     <Label htmlFor="phone">Telefone</Label>
                                     <Input id="phone" value={addForm.data.phone} onChange={e => addForm.setData('phone', e.target.value)} placeholder="(11) 90000-0000" />
-                                    {addForm.errors.phone && <p className="text-sm text-danger-500">{addForm.errors.phone}</p>}
+                                    {addForm.errors.phone && <p className="text-xs text-red-500">{addForm.errors.phone}</p>}
                                 </div>
                             </div>
 
-                            <div className="space-y-3 pt-2">
-                                <Label>Grupos de Acesso</Label>
-                                <div className="space-y-2 border border-neutral-100 rounded-lg p-3 bg-neutral-50/50 max-h-48 overflow-y-auto">
+                            <div className="space-y-2 pt-1">
+                                <Label className="text-xs font-semibold text-neutral-700">Grupos de Acesso (Roles)</Label>
+                                <div className="space-y-2 border border-neutral-200/80 rounded-xl p-3 bg-neutral-50/50 max-h-48 overflow-y-auto">
                                     {roles.map(role => (
-                                        <div key={role.id} className="flex items-center space-x-2">
+                                        <div key={role.id} className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer" onClick={() => toggleRoleAdd(role.id)}>
+                                            <Label htmlFor={`role-add-${role.id}`} className="font-medium text-sm text-neutral-800 cursor-pointer leading-none">
+                                                {role.name}
+                                            </Label>
                                             <Switch 
                                                 id={`role-add-${role.id}`} 
                                                 checked={addForm.data.role_ids.includes(role.id)}
                                                 onCheckedChange={() => toggleRoleAdd(role.id)}
                                             />
-                                            <Label htmlFor={`role-add-${role.id}`} className="font-normal cursor-pointer leading-none">
-                                                {role.name}
-                                            </Label>
                                         </div>
                                     ))}
                                 </div>
-                                {addForm.errors.role_ids && <p className="text-sm text-danger-500">{addForm.errors.role_ids}</p>}
+                                {addForm.errors.role_ids && <p className="text-xs text-red-500">{addForm.errors.role_ids}</p>}
                             </div>
 
-                            <DialogFooter className="pt-4 gap-2">
-                                <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
+                            <DialogFooter className="pt-4 gap-2 border-t border-neutral-100">
+                                <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)} className="cursor-pointer">
                                     Cancelar
                                 </Button>
-                                <Button type="submit" disabled={addForm.processing}>
-                                    Confirmar Adição
+                                <Button type="submit" disabled={addForm.processing} className="cursor-pointer">
+                                    {addForm.processing ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin mr-2" /> Salvando...
+                                        </>
+                                    ) : (
+                                        'Confirmar Adição'
+                                    )}
                                 </Button>
                             </DialogFooter>
                         </form>
@@ -198,34 +212,53 @@ export default function UsersList({ users, roles }: UsersListProps) {
                 </Dialog>
             </div>
 
-            <div className="border border-neutral-200 rounded-lg overflow-hidden">
+            <div className="border border-neutral-200/80 rounded-xl overflow-hidden shadow-xs bg-white">
                 <table className="min-w-full divide-y divide-neutral-200">
-                    <thead className="bg-neutral-50">
+                    <thead className="bg-neutral-50/80">
                         <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Usuário</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Status</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Grupos</th>
-                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Ações</th>
+                            <th scope="col" className="px-6 py-3.5 text-left text-xs font-semibold text-neutral-500 uppercase tracking-wider">Usuário</th>
+                            <th scope="col" className="px-6 py-3.5 text-left text-xs font-semibold text-neutral-500 uppercase tracking-wider">Cargo & Contato</th>
+                            <th scope="col" className="px-6 py-3.5 text-left text-xs font-semibold text-neutral-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" className="px-6 py-3.5 text-left text-xs font-semibold text-neutral-500 uppercase tracking-wider">Grupos</th>
+                            <th scope="col" className="px-6 py-3.5 text-right text-xs font-semibold text-neutral-500 uppercase tracking-wider">Ações</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-neutral-200">
+                    <tbody className="bg-white divide-y divide-neutral-100">
                         {users.map((user) => (
-                            <tr key={user.id} className="hover:bg-neutral-50 transition-colors">
+                            <tr key={user.id} className="hover:bg-neutral-50/60 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="flex items-center">
-                                        <Avatar className="h-9 w-9 border border-neutral-200">
+                                        <Avatar className="h-9 w-9 border border-neutral-200 shadow-xs">
                                             {user.avatar ? (
                                                 <AvatarImage src={`/storage/${user.avatar}`} alt={user.name} className="object-cover" />
                                             ) : (
-                                                <AvatarFallback className="bg-primary-50 text-primary-700 font-medium">
+                                                <AvatarFallback className="bg-primary-50 text-primary-700 font-semibold text-xs">
                                                     {user.name.substring(0, 2).toUpperCase()}
                                                 </AvatarFallback>
                                             )}
                                         </Avatar>
                                         <div className="ml-3">
-                                            <div className="text-sm font-medium text-neutral-900">{user.name}</div>
-                                            <div className="text-sm text-neutral-500">{user.email}</div>
+                                            <div className="text-sm font-semibold text-neutral-900">{user.name}</div>
+                                            <div className="text-xs text-neutral-500">{user.email}</div>
                                         </div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-xs text-neutral-600">
+                                    <div className="space-y-1">
+                                        {user.position ? (
+                                            <div className="flex items-center gap-1.5 font-medium text-neutral-800">
+                                                <Briefcase className="w-3.5 h-3.5 text-neutral-400" />
+                                                {user.position}
+                                            </div>
+                                        ) : (
+                                            <span className="text-neutral-400 italic">Não informado</span>
+                                        )}
+                                        {user.phone && (
+                                            <div className="flex items-center gap-1.5 text-neutral-500">
+                                                <Phone className="w-3.5 h-3.5 text-neutral-400" />
+                                                {user.phone}
+                                            </div>
+                                        )}
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -319,31 +352,37 @@ export default function UsersList({ users, roles }: UsersListProps) {
                             </div>
                         </div>
 
-                        <div className="space-y-3 pt-2">
-                            <Label>Grupos de Acesso</Label>
-                            <div className="space-y-2 border border-neutral-100 rounded-lg p-3 bg-neutral-50/50 max-h-48 overflow-y-auto">
+                        <div className="space-y-2 pt-1">
+                            <Label className="text-xs font-semibold text-neutral-700">Grupos de Acesso (Roles)</Label>
+                            <div className="space-y-2 border border-neutral-200/80 rounded-xl p-3 bg-neutral-50/50 max-h-48 overflow-y-auto">
                                 {roles.map(role => (
-                                    <div key={role.id} className="flex items-center space-x-2">
+                                    <div key={role.id} className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer" onClick={() => toggleRoleEdit(role.id)}>
+                                        <Label htmlFor={`role-edit-${role.id}`} className="font-medium text-sm text-neutral-800 cursor-pointer leading-none">
+                                            {role.name}
+                                        </Label>
                                         <Switch 
                                             id={`role-edit-${role.id}`} 
                                             checked={editForm.data.role_ids.includes(role.id)}
                                             onCheckedChange={() => toggleRoleEdit(role.id)}
                                         />
-                                        <Label htmlFor={`role-edit-${role.id}`} className="font-normal cursor-pointer leading-none">
-                                            {role.name}
-                                        </Label>
                                     </div>
                                 ))}
                             </div>
-                            {editForm.errors.role_ids && <p className="text-sm text-danger-500">{editForm.errors.role_ids}</p>}
+                            {editForm.errors.role_ids && <p className="text-xs text-red-500">{editForm.errors.role_ids}</p>}
                         </div>
 
-                        <DialogFooter className="pt-4 gap-2">
-                            <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                        <DialogFooter className="pt-4 gap-2 border-t border-neutral-100">
+                            <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} className="cursor-pointer">
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={editForm.processing}>
-                                Salvar Alterações
+                            <Button type="submit" disabled={editForm.processing} className="cursor-pointer">
+                                {editForm.processing ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin mr-2" /> Salvo...
+                                    </>
+                                ) : (
+                                    'Salvar Alterações'
+                                )}
                             </Button>
                         </DialogFooter>
                     </form>

@@ -74,14 +74,14 @@ export default function RolesMatrix({ roles, users, permissionsGrouped }: RolesM
                         <button
                             key={role.id}
                             onClick={() => handleRoleSelect(role)}
-                            className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                            className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-150 cursor-pointer flex items-center justify-between ${
                                 selectedRole?.id === role.id 
-                                ? 'bg-primary-50 text-primary-700 font-medium' 
-                                : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
+                                ? 'bg-primary-50 text-primary-700 font-semibold shadow-xs' 
+                                : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 font-medium'
                             }`}
                         >
-                            {role.name}
-                            {role.is_system && <span className="ml-2 text-[10px] bg-neutral-200/60 px-1.5 py-0.5 rounded text-neutral-600">Padrão</span>}
+                            <span>{role.name}</span>
+                            {role.is_system && <span className="text-[10px] bg-neutral-200/60 px-1.5 py-0.5 rounded text-neutral-600 font-normal">Padrão</span>}
                         </button>
                     ))}
                 </div>
@@ -103,14 +103,14 @@ export default function RolesMatrix({ roles, users, permissionsGrouped }: RolesM
                             </div>
                             <div className="flex items-center gap-2">
                                 {!selectedRole.is_system && (
-                                    <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200" onClick={deleteRole}>
+                                    <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 cursor-pointer" onClick={deleteRole}>
                                         <Trash2 className="w-4 h-4 mr-2" /> Excluir Grupo
                                     </Button>
                                 )}
                                 <Button 
                                     onClick={submitPermissions} 
                                     disabled={permissionsForm.processing || selectedRole.is_system}
-                                    className={selectedRole.is_system ? 'opacity-50 cursor-not-allowed' : ''}
+                                    className={`cursor-pointer ${selectedRole.is_system ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     Salvar Acessos
                                 </Button>
@@ -126,29 +126,38 @@ export default function RolesMatrix({ roles, users, permissionsGrouped }: RolesM
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-8">
                             {Object.entries(permissionsGrouped).map(([groupName, permissions]) => (
                                 <div key={groupName} className="space-y-3">
-                                    <h4 className="font-medium text-neutral-900 capitalize border-b border-neutral-100 pb-2">
+                                    <h4 className="font-semibold text-neutral-900 capitalize border-b border-neutral-100 pb-2 text-sm">
                                         Módulo {groupName}
                                     </h4>
-                                    <div className="space-y-3 pt-1">
+                                    <div className="space-y-2 pt-1">
                                         {permissions.map((permission: any) => (
-                                            <div key={permission.id} className="flex flex-col space-y-1">
-                                                <div className="flex items-center space-x-2">
+                                            <div 
+                                                key={permission.id} 
+                                                onClick={() => !selectedRole.is_system && togglePermission(permission.id)}
+                                                className={`flex items-center justify-between p-3 rounded-xl border border-neutral-100 bg-white transition-all duration-150 ${
+                                                    selectedRole.is_system ? 'opacity-75' : 'cursor-pointer hover:border-neutral-200 hover:bg-neutral-50/50 hover:shadow-xs'
+                                                }`}
+                                            >
+                                                <div className="space-y-0.5 pr-4">
+                                                    <Label 
+                                                        htmlFor={`perm-${permission.id}`} 
+                                                        className="font-medium text-sm text-neutral-900 cursor-pointer block"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        {permission.name}
+                                                    </Label>
+                                                    <p className="text-xs text-neutral-500">
+                                                        {permission.description}
+                                                    </p>
+                                                </div>
+                                                <div onClick={(e) => e.stopPropagation()}>
                                                     <Switch 
                                                         id={`perm-${permission.id}`}
                                                         checked={permissionsForm.data.permission_ids.includes(permission.id)}
                                                         onCheckedChange={() => togglePermission(permission.id)}
                                                         disabled={selectedRole.is_system}
                                                     />
-                                                    <Label 
-                                                        htmlFor={`perm-${permission.id}`} 
-                                                        className={`font-medium cursor-pointer ${selectedRole.is_system ? 'opacity-70' : ''}`}
-                                                    >
-                                                        {permission.name}
-                                                    </Label>
                                                 </div>
-                                                <p className="text-xs text-neutral-500 pl-6">
-                                                    {permission.description}
-                                                </p>
                                             </div>
                                         ))}
                                     </div>
