@@ -17,8 +17,10 @@ class AIResourcesController
             $organization = $request->get('_active_organization');
             $query = $request->query('q', '');
             $provider = $request->query('provider');
+            $type = $request->query('type');
+            $limit = (int) $request->query('limit', 50);
 
-            $resources = $this->service->search($organization, $query, $provider);
+            $resources = $this->service->search($organization, $query, $provider, $type, $limit);
 
             return response()->json([
                 'success' => true,

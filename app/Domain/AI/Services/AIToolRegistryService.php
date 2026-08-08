@@ -63,7 +63,7 @@ class AIToolRegistryService
             [
                 'slug' => 'google_search_resources',
                 'name' => 'Pesquisar Arquivos no Google Drive',
-                'description' => 'Busca arquivos e documentos disponíveis no Google Drive da organização.',
+                'description' => 'Busca arquivos no Google Drive. Parâmetros opcionais (query string): q (busca textual), type (ex: spreadsheet, document, pdf, folder, presentation, image), provider (google), limit (padrão 50). Exemplos: ?type=spreadsheet (lista planilhas), ?q=financeiro&type=spreadsheet (planilhas sobre financeiro).',
                 'endpoint' => '/api/ai/resources/search?provider=google',
                 'http_method' => 'GET',
                 'tool_type' => 'search',
@@ -98,7 +98,7 @@ class AIToolRegistryService
             [
                 'slug' => 'microsoft_search_resources',
                 'name' => 'Pesquisar Arquivos no OneDrive/SharePoint',
-                'description' => 'Busca arquivos e documentos disponíveis no ambiente Microsoft da organização.',
+                'description' => 'Busca arquivos no ambiente Microsoft. Parâmetros opcionais (query string): q (busca textual), type (ex: spreadsheet, document, pdf, folder), provider (microsoft), limit (padrão 50).',
                 'endpoint' => '/api/ai/resources/search?provider=microsoft',
                 'http_method' => 'GET',
                 'tool_type' => 'search',

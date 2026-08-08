@@ -20,7 +20,7 @@ class AIResourcesService
     /**
      * Search resources for the given organization.
      */
-    public function search(Organization $organization, string $query, ?string $provider = null): Collection
+    public function search(Organization $organization, string $query, ?string $provider = null, ?string $type = null, int $limit = 50): Collection
     {
         $integrationIds = $organization->integrations()
             ->when($provider, function ($q) use ($provider) {
@@ -32,6 +32,9 @@ class AIResourcesService
             ->pluck('id');
 
         return IntegrationResource::whereIn('integration_id', $integrationIds)
+            ->when($type, function ($q) use ($type) {
+                $q->where('resource_type', $type);
+            })
             ->where(function ($q) use ($query) {
                 if (!empty($query)) {
                     $q->where('name', 'like', "%{$query}%")
@@ -40,7 +43,7 @@ class AIResourcesService
                 }
             })
             ->orderBy('updated_by_provider_at', 'desc')
-            ->limit(100) // Limit increased for better context
+            ->limit($limit)
             ->get();
     }
 
