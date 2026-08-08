@@ -103,23 +103,27 @@ class GoogleWorkspaceImportController extends Controller
         $importedUsersCount = 0;
         $importedGroupsCount = 0;
 
-        // 1. Importar Grupos como Roles
+        // 1. Importar Grupos corporativos
         if (isset($json['groups']['groups'])) {
             foreach ($json['groups']['groups'] as $googleGroup) {
                 if (in_array($googleGroup['id'], $selectedGroups)) {
-                    $slug = Str::slug($googleGroup['email']);
-                    
-                    Role::firstOrCreate(
+                    $group = \App\Domain\Directory\Models\Group::updateOrCreate(
                         [
-                            'organization_id' => $organizationId,
-                            'slug' => $slug,
+                            'integration_id' => $integrationId,
+                            'external_id' => $googleGroup['id'],
                         ],
                         [
+                            'organization_id' => $organizationId,
+                            'provider' => 'google_workspace',
                             'name' => $googleGroup['name'] ?? $googleGroup['email'],
-                            'description' => $googleGroup['description'] ?? 'Importado do Google Workspace',
-                            'is_system' => false,
+                            'email' => $googleGroup['email'],
+                            'description' => $googleGroup['description'] ?? null,
+                            'metadata_json' => $googleGroup,
                         ]
                     );
+                    
+                    \App\Domain\Integrations\Jobs\SyncGoogleGroupMembersJob::dispatch($integration, $group);
+                    
                     $importedGroupsCount++;
                 }
             }

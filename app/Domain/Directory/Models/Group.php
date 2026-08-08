@@ -15,9 +15,18 @@ class Group extends Model
 
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'metadata_json' => 'array',
+    ];
+
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function integration(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domain\Integrations\Models\Integration::class);
     }
 
     public function users(): BelongsToMany
