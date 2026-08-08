@@ -18,7 +18,7 @@ class UserAddedToOrganizationMail extends Mailable implements ShouldQueue
     public function __construct(
         public User $user,
         public Organization $organization,
-        public string $temporaryPassword
+        public ?string $temporaryPassword = null
     ) {}
 
     public function envelope(): Envelope

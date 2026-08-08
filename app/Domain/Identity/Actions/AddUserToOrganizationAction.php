@@ -45,14 +45,13 @@ class AddUserToOrganizationAction
                 $user->roles()->syncWithPivotValues($roleIds, ['organization_id' => $organization->id]);
             }
 
-            // 4. Envia o E-mail SOMENTE para usuários recém-criados com senha temporária
-            if ($isNewUser && $temporaryPassword) {
-                Mail::to($user->email)->send(new UserAddedToOrganizationMail(
-                    user: $user,
-                    organization: $organization,
-                    temporaryPassword: $temporaryPassword
-                ));
-            }
+            // 4. Envia o E-mail sempre que for adicionado à organização
+            // Se já era usuário do sistema, temporaryPassword vai como null e a blade lida com isso.
+            Mail::to($user->email)->send(new UserAddedToOrganizationMail(
+                user: $user,
+                organization: $organization,
+                temporaryPassword: $temporaryPassword
+            ));
 
             return $user;
         });

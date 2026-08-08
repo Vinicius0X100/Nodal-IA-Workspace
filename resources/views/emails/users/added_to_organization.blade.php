@@ -29,7 +29,9 @@
 
         <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e5e7eb;">
             <p style="margin: 0; color: #374151; font-size: 14px;"><strong>E-mail de acesso:</strong> {{ $email }}</p>
-            <p style="margin: 12px 0 0 0; color: #374151; font-size: 14px;"><strong>Senha temporária:</strong> <span style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-family: monospace;">{!! $temporaryPassword !!}</span></p>
+            @if($temporaryPassword)
+                <p style="margin: 12px 0 0 0; color: #374151; font-size: 14px;"><strong>Senha temporária:</strong> <span style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-family: monospace;">{!! $temporaryPassword !!}</span></p>
+            @endif
         </div>
 
         <p style="color: #4b5563; font-size: 14px; margin-bottom: 30px;">
