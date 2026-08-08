@@ -46,9 +46,15 @@ class AuthorizationService
             \App\Domain\Audit\Models\AuditLog::create([
                 'organization_id' => $organization->id,
                 'user_id' => $user->id,
-                'event' => 'authorization_denied',
-                'description' => "Tentativa de acesso negado para a capacidade: {$capability}",
+                'action' => 'authorization.denied',
+                'entity_type' => get_class($user),
+                'entity_id' => $user->id,
+                'metadata' => [
+                    'capability' => $capability,
+                    'description' => "Tentativa de acesso negado para a capacidade: {$capability}",
+                ],
                 'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
             ]);
 
             throw new AuthorizationException("Você não possui a permissão necessária ({$capability}).");
