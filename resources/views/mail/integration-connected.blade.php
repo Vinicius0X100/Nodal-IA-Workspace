@@ -92,8 +92,7 @@
                                     
                                     @foreach($tools as $tool)
                                     <div style="margin-bottom: 12px;">
-                                        <strong style="color:#202124; font-size:13px; font-family:'Inter',Arial,sans-serif;">&bull; {{ $tool->name }}</strong><br>
-                                        <span style="color:#5f6368; font-size:13px; font-family:'Inter',Arial,sans-serif; line-height:1.5;">{{ $tool->description }}</span>
+                                        <strong style="color:#202124; font-size:13px; font-family:'Inter',Arial,sans-serif;">&bull; {{ $tool->name }}</strong>
                                     </div>
                                     @endforeach
 
