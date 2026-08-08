@@ -1,41 +1,30 @@
-import { useState } from 'react';
-import { useForm } from '@inertiajs/react';
+import { useState, useEffect } from 'react';
+import { useForm, router } from '@inertiajs/react';
+import { Settings2, ShieldAlert, Trash2 } from 'lucide-react';
 import { Button } from '@/Components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/Components/ui/dialog';
-import { Input } from '@/Components/ui/input';
-import { Label } from '@/Components/ui/label';
 import { Checkbox } from '@/Components/ui/checkbox';
-import { Settings2 } from 'lucide-react';
+import { Label } from '@/Components/ui/label';
+import CreateRoleWizard from './CreateRoleWizard';
 
 interface RolesMatrixProps {
     roles: any[];
+    users: any[];
     permissionsGrouped: Record<string, any[]>;
 }
 
-export default function RolesMatrix({ roles, permissionsGrouped }: RolesMatrixProps) {
-    const [selectedRole, setSelectedRole] = useState<any>(roles[0] || null);
+export default function RolesMatrix({ roles, users, permissionsGrouped }: RolesMatrixProps) {
+    const [selectedRole, setSelectedRole] = useState<any>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-    // Form para criar novo grupo
-    const createForm = useForm({
-        name: '',
-        description: '',
-    });
-
-    // Form para salvar permissões da role selecionada
     const permissionsForm = useForm({
         permission_ids: [] as number[],
     });
 
-    const submitCreate = (e: React.FormEvent) => {
-        e.preventDefault();
-        createForm.post(route('directory.roles.store'), {
-            onSuccess: () => {
-                setIsCreateOpen(false);
-                createForm.reset();
-            },
-        });
-    };
+    useEffect(() => {
+        if (roles.length > 0 && !selectedRole) {
+            handleRoleSelect(roles[0]);
+        }
+    }, [roles]);
 
     const handleRoleSelect = (role: any) => {
         setSelectedRole(role);
@@ -43,11 +32,13 @@ export default function RolesMatrix({ roles, permissionsGrouped }: RolesMatrixPr
     };
 
     const togglePermission = (permissionId: number) => {
-        const current = [...permissionsForm.data.permission_ids];
-        if (current.includes(permissionId)) {
-            permissionsForm.setData('permission_ids', current.filter(id => id !== permissionId));
+        if (selectedRole?.is_system) return;
+
+        const currentIds = permissionsForm.data.permission_ids;
+        if (currentIds.includes(permissionId)) {
+            permissionsForm.setData('permission_ids', currentIds.filter(id => id !== permissionId));
         } else {
-            permissionsForm.setData('permission_ids', [...current, permissionId]);
+            permissionsForm.setData('permission_ids', [...currentIds, permissionId]);
         }
     };
 
@@ -58,6 +49,16 @@ export default function RolesMatrix({ roles, permissionsGrouped }: RolesMatrixPr
         });
     };
 
+    const deleteRole = () => {
+        if (!selectedRole || selectedRole.is_system) return;
+        if (confirm(`Tem certeza que deseja excluir o grupo "${selectedRole.name}"? Isso removerá as permissões de todos os usuários que dependem exclusivamente dele.`)) {
+            router.delete(route('directory.roles.destroy', selectedRole.id), {
+                preserveScroll: true,
+                onSuccess: () => setSelectedRole(null),
+            });
+        }
+    };
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             
@@ -65,32 +66,7 @@ export default function RolesMatrix({ roles, permissionsGrouped }: RolesMatrixPr
             <div className="md:col-span-1 border-r border-neutral-100 pr-4 space-y-4">
                 <div className="flex items-center justify-between">
                     <h3 className="font-medium text-neutral-900">Grupos</h3>
-                    <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-7 text-xs">Novo</Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
-                            <DialogHeader>
-                                <DialogTitle>Criar Novo Grupo</DialogTitle>
-                                <DialogDescription>
-                                    Crie um grupo de acesso customizado para atribuir permissões específicas.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={submitCreate} className="space-y-4 pt-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="role_name">Nome do Grupo</Label>
-                                    <Input id="role_name" value={createForm.data.name} onChange={e => createForm.setData('name', e.target.value)} required placeholder="Ex: Financeiro" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">Descrição (opcional)</Label>
-                                    <Input id="description" value={createForm.data.description} onChange={e => createForm.setData('description', e.target.value)} />
-                                </div>
-                                <DialogFooter>
-                                    <Button type="submit" disabled={createForm.processing}>Criar Grupo</Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setIsCreateOpen(true)}>Novo</Button>
                 </div>
                 
                 <div className="space-y-1">
@@ -125,18 +101,25 @@ export default function RolesMatrix({ roles, permissionsGrouped }: RolesMatrixPr
                                     {selectedRole.description || 'Nenhuma descrição fornecida.'}
                                 </p>
                             </div>
-                            <Button 
-                                onClick={submitPermissions} 
-                                disabled={permissionsForm.processing || selectedRole.is_system}
-                                className={selectedRole.is_system ? 'opacity-50 cursor-not-allowed' : ''}
-                            >
-                                Salvar Acessos
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                {!selectedRole.is_system && (
+                                    <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200" onClick={deleteRole}>
+                                        <Trash2 className="w-4 h-4 mr-2" /> Excluir Grupo
+                                    </Button>
+                                )}
+                                <Button 
+                                    onClick={submitPermissions} 
+                                    disabled={permissionsForm.processing || selectedRole.is_system}
+                                    className={selectedRole.is_system ? 'opacity-50 cursor-not-allowed' : ''}
+                                >
+                                    Salvar Acessos
+                                </Button>
+                            </div>
                         </div>
 
                         {selectedRole.is_system && (
-                            <div className="bg-primary-50 text-primary-700 px-4 py-3 rounded-lg text-sm mb-4 border border-primary-100">
-                                Este é um grupo padrão do sistema. Suas permissões são fixas e não podem ser alteradas.
+                            <div className="bg-primary-50 text-primary-700 px-4 py-3 rounded-lg text-sm mb-4 border border-primary-100 flex items-center">
+                                <ShieldAlert className="w-4 h-4 mr-2" /> Este é um grupo padrão do sistema. Suas permissões são fixas e não podem ser alteradas.
                             </div>
                         )}
 
@@ -185,6 +168,12 @@ export default function RolesMatrix({ roles, permissionsGrouped }: RolesMatrixPr
                     </div>
                 )}
             </div>
+
+            <CreateRoleWizard 
+                isOpen={isCreateOpen} 
+                onClose={() => setIsCreateOpen(false)} 
+                users={users} 
+            />
         </div>
     );
 }

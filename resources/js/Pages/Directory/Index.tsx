@@ -40,7 +40,7 @@ export default function Directory({ users, roles, permissionsGrouped }: Director
                             </TabsContent>
                             
                             <TabsContent value="roles" className="mt-0 outline-none">
-                                <RolesMatrix roles={roles} permissionsGrouped={permissionsGrouped} />
+                                <RolesMatrix roles={roles} users={users} permissionsGrouped={permissionsGrouped} />
                             </TabsContent>
                         </div>
                     </Tabs>

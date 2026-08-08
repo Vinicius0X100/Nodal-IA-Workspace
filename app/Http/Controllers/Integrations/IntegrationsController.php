@@ -28,19 +28,25 @@ class IntegrationsController extends Controller
     {
         $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
         
-        $integration = \App\Domain\Integrations\Models\Integration::with(['organizationData', 'logs' => function($query) {
-            $query->latest()->limit(50);
-        }])->firstOrCreate(
+        $integration = \App\Domain\Integrations\Models\Integration::with([
+            'organizationData', 
+            'groups.users',
+            'logs' => function($query) {
+                $query->latest()->limit(50);
+            }
+        ])->firstOrCreate(
             ['organization_id' => $organization->id, 'provider' => 'google_workspace'],
             ['display_name' => 'Google Workspace', 'status' => 'not_connected']
         );
         
         $config = $integration->config;
+        $allUsers = $organization->users()->get();
 
         return Inertia::render('Integrations/Providers/GoogleWorkspace', [
             'app_url' => config('app.url'),
             'integration' => $integration,
             'config' => $config,
+            'all_users' => $allUsers,
         ]);
     }
 

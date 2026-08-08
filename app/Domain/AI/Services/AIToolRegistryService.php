@@ -68,6 +68,7 @@ class AIToolRegistryService
                 'http_method' => 'GET',
                 'tool_type' => 'search',
                 'requires_confirmation' => false,
+                'required_permissions' => ['resources.search'],
             ],
             [
                 'slug' => 'google_calendar_events',
@@ -77,6 +78,7 @@ class AIToolRegistryService
                 'http_method' => 'GET',
                 'tool_type' => 'search',
                 'requires_confirmation' => false,
+                'required_permissions' => ['calendar.read'],
             ],
             [
                 'slug' => 'google_read_resource',
@@ -86,6 +88,7 @@ class AIToolRegistryService
                 'http_method' => 'GET',
                 'tool_type' => 'action',
                 'requires_confirmation' => false,
+                'required_permissions' => ['resources.read'],
             ],
         ];
 
@@ -103,6 +106,7 @@ class AIToolRegistryService
                 'http_method' => 'GET',
                 'tool_type' => 'search',
                 'requires_confirmation' => false,
+                'required_permissions' => ['resources.search'],
             ],
         ];
 
@@ -134,7 +138,9 @@ class AIToolRegistryService
                     'http_method' => $toolData['http_method'],
                     'tool_type' => $toolData['tool_type'],
                     'requires_confirmation' => $toolData['requires_confirmation'],
-                    // fields not updated if tool exists to preserve manual disablements
+                    'configuration_json' => [
+                        'required_permissions' => $toolData['required_permissions'] ?? []
+                    ],
                 ]
             );
         }

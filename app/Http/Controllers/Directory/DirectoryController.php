@@ -62,17 +62,67 @@ class DirectoryController extends Controller
         return back()->with('success', 'Usuário adicionado com sucesso. Ele receberá um e-mail em breve.');
     }
 
+    public function permissions()
+    {
+        $permissionsGrouped = Permission::all()->groupBy('group');
+        return response()->json($permissionsGrouped);
+    }
+
+    public function destroyRole(Request $request, Role $role)
+    {
+        if ($role->organization_id !== session('active_organization_id')) {
+            abort(403);
+        }
+        
+        $role->delete();
+
+        return back()->with('success', 'Grupo de acesso (Role) excluído com sucesso.');
+    }
+
     public function createRole(Request $request, CreateRoleAction $action)
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:255'],
+            'permission_ids' => ['array'],
+            'permission_ids.*' => ['exists:permissions,id'],
+            'user_ids' => ['array'],
+            'user_ids.*' => ['exists:users,id'],
         ]);
 
         $organizationId = session('active_organization_id');
         $organization = Organization::find($organizationId);
 
-        $action->execute($organization, $validated);
+        $role = $action->execute($organization, $validated);
+        
+        // Sync Permissions
+        if (isset($validated['permission_ids'])) {
+            $role->permissions()->sync($validated['permission_ids']);
+        }
+
+        // Sync Users
+        if (isset($validated['user_ids'])) {
+            // We need to attach these users to the role in the pivot `user_roles`
+            // Wait, we need to make sure we sync with the organization_id context.
+            foreach ($validated['user_ids'] as $userId) {
+                // Check if user doesn't already have this role in this org to avoid duplicates
+                $exists = \Illuminate\Support\Facades\DB::table('user_roles')
+                    ->where('user_id', $userId)
+                    ->where('role_id', $role->id)
+                    ->where('organization_id', $organizationId)
+                    ->exists();
+                    
+                if (!$exists) {
+                    \Illuminate\Support\Facades\DB::table('user_roles')->insert([
+                        'user_id' => $userId,
+                        'role_id' => $role->id,
+                        'organization_id' => $organizationId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        }
 
         return back()->with('success', 'Grupo criado com sucesso.');
     }

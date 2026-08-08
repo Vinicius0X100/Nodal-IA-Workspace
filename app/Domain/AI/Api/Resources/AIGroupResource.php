@@ -17,7 +17,10 @@ class AIGroupResource extends JsonResource
         return [
             'uuid' => $this->uuid,
             'name' => $this->name,
-            'members_count' => $this->users()->count(),
+            'email' => $this->email,
+            'description' => $this->description,
+            'provider' => $this->provider,
+            'members_count' => $this->users_count ?? $this->users()->count(),
         ];
     }
 }

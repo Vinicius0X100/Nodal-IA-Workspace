@@ -59,4 +59,9 @@ class Integration extends Model
     {
         return $this->hasOne(IntegrationOrganization::class);
     }
+
+    public function groups(): HasMany
+    {
+        return $this->hasMany(\App\Domain\Directory\Models\Group::class);
+    }
 }
