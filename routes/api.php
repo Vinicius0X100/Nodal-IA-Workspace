@@ -36,6 +36,7 @@ Route::prefix('v1')->group(function () {
 Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/organization', [\App\Domain\AI\Api\Controllers\AIOrganizationController::class, 'index']);
     Route::get('/users', [\App\Domain\AI\Api\Controllers\AIUsersController::class, 'index']);
+    Route::get('/users/{uuid}/groups', [\App\Domain\AI\Api\Controllers\AIUsersController::class, 'groups']);
     Route::get('/groups', [\App\Domain\AI\Api\Controllers\AIGroupsController::class, 'index']);
     Route::get('/groups/with-members', [\App\Domain\AI\Api\Controllers\AIGroupsController::class, 'withMembers']);
     Route::get('/groups/{uuid}/members', [\App\Domain\AI\Api\Controllers\AIGroupsController::class, 'members']);
