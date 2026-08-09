@@ -42,6 +42,37 @@ class AIGroupsController
         }
     }
 
+    public function withMembers(Request $request): JsonResponse
+    {
+        try {
+            $organization = $request->get('_active_organization');
+            $user = $request->get('_active_user');
+            $onlyWithMembers = filter_var($request->query('has_members', false), FILTER_VALIDATE_BOOLEAN);
+
+            // Exigir leitura de grupos E leitura de usuários, já que expõe dados dos membros.
+            $this->authorizationService->authorize($user, $organization, 'directory.groups.read');
+            $this->authorizationService->authorize($user, $organization, 'directory.users.read');
+
+            $data = $this->service->getGroupsWithMembers($organization, $user, $onlyWithMembers);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json([
+                'success' => false,
+                'code' => 'ACCESS_DENIED',
+                'message' => $e->getMessage()
+            ], 403);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching groups with members: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function members(Request $request, string $uuid): JsonResponse
     {
         try {

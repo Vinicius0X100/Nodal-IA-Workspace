@@ -16,6 +16,61 @@ class AIGroupsService
     }
 
     /**
+     * Get all groups with their members and count.
+     */
+    public function getGroupsWithMembers(Organization $organization, \App\Domain\Identity\Models\User $activeUser, bool $onlyWithMembers): array
+    {
+        $query = $organization->groups()
+            ->withCount('users')
+            ->with(['users' => function($query) {
+                $query->select('users.id', 'users.uuid', 'users.name', 'users.email');
+            }])
+            ->orderBy('name', 'asc');
+
+        if ($onlyWithMembers) {
+            $query->has('users');
+        }
+
+        $groups = $query->get();
+
+        $result = $groups->map(function ($group) {
+            $members = $group->users->map(function ($user) {
+                return [
+                    'uuid' => $user->uuid,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ];
+            })->toArray();
+
+            return [
+                'uuid' => $group->uuid,
+                'name' => $group->name,
+                'email' => $group->email,
+                'members_count' => $group->users_count,
+                'members' => $members,
+            ];
+        })->toArray();
+
+        // Registrar auditoria da IA consultando dados
+        \App\Domain\Audit\Models\AuditLog::create([
+            'organization_id' => $organization->id,
+            'user_id' => $activeUser->id,
+            'action' => 'ai_read_all_groups_with_members',
+            'entity_type' => Organization::class,
+            'entity_id' => $organization->id,
+            'metadata' => [
+                'total_groups_fetched' => count($result),
+                'only_with_members_filter' => $onlyWithMembers,
+                'requested_by_ai' => true,
+            ],
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        return $result;
+    }
+
+    /**
      * Get members of a specific group in an organization.
      */
     public function getGroupMembers(Organization $organization, \App\Domain\Identity\Models\User $activeUser, string $groupUuid): array
