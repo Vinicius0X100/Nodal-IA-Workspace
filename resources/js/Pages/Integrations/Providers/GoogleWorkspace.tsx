@@ -490,7 +490,8 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                             </div>
                         </TabsContent>
 
-
+                        {/* TAB: LOGS */}
+                        <TabsContent value="logs" className="space-y-6">
                             {integration?.logs && integration.logs.length > 0 ? (
                                 <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden">
                                     <table className="w-full text-sm text-left">
