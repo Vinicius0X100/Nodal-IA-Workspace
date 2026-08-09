@@ -65,6 +65,22 @@ class IntegrationsController extends Controller
         ]);
     }
 
+    public function googleWorkspaceGroups(Request $request)
+    {
+        $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
+        
+        $integration = \App\Domain\Integrations\Models\Integration::with([
+            'organizationData',
+            'groups.users',
+        ])->where('organization_id', $organization->id)
+          ->where('provider', 'google_workspace')
+          ->firstOrFail();
+
+        return Inertia::render('Integrations/Providers/GoogleWorkspaceGroups', [
+            'integration' => $integration,
+        ]);
+    }
+
     public function saveConfig(Request $request, string $provider)
     {
         $request->validate([

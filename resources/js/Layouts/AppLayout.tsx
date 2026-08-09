@@ -54,6 +54,91 @@ interface AppLayoutProps {
     title?: string;
 }
 
+function SidebarItem({ item }: { item: any }) {
+    const [isOpen, setIsOpen] = useState(item.active);
+
+    if (item.subItems) {
+        return (
+            <div className="space-y-1">
+                <button
+                    onClick={() => setIsOpen(!isOpen)}
+                    className={cn(
+                        "w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group cursor-pointer",
+                        item.active
+                            ? "bg-neutral-100 text-neutral-900"
+                            : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                    )}
+                >
+                    <div className="flex items-center gap-3">
+                        {item.imgSrc ? (
+                            <img 
+                                src={item.imgSrc} 
+                                alt={item.name} 
+                                className={cn("w-4 h-4 flex-shrink-0 object-contain", item.active ? "opacity-100" : "opacity-60 group-hover:opacity-100 transition-opacity")} 
+                            />
+                        ) : (
+                            <item.icon className={cn(
+                                "w-4 h-4 flex-shrink-0 transition-colors",
+                                item.active ? "text-neutral-900" : "text-neutral-400 group-hover:text-neutral-600"
+                            )} />
+                        )}
+                        <span>{item.name}</span>
+                    </div>
+                    <ChevronDown className={cn("w-4 h-4 transition-transform text-neutral-400", isOpen && "rotate-180")} />
+                </button>
+                {isOpen && (
+                    <div className="pl-9 pr-2 space-y-1 mt-1">
+                        {item.subItems.map((sub: any) => (
+                            <Link
+                                key={sub.name}
+                                href={sub.href}
+                                className={cn(
+                                    "flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors group",
+                                    sub.active
+                                        ? "bg-neutral-100 text-neutral-900"
+                                        : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900"
+                                )}
+                            >
+                                <sub.icon className={cn(
+                                    "w-3.5 h-3.5 flex-shrink-0 transition-colors",
+                                    sub.active ? "text-neutral-900" : "text-neutral-400 group-hover:text-neutral-600"
+                                )} />
+                                {sub.name}
+                            </Link>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <Link
+            href={item.href}
+            className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group",
+                item.active
+                    ? "bg-neutral-100 text-neutral-900"
+                    : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+            )}
+        >
+            {item.imgSrc ? (
+                <img 
+                    src={item.imgSrc} 
+                    alt={item.name} 
+                    className={cn("w-4 h-4 flex-shrink-0 object-contain", item.active ? "opacity-100" : "opacity-60 group-hover:opacity-100 transition-opacity")} 
+                />
+            ) : (
+                <item.icon className={cn(
+                    "w-4 h-4 flex-shrink-0 transition-colors",
+                    item.active ? "text-neutral-900" : "text-neutral-400 group-hover:text-neutral-600"
+                )} />
+            )}
+            <span>{item.name}</span>
+        </Link>
+    );
+}
+
 export default function AppLayout({ children, title }: AppLayoutProps) {
     const { auth, organization, notifications, flash } = usePage().props as any;
 
@@ -113,17 +198,23 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                 let name = i.display_name || i.provider;
                 let href = route('integrations.index'); // Default fallback
                 let imgSrc = null;
+                let subItems = undefined;
 
                 if (i.provider === 'google_workspace') {
                     name = 'Google Workspace';
-                    href = route('integrations.google-workspace.users');
+                    href = '#';
                     imgSrc = '/images/google-logo.svg';
+                    subItems = [
+                        { name: 'Usuários', href: route('integrations.google-workspace.users'), icon: Users, active: route().current('integrations.google-workspace.users') },
+                        { name: 'Grupos', href: route('integrations.google-workspace.groups'), icon: Users, active: route().current('integrations.google-workspace.groups') }
+                    ];
                 }
 
                 return {
                     name,
                     href,
                     imgSrc,
+                    subItems,
                     active: route().current(`integrations.${i.provider.replace('_', '-')}*`)
                 };
             }) as any
@@ -227,30 +318,7 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                                 </h3>
                                 <div className="space-y-1">
                                     {group.items.map((item) => (
-                                        <Link
-                                            key={item.name}
-                                            href={item.href}
-                                            className={cn(
-                                                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group",
-                                                item.active
-                                                    ? "bg-neutral-100 text-neutral-900"
-                                                    : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
-                                            )}
-                                        >
-                                            {item.imgSrc ? (
-                                                <img 
-                                                    src={item.imgSrc} 
-                                                    alt={item.name} 
-                                                    className={cn("w-4 h-4 flex-shrink-0 object-contain", item.active ? "opacity-100" : "opacity-60 group-hover:opacity-100 transition-opacity")} 
-                                                />
-                                            ) : (
-                                                <item.icon className={cn(
-                                                    "w-4 h-4 flex-shrink-0 transition-colors",
-                                                    item.active ? "text-neutral-900" : "text-neutral-400 group-hover:text-neutral-600"
-                                                )} />
-                                            )}
-                                            {item.name}
-                                        </Link>
+                                        <SidebarItem key={item.name} item={item} />
                                     ))}
                                 </div>
                             </div>

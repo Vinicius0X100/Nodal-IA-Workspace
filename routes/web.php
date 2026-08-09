@@ -66,8 +66,10 @@ Route::middleware(['auth'])->group(function () {
         // Integrações
         Route::prefix('integrations')->name('integrations.')->group(function () {
             Route::get('/', [IntegrationsController::class, 'index'])->name('index');
+            Route::get('/google-workspace', [\App\Http\Controllers\Integrations\IntegrationsController::class, 'googleWorkspace'])->name('google-workspace');
             Route::get('/google-workspace/users', [\App\Http\Controllers\Integrations\IntegrationsController::class, 'googleWorkspaceUsers'])->name('google-workspace.users');
-            Route::get('/google-workspace', [IntegrationsController::class, 'googleWorkspace'])->name('google-workspace');
+            Route::get('/google-workspace/groups', [\App\Http\Controllers\Integrations\IntegrationsController::class, 'googleWorkspaceGroups'])->name('google-workspace.groups');
+            Route::get('/oauth/{provider}/redirect', [IntegrationsController::class, 'redirect'])->name('oauth.redirect');
             
             // OAuth Genérico (Connect, Callback, Disconnect, Config)
             Route::post('/{provider}/config', [IntegrationsController::class, 'saveConfig'])->name('config');

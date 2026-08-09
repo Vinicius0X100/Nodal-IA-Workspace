@@ -118,9 +118,6 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                         <TabsTrigger value="permissions" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                             <ShieldCheck className="w-4 h-4 mr-2" /> Permissões
                         </TabsTrigger>
-                        <TabsTrigger value="groups" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                            <Users className="w-4 h-4 mr-2" /> Grupos
-                        </TabsTrigger>
                         <TabsTrigger value="logs" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                             <Activity className="w-4 h-4 mr-2" /> Logs
                         </TabsTrigger>
@@ -494,72 +491,6 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                         </TabsContent>
 
 
-
-                        {/* TAB: GRUPOS */}
-                        <TabsContent value="groups" className="space-y-6">
-                            {integration?.groups && integration.groups.length > 0 ? (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-end mb-4">
-                                        <div>
-                                            <h3 className="text-lg font-bold text-neutral-900">Grupos Sincronizados</h3>
-                                            <p className="text-neutral-500 text-sm">Estes são os grupos importados do seu Google Workspace. Você pode convertê-los em grupos de acesso no Nodal.</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {integration.groups.map((group: any) => (
-                                            <div key={group.id} className="bg-white border border-neutral-200 rounded-xl p-6 hover:border-neutral-300 transition-colors">
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <div>
-                                                        <h4 className="font-semibold text-neutral-900 text-lg">{group.name}</h4>
-                                                        {group.email && <p className="text-neutral-500 text-sm">{group.email}</p>}
-                                                    </div>
-                                                    <span className="bg-neutral-100 text-neutral-700 text-xs px-2.5 py-1 rounded-full font-medium">
-                                                        {group.users?.length || 0} membros
-                                                    </span>
-                                                </div>
-                                                
-                                                {group.description && (
-                                                    <p className="text-sm text-neutral-600 mb-4">{group.description}</p>
-                                                )}
-                                                
-                                                <div className="mt-4 pt-4 border-t border-neutral-100 flex justify-end">
-                                                    <Button 
-                                                        variant="outline" 
-                                                        className="text-primary-600 border-primary-200 hover:bg-primary-50 w-full"
-                                                        onClick={() => {
-                                                            setRoleWizardData({
-                                                                name: group.name,
-                                                                description: group.description || `Criado a partir do grupo ${group.email}`,
-                                                                preSelectedUsers: group.users ? group.users.map((u: any) => u.id) : []
-                                                            });
-                                                            setRoleWizardOpen(true);
-                                                        }}
-                                                    >
-                                                        <ShieldCheck className="w-4 h-4 mr-2" /> Converter para Grupo de Acesso Nodal
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center">
-                                    <div className="w-16 h-16 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center mx-auto mb-4">
-                                        <Users className="w-8 h-8 text-neutral-300" />
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-neutral-900 mb-1">Nenhum grupo sincronizado</h3>
-                                    <p className="text-neutral-500 max-w-sm mx-auto mb-6">
-                                        Conclua a configuração do OAuth e ative a sincronização para visualizar os grupos importados do Google Workspace.
-                                    </p>
-                                    <Button onClick={() => setWizardOpen(true)} className="bg-primary-600 hover:bg-primary-700 text-white">
-                                        <Users className="w-4 h-4 mr-2" /> Importar Diretório
-                                    </Button>
-                                </div>
-                            )}
-                        </TabsContent>
-
-                        {/* TAB: LOGS */}
-                        <TabsContent value="logs" className="space-y-6">
                             {integration?.logs && integration.logs.length > 0 ? (
                                 <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden">
                                     <table className="w-full text-sm text-left">

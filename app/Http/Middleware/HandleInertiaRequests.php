@@ -57,8 +57,14 @@ class HandleInertiaRequests extends Middleware
             ],
             // Alertas globais para navbar/notificações
             'notifications' => fn () => $this->buildNotifications($request),
-            'connected_integrations' => fn () => $request->user() 
-                ? \App\Domain\Integrations\Models\Integration::where('organization_id', session('active_organization_id'))->where('status', 'connected')->get()
+            'connected_integrations' => fn () => $request->user() && session('active_organization_id')
+                ? \Illuminate\Support\Facades\Cache::remember(
+                    'connected_integrations_' . session('active_organization_id'),
+                    now()->addMinutes(5),
+                    fn() => \App\Domain\Integrations\Models\Integration::where('organization_id', session('active_organization_id'))
+                            ->where('status', 'connected')
+                            ->get()
+                )
                 : [],
         ];
     }
