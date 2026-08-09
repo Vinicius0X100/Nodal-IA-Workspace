@@ -122,7 +122,7 @@ class GoogleWorkspaceImportController extends Controller
                         ]
                     );
                     
-                    \App\Domain\Integrations\Jobs\SyncGoogleGroupMembersJob::dispatch($integration, $group);
+                    \App\Domain\Integrations\Jobs\SyncGoogleGroupMembersJob::dispatchSync($integration, $group);
                     
                     $importedGroupsCount++;
                 }

@@ -43,6 +43,10 @@ class GoogleOrganizationSyncService
             // Atualiza o last_sync_at da integração principal
             $integration->update(['last_sync_at' => now()]);
 
+            // Sincroniza também todos os grupos que já foram importados (traz os membros atualizados)
+            $directorySyncService = app(\App\Domain\Integrations\Services\GoogleDirectorySyncService::class);
+            $directorySyncService->syncImportedGroups($integration);
+
             $this->logEvent($integration, 'organization_sync_completed', 'success', 'Organização sincronizada com sucesso. Usuários: ' . $data['total_users']);
 
             return $organizationData;
