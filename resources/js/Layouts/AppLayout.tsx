@@ -104,6 +104,32 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
         }
     ];
 
+    const connectedIntegrations = (usePage().props as any).connected_integrations || [];
+    
+    if (connectedIntegrations.length > 0) {
+        navigationGroups.push({
+            title: 'Workspaces Conectados',
+            items: connectedIntegrations.map((i: any) => {
+                let name = i.display_name || i.provider;
+                let href = route('integrations.index'); // Default fallback
+                let imgSrc = null;
+
+                if (i.provider === 'google_workspace') {
+                    name = 'Google Workspace';
+                    href = route('integrations.google-workspace.users');
+                    imgSrc = '/images/google-logo.svg';
+                }
+
+                return {
+                    name,
+                    href,
+                    imgSrc,
+                    active: route().current(`integrations.${i.provider.replace('_', '-')}*`)
+                };
+            }) as any
+        });
+    }
+
     const orgLogo = (organization as any)?.logo;
     const orgName = (organization as any)?.name;
     const user = (auth as any)?.user;
@@ -211,10 +237,18 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                                                     : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
                                             )}
                                         >
-                                            <item.icon className={cn(
-                                                "w-4 h-4 flex-shrink-0 transition-colors",
-                                                item.active ? "text-neutral-900" : "text-neutral-400 group-hover:text-neutral-600"
-                                            )} />
+                                            {item.imgSrc ? (
+                                                <img 
+                                                    src={item.imgSrc} 
+                                                    alt={item.name} 
+                                                    className={cn("w-4 h-4 flex-shrink-0 object-contain", item.active ? "opacity-100" : "opacity-60 group-hover:opacity-100 transition-opacity")} 
+                                                />
+                                            ) : (
+                                                <item.icon className={cn(
+                                                    "w-4 h-4 flex-shrink-0 transition-colors",
+                                                    item.active ? "text-neutral-900" : "text-neutral-400 group-hover:text-neutral-600"
+                                                )} />
+                                            )}
                                             {item.name}
                                         </Link>
                                     ))}

@@ -118,9 +118,6 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                         <TabsTrigger value="permissions" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                             <ShieldCheck className="w-4 h-4 mr-2" /> Permissões
                         </TabsTrigger>
-                        <TabsTrigger value="users" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                            <Users className="w-4 h-4 mr-2" /> Usuários
-                        </TabsTrigger>
                         <TabsTrigger value="groups" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                             <Users className="w-4 h-4 mr-2" /> Grupos
                         </TabsTrigger>
@@ -496,66 +493,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                             </div>
                         </TabsContent>
 
-                        {/* TAB: USUÁRIOS */}
-                        <TabsContent value="users" className="space-y-6">
-                            {integration?.organization_data?.organization_json?.users?.users && integration.organization_data.organization_json.users.users.length > 0 ? (
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="text-lg font-bold text-neutral-900">Usuários do Workspace</h3>
-                                            <p className="text-sm text-neutral-500">Abaixo estão os usuários listados na sua organização do Google.</p>
-                                        </div>
-                                        <Button onClick={() => setWizardOpen(true)} className="bg-primary-600 hover:bg-primary-700 text-white">
-                                            <Users className="w-4 h-4 mr-2" /> Importar Usuários
-                                        </Button>
-                                    </div>
-                                    <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-neutral-50 text-neutral-500 font-medium border-b border-neutral-200">
-                                                <tr>
-                                                    <th className="px-6 py-4">Nome</th>
-                                                    <th className="px-6 py-4">E-mail</th>
-                                                    <th className="px-6 py-4">Status</th>
-                                                    <th className="px-6 py-4">Admin</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-neutral-200">
-                                                {integration.organization_data.organization_json.users.users.map((u: any) => (
-                                                    <tr key={u.id} className="hover:bg-neutral-50">
-                                                        <td className="px-6 py-4 font-medium text-neutral-900">{u.name?.fullName || u.primaryEmail}</td>
-                                                        <td className="px-6 py-4 text-neutral-500">{u.primaryEmail}</td>
-                                                        <td className="px-6 py-4">
-                                                            <span className={cn(
-                                                                "px-2.5 py-1 text-xs font-semibold rounded-full border",
-                                                                u.suspended ? "bg-red-50 text-red-700 border-red-200" : "bg-green-50 text-green-700 border-green-200"
-                                                            )}>
-                                                                {u.suspended ? 'Suspenso' : 'Ativo'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-neutral-500">
-                                                            {u.isAdmin ? 'Sim' : 'Não'}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center">
-                                    <div className="w-16 h-16 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center mx-auto mb-4">
-                                        <Users className="w-8 h-8 text-neutral-300" />
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-neutral-900 mb-1">Nenhum usuário sincronizado</h3>
-                                    <p className="text-neutral-500 max-w-sm mx-auto mb-6">
-                                        Conclua a configuração do OAuth e ative a sincronização para visualizar os usuários importados do Google Workspace.
-                                    </p>
-                                    <Button onClick={() => setWizardOpen(true)} className="bg-primary-600 hover:bg-primary-700 text-white">
-                                        <Users className="w-4 h-4 mr-2" /> Importar Diretório
-                                    </Button>
-                                </div>
-                            )}
-                        </TabsContent>
+
 
                         {/* TAB: GRUPOS */}
                         <TabsContent value="groups" className="space-y-6">
