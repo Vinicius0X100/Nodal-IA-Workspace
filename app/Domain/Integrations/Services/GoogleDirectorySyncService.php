@@ -97,17 +97,39 @@ class GoogleDirectorySyncService
                 }
             } while ($pageToken);
 
-            // Se encontrou membros, faz o match por e-mail com usuários que já existem no Nodal
+            // Se encontrou membros, faz o match por e-mail com usuários que já existem no Nodal ou cria novos
             if (!empty($memberEmails)) {
-                // Usuários que existem no Nodal
-                $userIds = User::whereIn('email', $memberEmails)->pluck('id')->toArray();
-                
-                // Relacionar na pivot group_user sem remover outras associações
-                if (!empty($userIds)) {
-                    $group->users()->syncWithoutDetaching($userIds);
+                $userIds = [];
+                $organizationId = $integration->organization_id;
+
+                foreach ($memberEmails as $email) {
+                    // Busca o usuário existente ou cria um novo
+                    $user = User::firstOrCreate(
+                        ['email' => $email],
+                        [
+                            'name' => $email, // Usa o e-mail provisoriamente se não tiver o nome detalhado
+                            'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)),
+                            'email_verified_at' => now(), // Vem de uma fonte confiável
+                            'status' => 'active',
+                        ]
+                    );
+
+                    // Garante que o usuário está vinculado à organização para aparecer no Diretório
+                    $user->organizations()->syncWithoutDetaching([
+                        $organizationId => ['joined_at' => now()]
+                    ]);
+
+                    $userIds[] = $user->id;
                 }
                 
+                // Relacionar na pivot group_user removendo quem não está mais no grupo (Sincronização estrita)
+                $group->users()->sync($userIds);
+                
                 Log::info("Sincronização de membros concluída para o grupo {$group->email}. Membros vinculados: " . count($userIds));
+            } else {
+                // Se o grupo estiver vazio no Google, esvazia aqui também
+                $group->users()->sync([]);
+                Log::info("Sincronização de membros concluída para o grupo {$group->email}. O grupo agora está vazio.");
             }
             
         } catch (\Exception $e) {
