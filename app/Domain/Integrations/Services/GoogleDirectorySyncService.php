@@ -65,6 +65,20 @@ class GoogleDirectorySyncService
         $token = $integration->access_token;
         $pageToken = null;
         $memberEmails = [];
+        
+        $diagnosticLogs = [
+            'group_uuid' => $group->uuid,
+            'group_email' => $group->email,
+            'external_id' => $group->external_id,
+            'http_status' => null,
+            'members_count' => 0,
+            'member_emails' => [],
+            'matched_users' => [],
+            'created_users' => [],
+            'user_ids' => [],
+            'pivot_count_after_sync' => null,
+            'errors' => []
+        ];
 
         try {
             do {
@@ -73,12 +87,22 @@ class GoogleDirectorySyncService
                         'maxResults' => 200,
                         'pageToken' => $pageToken,
                     ]);
+                    
+                $diagnosticLogs['http_status'] = $response->status();
 
                 if ($response->successful()) {
                     $data = $response->json();
                     $pageMembers = $data['members'] ?? [];
                     
+                    if (empty($pageMembers)) {
+                        Log::info("[Google Group Sync] GOOGLE_RETURNED_ZERO_MEMBERS for group {$group->email}", [
+                            'group_uuid' => $group->uuid,
+                            'external_id' => $group->external_id
+                        ]);
+                    }
+                    
                     foreach ($pageMembers as $member) {
+                        $diagnosticLogs['members_count']++;
                         if (isset($member['email'])) {
                             $memberEmails[] = strtolower(trim($member['email']));
                         }
@@ -87,50 +111,73 @@ class GoogleDirectorySyncService
                     $pageToken = $data['nextPageToken'] ?? null;
                 } else {
                     $pageToken = null;
+                    
+                    $errorBody = $response->json() ?? $response->body();
+                    $diagnosticLogs['errors'][] = $errorBody;
+                    
+                    Log::info("[Google Group Sync] API Failed", [
+                        'http_status' => $response->status(),
+                        'body' => $errorBody,
+                        'group_uuid' => $group->uuid,
+                    ]);
+
                     IntegrationLog::create([
                         'integration_id' => $integration->id,
                         'event' => 'sync_group_members',
                         'status' => 'error',
-                        'message' => "Falha ao buscar membros do grupo {$group->email}: " . $response->body(),
+                        'message' => "Falha ao buscar membros do grupo {$group->email}. Status: " . $response->status(),
                     ]);
-                    return; // Aborta a sincronização deste grupo em caso de erro na API
+                    
+                    // Proteção Explicita: Não executa $group->users()->sync([]) se a API falhou.
+                    return; 
                 }
             } while ($pageToken);
 
-            // Se encontrou membros, faz o match por e-mail com usuários que já existem no Nodal ou cria novos
-            if (!empty($memberEmails)) {
-                $userIds = [];
-                $organizationId = $integration->organization_id;
+            $diagnosticLogs['member_emails'] = $memberEmails;
 
-                foreach ($memberEmails as $email) {
-                    // Busca o usuário existente ou cria um novo
-                    $user = User::firstOrCreate(
-                        ['email' => $email],
-                        [
-                            'name' => $email, // Usa o e-mail provisoriamente se não tiver o nome detalhado
-                            'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)),
-                            'email_verified_at' => now(), // Vem de uma fonte confiável
-                            'status' => 'active',
-                        ]
-                    );
+            $userIds = [];
+            $organizationId = $integration->organization_id;
 
-                    // Garante que o usuário está vinculado à organização para aparecer no Diretório
-                    $user->organizations()->syncWithoutDetaching([
-                        $organizationId => ['joined_at' => now()]
-                    ]);
-
-                    $userIds[] = $user->id;
+            foreach ($memberEmails as $email) {
+                // Busca o usuário existente ou cria um novo
+                $user = User::firstOrCreate(
+                    ['email' => $email],
+                    [
+                        'name' => $email, // Usa o e-mail provisoriamente se não tiver o nome detalhado
+                        'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)),
+                        'email_verified_at' => now(), // Vem de uma fonte confiável
+                        'status' => 'active',
+                    ]
+                );
+                
+                if ($user->wasRecentlyCreated) {
+                    $diagnosticLogs['created_users'][] = ['email' => $email, 'uuid' => $user->uuid ?? null, 'id' => $user->id];
+                } else {
+                    $diagnosticLogs['matched_users'][] = ['email' => $email, 'uuid' => $user->uuid ?? null, 'id' => $user->id];
                 }
-                
-                // Relacionar na pivot group_user removendo quem não está mais no grupo (Sincronização estrita)
-                $group->users()->sync($userIds);
-                
-                Log::info("Sincronização de membros concluída para o grupo {$group->email}. Membros vinculados: " . count($userIds));
-            } else {
-                // Se o grupo estiver vazio no Google, esvazia aqui também
-                $group->users()->sync([]);
-                Log::info("Sincronização de membros concluída para o grupo {$group->email}. O grupo agora está vazio.");
+
+                // Garante que o usuário está vinculado à organização para aparecer no Diretório
+                $user->organizations()->syncWithoutDetaching([
+                    $organizationId => ['joined_at' => now()]
+                ]);
+
+                $userIds[] = $user->id;
             }
+            
+            $diagnosticLogs['user_ids'] = $userIds;
+            
+            // Log antes do sync
+            Log::info("[Google Group Sync] Preparando para sync()", [
+                'group_email' => $group->email,
+                'user_ids_array' => $userIds
+            ]);
+
+            // Relacionar na pivot group_user removendo quem não está mais no grupo (Sincronização estrita)
+            $group->users()->sync($userIds);
+            
+            // Log após o sync
+            $diagnosticLogs['pivot_count_after_sync'] = $group->users()->count();
+            Log::info("[Google Group Sync] Sincronização Finalizada", $diagnosticLogs);
             
         } catch (\Exception $e) {
             IntegrationLog::create([
@@ -139,7 +186,7 @@ class GoogleDirectorySyncService
                 'status' => 'error',
                 'message' => "Erro de execução ao sincronizar membros do grupo {$group->email}: " . $e->getMessage(),
             ]);
-            Log::error("Erro no GoogleDirectorySyncService ao sincronizar membros", ['error' => $e->getMessage()]);
+            Log::error("[Google Group Sync] Erro no GoogleDirectorySyncService ao sincronizar membros", ['error' => $e->getMessage(), 'group_uuid' => $group->uuid]);
         }
     }
 }

@@ -1,24 +1,55 @@
 <?php
-require "vendor/autoload.php";
-$app = require_once "bootstrap/app.php";
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
-$kernel->bootstrap();
 
-$integration = \App\Domain\Integrations\Models\Integration::where('provider', 'google_workspace')->whereNotNull('access_token')->first();
-if (!$integration) {
-    echo "No integration found\n";
-    exit;
+use App\Domain\Directory\Models\Group;
+use App\Domain\Identity\Models\User;
+use App\Domain\Integrations\Models\Integration;
+use App\Domain\Organizations\Models\Organization;
+
+$org = Organization::create(['name' => 'Test Org']);
+$integration = Integration::create([
+    'organization_id' => $org->id,
+    'provider' => 'google',
+    'access_token' => 'dummy',
+    'status' => 'active',
+    'display_name' => 'Google Workspace',
+]);
+
+$group = Group::create([
+    'organization_id' => $org->id,
+    'integration_id' => $integration->id,
+    'name' => 'Test Group',
+    'email' => 'test@example.com',
+    'external_id' => '12345',
+]);
+
+$owner = User::create([
+    'name' => 'Owner User',
+    'email' => 'owner@example.com',
+    'password' => bcrypt('password'),
+]);
+$owner->organizations()->sync([$org->id => ['is_owner' => true, 'joined_at' => now()]]);
+
+$memberEmails = ['owner@example.com'];
+$userIds = [];
+foreach ($memberEmails as $email) {
+    $user = User::firstOrCreate(
+        ['email' => $email],
+        [
+            'name' => $email,
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'status' => 'active',
+        ]
+    );
+    
+    $user->organizations()->syncWithoutDetaching([
+        $org->id => ['joined_at' => now()]
+    ]);
+    
+    $userIds[] = $user->id;
 }
 
-$group = \App\Domain\Directory\Models\Group::where('integration_id', $integration->id)->first();
-if (!$group) {
-    echo "No group found\n";
-    exit;
-}
+$group->users()->sync($userIds);
 
-echo "Syncing group: {$group->email}\n";
-$service = new \App\Domain\Integrations\Services\GoogleDirectorySyncService();
-$service->syncGroupMembers($integration, $group);
-
-$members = $group->users()->get();
-echo "Members linked: " . $members->count() . "\n";
+echo "Group users count: " . $group->users()->count() . "\n";
+echo "Group users ids: " . implode(', ', $group->users()->pluck('users.id')->toArray()) . "\n";
+echo "Done.\n";
