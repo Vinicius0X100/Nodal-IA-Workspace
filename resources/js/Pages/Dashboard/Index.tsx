@@ -123,7 +123,7 @@ function StatCard({ label, value, sub, icon: Icon, delay = 0 }: {
     );
 }
 
-/* ── Nodal AI Hero Card ───────────────────────── */
+/* ── Nodal AI Hero Banner (page-level) ───────── */
 function NodalAIHero({ orgName }: { orgName: string }) {
     const [query, setQuery] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
@@ -135,63 +135,48 @@ function NodalAIHero({ orgName }: { orgName: string }) {
             router.visit(route('assistant.index'));
             return;
         }
-        // Navigate to assistant and carry the message to be pre-filled
         router.post(route('assistant.store'), { message: q }, {
             preserveScroll: false,
         });
     };
 
-    const handleInputClick = () => {
-        if (!query) {
-            router.visit(route('assistant.index'));
-        }
-    };
-
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className="relative overflow-hidden rounded-3xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            className="-mx-8 -mt-8 mb-2 px-8 pt-10 pb-8 relative overflow-hidden"
             style={{
-                background: 'linear-gradient(135deg, #0039A6 0%, #0048AA 30%, #0066FF 70%, #338BFF 100%)',
+                background: 'linear-gradient(160deg, #0039A6 0%, #0055CC 45%, #1a7fff 100%)',
             }}
         >
-            {/* Decorative blobs */}
-            <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/5 blur-2xl pointer-events-none" />
-            <div className="absolute -bottom-20 -left-10 w-72 h-72 rounded-full bg-blue-300/10 blur-3xl pointer-events-none" />
-            <div className="absolute top-0 right-0 w-full h-full opacity-[0.04] pointer-events-none"
-                style={{ backgroundImage: 'radial-gradient(circle at 80% 20%, white 0%, transparent 60%)' }}
+            {/* Subtle noise/glow overlays */}
+            <div className="absolute inset-0 pointer-events-none" style={{
+                background: 'radial-gradient(ellipse at 70% 0%, rgba(255,255,255,0.08) 0%, transparent 60%)',
+            }} />
+            <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
+                style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.06))' }}
             />
 
-            <div className="relative px-7 py-7 flex flex-col gap-5">
-                {/* Header */}
-                <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-inner">
-                        <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-6 h-6 object-contain brightness-200" />
-                    </div>
-                    <div>
-                        <h2 className="text-white font-bold text-lg leading-tight tracking-tight">Nodal AI</h2>
-                        <p className="text-blue-200 text-xs font-medium mt-0.5">Assistente inteligente do seu workspace</p>
-                    </div>
-                    <span className="ml-auto text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/15 text-white/80 border border-white/10">
-                        BETA
-                    </span>
+            <div className="relative max-w-6xl mx-auto flex flex-col gap-6">
+                {/* Logo + greeting */}
+                <div className="flex flex-col gap-1">
+                    <img src="/images/Nodal-Logo.png" alt="Nodal" className="w-24 h-auto object-contain brightness-200 mb-1 opacity-90" />
+                    <h1 className="text-white text-2xl font-bold tracking-tight">
+                        Olá! Como posso ajudar hoje?
+                    </h1>
+                    <p className="text-blue-200 text-sm">Pergunte algo ou explore os recursos do seu workspace.</p>
                 </div>
 
-                {/* Prompt area */}
-                <form onSubmit={handleSubmit}>
-                    <div
-                        className="relative bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl transition-all duration-200 cursor-text focus-within:bg-white/15 focus-within:border-white/30 focus-within:shadow-lg"
-                        onClick={() => inputRef.current?.focus()}
-                    >
+                {/* Search bar */}
+                <form onSubmit={handleSubmit} className="max-w-xl">
+                    <div className="relative bg-white/12 hover:bg-white/16 backdrop-blur-md border border-white/20 rounded-2xl transition-all duration-200 focus-within:bg-white/16 focus-within:border-white/35 focus-within:shadow-lg">
                         <input
                             ref={inputRef}
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            onClick={handleInputClick}
-                            placeholder={`Pergunte algo ao Nodal AI...`}
+                            placeholder="Pergunte algo ao Nodal AI..."
                             className="w-full bg-transparent text-white placeholder:text-blue-200/70 text-[14px] font-medium outline-none px-5 py-3.5 pr-14"
                         />
                         <button
@@ -203,7 +188,7 @@ function NodalAIHero({ orgName }: { orgName: string }) {
                     </div>
                 </form>
 
-                {/* Suggestions */}
+                {/* Quick chips */}
                 <div className="flex flex-wrap gap-2">
                     {['Resumir documentos', 'Buscar membros', 'Analisar grupos'].map((s) => (
                         <button
@@ -213,7 +198,7 @@ function NodalAIHero({ orgName }: { orgName: string }) {
                                 setQuery(s + ' ');
                                 inputRef.current?.focus();
                             }}
-                            className="text-xs font-medium px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-blue-100 hover:text-white border border-white/10 transition-all"
+                            className="text-xs font-medium px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/18 text-blue-100 hover:text-white border border-white/10 transition-all"
                         >
                             {s}
                         </button>

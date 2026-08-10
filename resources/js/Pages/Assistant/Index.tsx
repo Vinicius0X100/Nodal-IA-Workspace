@@ -242,8 +242,7 @@ function ChatHeader({
     onDelete: () => void;
     onToggleSidebar: () => void;
 }) {
-    const { auth } = usePage<any>().props;
-    const org = auth?.user?.current_organization;
+    const { organization } = usePage<any>().props;
     const [editing, setEditing] = useState(false);
     const [title, setTitle] = useState(conversation?.title || '');
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -276,18 +275,16 @@ function ChatHeader({
                     </button>
 
                     <Link href={route('dashboard')} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                        {org?.logo_url ? (
-                            <img src={org.logo_url} alt={org.name} className="w-8 h-8 rounded-lg object-contain shadow-sm border border-neutral-100" />
-                        ) : org?.name ? (
-                            <div className="w-8 h-8 rounded-lg bg-[#0048AA] text-white flex items-center justify-center text-xs font-bold shadow-sm">
-                                {org.name.substring(0, 2).toUpperCase()}
+                        {organization?.logo ? (
+                            <img src={`/storage/${organization.logo}`} alt={organization.name} className="w-7 h-7 rounded-lg object-contain shadow-sm border border-neutral-100" />
+                        ) : organization?.name ? (
+                            <div className="w-7 h-7 rounded-lg bg-[#0048AA] text-white flex items-center justify-center text-[10px] font-bold shadow-sm">
+                                {organization.name.substring(0, 2).toUpperCase()}
                             </div>
-                        ) : (
-                            <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center shadow-sm">
-                                <ArrowLeft className="w-4 h-4 text-neutral-600" />
-                            </div>
+                        ) : null}
+                        {organization && (
+                            <X className="w-3 h-3 text-neutral-300" />
                         )}
-                        <X className="w-3 h-3 text-neutral-300" />
                         <motion.div layoutId="nodal-logo" className="w-20 hidden sm:block">
                             <img src="/images/Nodal-Logo.png" alt="Nodal" className="w-full h-auto object-contain" />
                         </motion.div>
