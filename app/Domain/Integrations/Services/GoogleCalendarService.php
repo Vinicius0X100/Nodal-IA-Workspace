@@ -159,7 +159,27 @@ class GoogleCalendarService
         $body        = $response->json();
         $rawEvents   = $body['items'] ?? [];
         $calTimezone = $body['timeZone'] ?? $timeZone;
-        $normalized  = array_map(fn($e) => $this->normalizeEvent($e), $rawEvents);
+        
+        $normalized = [];
+        $startCarbon = Carbon::parse($start);
+        $endCarbon   = Carbon::parse($end);
+
+        foreach ($rawEvents as $e) {
+            $event = $this->normalizeEvent($e);
+            $eventStartRaw = $event['start'] ?? null;
+            
+            if (!$eventStartRaw) {
+                continue;
+            }
+
+            // Para eventos all-day, eventStartRaw é um formato de data 'Y-m-d' que será assumido no timezone do calendário
+            $eventStartCarbon = Carbon::parse($eventStartRaw, $calTimezone);
+
+            // O evento pertence ao intervalo se: start >= timeMin AND start < timeMax
+            if ($eventStartCarbon->gte($startCarbon) && $eventStartCarbon->lt($endCarbon)) {
+                $normalized[] = $event;
+            }
+        }
 
         $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, $start, $end, count($normalized), true, null);
 

@@ -516,6 +516,30 @@ class AICalendarEventsTest extends TestCase
             ->assertJsonPath('data.events.0.meeting', null);
     }
 
+    // ── 21. Validação defensiva descarta eventos fora do range ──────────────────
+
+    public function test_defensive_validation_discards_events_outside_requested_range(): void
+    {
+        $this->fakeGoogleEvents([
+            // Fora do range (antes)
+            $this->makeEvent('Old Event', '2026-03-27T10:00:00-03:00', '2026-03-27T11:00:00-03:00'),
+            // Dentro do range
+            $this->makeEvent('Valid Event', '2026-08-12T10:00:00-03:00', '2026-08-12T11:00:00-03:00'),
+            // Limite superior exato (deve ser descartado porque range é start <= event < end)
+            $this->makeEvent('Exact End Event', '2026-08-17T00:00:00-03:00', '2026-08-17T01:00:00-03:00'),
+            // Limite inferior exato (deve ser retornado porque range inclui o start)
+            $this->makeEvent('Exact Start Event', '2026-08-10T00:00:00-03:00', '2026-08-10T01:00:00-03:00'),
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events?start=2026-08-10T00:00:00-03:00&end=2026-08-17T00:00:00-03:00');
+
+        $response->assertOk()
+            ->assertJsonPath('data.total', 2)
+            ->assertJsonPath('data.events.0.title', 'Valid Event')
+            ->assertJsonPath('data.events.1.title', 'Exact Start Event');
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function makeEvent(string $title, string $start, string $end): array
