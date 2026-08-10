@@ -44,7 +44,7 @@ class ConversationController extends Controller
 
         // Generate title if initial message is provided
         $initialMessage = $request->input('message');
-        $title = $initialMessage ? substr($initialMessage, 0, 30) . '...' : 'Nova Conversa';
+        $title = $initialMessage ? (mb_strlen($initialMessage) > 30 ? mb_substr($initialMessage, 0, 30) . '...' : $initialMessage) : 'Nova Conversa';
 
         $conversation = $this->conversationService->create($organizationId, $userId, $title);
 
