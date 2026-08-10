@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Head, router, useForm, Link } from '@inertiajs/react';
+import { Head, router, useForm, Link, usePage } from '@inertiajs/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,7 +8,7 @@ import {
     Send, Paperclip, Mic, MessageSquare, ArrowLeft,
     FileText, FileSpreadsheet, BarChart3, Search as SearchIcon,
     FileSearch, PresentationIcon, X, Check, Loader2,
-    Sparkles, Menu, Edit, MoreHorizontal, Pin, PinOff, Edit2, Trash
+    Sparkles, Menu, Edit, MoreHorizontal, Pin, PinOff, Edit2, Trash, AlertTriangle
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import {
@@ -130,8 +130,8 @@ function MessageBubble({ message }: { message: Message }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="flex gap-4 px-4 py-3 w-full max-w-3xl mx-auto group"
         >
-            <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm">
-                <Sparkles className="w-4 h-4 text-blue-600" />
+            <div className="w-8 h-8 rounded-full bg-blue-50/50 border border-blue-100 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm overflow-hidden">
+                <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-5 h-5 object-contain" />
             </div>
             <div className="max-w-[85%] text-neutral-800 text-[15px] leading-relaxed prose prose-neutral prose-p:leading-relaxed max-w-none">
                 <ReactMarkdown
@@ -242,8 +242,11 @@ function ChatHeader({
     onDelete: () => void;
     onToggleSidebar: () => void;
 }) {
+    const { auth } = usePage<any>().props;
+    const org = auth?.user?.current_organization;
     const [editing, setEditing] = useState(false);
     const [title, setTitle] = useState(conversation?.title || '');
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -262,89 +265,128 @@ function ChatHeader({
     };
 
     return (
-        <header className="h-16 flex items-center justify-between px-4 sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-neutral-100">
-            <div className="flex items-center gap-4 flex-1">
-                <button
-                    onClick={onToggleSidebar}
-                    className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                >
-                    <Menu className="w-5 h-5" />
-                </button>
+        <>
+            <header className="h-16 flex items-center justify-between px-4 sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-neutral-100">
+                <div className="flex items-center gap-4 flex-1">
+                    <button
+                        onClick={onToggleSidebar}
+                        className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
 
-                {conversation ? (
                     <Link href={route('dashboard')} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                        <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center">
-                            <ArrowLeft className="w-4 h-4 text-neutral-600" />
-                        </div>
+                        {org?.logo_url ? (
+                            <img src={org.logo_url} alt={org.name} className="w-8 h-8 rounded-lg object-contain shadow-sm border border-neutral-100" />
+                        ) : org?.name ? (
+                            <div className="w-8 h-8 rounded-lg bg-[#0048AA] text-white flex items-center justify-center text-xs font-bold shadow-sm">
+                                {org.name.substring(0, 2).toUpperCase()}
+                            </div>
+                        ) : (
+                            <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center shadow-sm">
+                                <ArrowLeft className="w-4 h-4 text-neutral-600" />
+                            </div>
+                        )}
+                        <X className="w-3 h-3 text-neutral-300" />
                         <motion.div layoutId="nodal-logo" className="w-20 hidden sm:block">
                             <img src="/images/Nodal-Logo.png" alt="Nodal" className="w-full h-auto object-contain" />
                         </motion.div>
                     </Link>
-                ) : (
-                    <Link href={route('dashboard')} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-neutral-100 transition-colors text-sm font-medium text-neutral-600">
-                        <ArrowLeft className="w-4 h-4" />
-                        Dashboard
-                    </Link>
-                )}
-            </div>
-
-            {conversation && (
-                <div className="flex items-center justify-center flex-1 max-w-sm absolute left-1/2 -translate-x-1/2">
-                    {editing ? (
-                        <div className="flex items-center gap-2 w-full">
-                            <input
-                                ref={inputRef}
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleConfirm();
-                                    if (e.key === 'Escape') { setTitle(conversation.title); setEditing(false); }
-                                }}
-                                className="bg-white text-neutral-900 text-sm rounded-xl px-4 py-1.5 flex-1 outline-none border border-neutral-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-medium text-center shadow-sm"
-                            />
-                        </div>
-                    ) : (
-                        <div 
-                            className="flex items-center gap-2 cursor-pointer group px-3 py-1.5 rounded-lg hover:bg-neutral-50 transition-colors"
-                            onClick={() => setEditing(true)}
-                        >
-                            <h2 className="text-[15px] font-medium text-neutral-800 truncate tracking-tight">
-                                {conversation.title || 'Nova Conversa'}
-                            </h2>
-                            <Edit className="w-3.5 h-3.5 text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                    )}
                 </div>
-            )}
 
-            <div className="flex items-center gap-2 flex-1 justify-end">
                 {conversation && (
-                    <>
-                        <button
-                            title="Compartilhar"
-                            disabled
-                            className="p-2 rounded-xl text-neutral-300 cursor-not-allowed hover:bg-neutral-50 transition-colors hidden sm:block"
-                        >
-                            <Share2 className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={onDelete}
-                            title="Excluir conversa"
-                            className="p-2 rounded-xl text-neutral-400 hover:bg-red-50 hover:text-red-500 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                    </>
+                    <div className="flex items-center justify-center flex-1 max-w-sm absolute left-1/2 -translate-x-1/2">
+                        {editing ? (
+                            <div className="flex items-center gap-2 w-full">
+                                <input
+                                    ref={inputRef}
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleConfirm();
+                                        if (e.key === 'Escape') { setTitle(conversation.title); setEditing(false); }
+                                    }}
+                                    onBlur={handleConfirm}
+                                    className="bg-white text-neutral-900 text-sm rounded-xl px-4 py-1.5 flex-1 outline-none border border-neutral-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-medium text-center shadow-sm"
+                                />
+                            </div>
+                        ) : (
+                            <div 
+                                className="flex items-center gap-2 cursor-pointer group px-3 py-1.5 rounded-lg hover:bg-neutral-50 transition-colors"
+                                onClick={() => setEditing(true)}
+                            >
+                                <h2 className="text-[15px] font-medium text-neutral-800 truncate tracking-tight">
+                                    {conversation.title || 'Nova Conversa'}
+                                </h2>
+                                <Edit className="w-3.5 h-3.5 text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                        )}
+                    </div>
                 )}
-                <button
-                    onClick={() => router.post(route('assistant.store'))}
-                    title="Nova Conversa"
-                    className="p-2 rounded-xl text-neutral-600 hover:bg-neutral-100 transition-colors ml-1"
-                >
-                    <Plus className="w-5 h-5" />
-                </button>
-            </div>
-        </header>
+
+                <div className="flex items-center gap-2 flex-1 justify-end">
+                    {conversation && (
+                        <>
+                            <button
+                                title="Compartilhar"
+                                disabled
+                                className="p-2 rounded-xl text-neutral-300 cursor-not-allowed hover:bg-neutral-50 transition-colors hidden sm:block"
+                            >
+                                <Share2 className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setDeleteModalOpen(true)}
+                                title="Excluir conversa"
+                                className="p-2 rounded-xl text-neutral-400 hover:bg-red-50 hover:text-red-500 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </>
+                    )}
+                    <button
+                        onClick={() => router.visit(route('assistant.index'))}
+                        title="Nova Conversa"
+                        className="p-2 rounded-xl text-neutral-600 hover:bg-neutral-100 transition-colors ml-1"
+                    >
+                        <Plus className="w-5 h-5" />
+                    </button>
+                </div>
+            </header>
+
+            <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+                <DialogContent className="sm:max-w-md bg-white border-0 shadow-2xl rounded-3xl p-6">
+                    <DialogHeader className="mb-4">
+                        <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                            <AlertTriangle className="w-6 h-6 text-red-600" />
+                        </div>
+                        <DialogTitle className="text-center text-xl font-semibold text-neutral-900">Excluir Chat</DialogTitle>
+                        <DialogDescription className="text-center text-neutral-500 mt-2 text-[15px]">
+                            Tem certeza que deseja apagar o chat <strong>"{conversation?.title}"</strong>?<br/> 
+                            Essa ação será definitiva e todo o contexto da conversa será perdido.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex gap-3 sm:justify-center w-full mt-6">
+                        <Button 
+                            variant="outline" 
+                            className="flex-1 rounded-xl h-11 text-[15px] font-medium border-neutral-200 hover:bg-neutral-50"
+                            onClick={() => setDeleteModalOpen(false)}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button 
+                            variant="destructive" 
+                            className="flex-1 rounded-xl h-11 text-[15px] font-medium bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20"
+                            onClick={() => {
+                                onDelete();
+                                setDeleteModalOpen(false);
+                            }}
+                        >
+                            Excluir Chat
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }
 
@@ -418,7 +460,7 @@ function ConversationSidebar({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-neutral-900/20 backdrop-blur-sm z-30"
+                        className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm z-30"
                     />
                     
                     {/* Sidebar */}
@@ -427,36 +469,36 @@ function ConversationSidebar({
                         animate={{ x: 0 }}
                         exit={{ x: '-100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="fixed inset-y-0 left-0 w-[280px] bg-white border-r border-neutral-200 z-40 flex flex-col shadow-2xl"
+                        className="fixed inset-y-0 left-0 w-[300px] bg-white border-r border-neutral-100 z-40 flex flex-col shadow-2xl"
                     >
                         <div className="p-4 flex items-center justify-between border-b border-neutral-100">
-                            <h3 className="font-medium text-neutral-800">Histórico</h3>
+                            <h3 className="font-semibold text-neutral-900 text-lg">Histórico de Chats</h3>
                             <button onClick={onClose} className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-500 transition-colors">
-                                <X className="w-4 h-4" />
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        <div className="p-4">
+                        <div className="p-4 bg-neutral-50/50 border-b border-neutral-100">
                             <div className="relative">
                                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                                 <input
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Pesquisar..."
-                                    className="w-full pl-10 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-medium"
+                                    placeholder="Buscar nas conversas..."
+                                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm font-medium"
                                 />
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto px-3 pb-6 space-y-6">
+                        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
                             {filteredGroups.length === 0 ? (
                                 <p className="text-sm text-neutral-400 text-center pt-8 px-4 font-medium">
-                                    {search ? 'Nada encontrado.' : 'Seu histórico aparecerá aqui.'}
+                                    {search ? 'Nada encontrado.' : 'Comece uma nova conversa para salvar o histórico.'}
                                 </p>
                             ) : (
                                 filteredGroups.map((group) => (
                                     <div key={group.label}>
-                                        <p className="text-[11px] font-semibold text-neutral-400 uppercase tracking-widest px-4 mb-2">
+                                        <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest px-4 mb-3">
                                             {group.label}
                                         </p>
                                         <div className="space-y-1">
@@ -473,7 +515,7 @@ function ConversationSidebar({
                                                                     if (e.key === 'Escape') setEditingUuid(null);
                                                                 }}
                                                                 onBlur={() => handleRename(item.uuid)}
-                                                                className="h-8 text-[13px]"
+                                                                className="h-9 text-[13px] rounded-xl focus:ring-2 focus:ring-blue-500/20"
                                                             />
                                                         </div>
                                                     ) : (
@@ -483,39 +525,40 @@ function ConversationSidebar({
                                                                     router.visit(route('assistant.show', item.uuid));
                                                                     onClose();
                                                                 }}
-                                                                className={`w-full text-left pl-4 pr-10 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                                                                className={`w-full text-left pl-4 pr-10 py-3 rounded-2xl text-[14px] font-medium transition-all duration-200 flex items-center gap-3 focus:outline-none ${
                                                                     item.uuid === activeUuid
-                                                                        ? 'bg-blue-50 text-blue-700'
-                                                                        : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+                                                                        ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100'
+                                                                        : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 border border-transparent'
                                                                 }`}
                                                             >
                                                                 <MessageSquare className={`w-4 h-4 flex-shrink-0 ${item.uuid === activeUuid ? 'text-blue-500' : 'text-neutral-400'}`} />
                                                                 <span className="truncate flex-1">{item.title || 'Nova Conversa'}</span>
-                                                                {item.is_pinned && <Pin className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" />}
+                                                                {item.is_pinned && <Pin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />}
                                                             </button>
 
                                                             <DropdownMenu>
                                                                 <DropdownMenuTrigger asChild>
-                                                                    <button className="absolute right-2 opacity-0 group-hover/item:opacity-100 p-1.5 rounded-lg hover:bg-neutral-200 text-neutral-500 transition-all focus:opacity-100">
+                                                                    <button className="absolute right-3 opacity-0 group-hover/item:opacity-100 p-2 rounded-xl hover:bg-white border border-transparent hover:border-neutral-200 hover:shadow-sm text-neutral-500 transition-all focus:opacity-100">
                                                                         <MoreHorizontal className="w-4 h-4" />
                                                                     </button>
                                                                 </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end" className="w-48">
-                                                                    <DropdownMenuItem onClick={() => {
+                                                                <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-neutral-100">
+                                                                    <DropdownMenuItem className="py-2.5 cursor-pointer rounded-lg" onClick={() => {
                                                                         setEditingUuid(item.uuid);
                                                                         setEditTitle(item.title);
                                                                     }}>
-                                                                        <Edit2 className="w-4 h-4 mr-2" />
+                                                                        <Edit2 className="w-4 h-4 mr-2 text-neutral-500" />
                                                                         Renomear
                                                                     </DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={() => handleTogglePin(item.uuid, item.is_pinned ?? false)}>
+                                                                    <DropdownMenuItem className="py-2.5 cursor-pointer rounded-lg" onClick={() => handleTogglePin(item.uuid, item.is_pinned ?? false)}>
                                                                         {item.is_pinned ? (
-                                                                            <><PinOff className="w-4 h-4 mr-2" /> Desafixar</>
+                                                                            <><PinOff className="w-4 h-4 mr-2 text-neutral-500" /> Desafixar</>
                                                                         ) : (
-                                                                            <><Pin className="w-4 h-4 mr-2" /> Fixar</>
+                                                                            <><Pin className="w-4 h-4 mr-2 text-neutral-500" /> Fixar</>
                                                                         )}
                                                                     </DropdownMenuItem>
-                                                                    <DropdownMenuItem className="text-red-600 focus:bg-red-50 focus:text-red-700" onClick={() => setConversationToDelete(item)}>
+                                                                    <div className="h-[1px] bg-neutral-100 my-1" />
+                                                                    <DropdownMenuItem className="py-2.5 cursor-pointer rounded-lg text-red-600 focus:bg-red-50 focus:text-red-700" onClick={() => setConversationToDelete(item)}>
                                                                         <Trash className="w-4 h-4 mr-2" />
                                                                         Excluir
                                                                     </DropdownMenuItem>
@@ -532,18 +575,34 @@ function ConversationSidebar({
                         </div>
                     </motion.div>
 
-                    {/* Delete Confirmation Dialog */}
+                    {/* Sidebar Delete Confirmation Dialog */}
                     <Dialog open={!!conversationToDelete} onOpenChange={(open) => !open && setConversationToDelete(null)}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Excluir conversa?</DialogTitle>
-                                <DialogDescription>
-                                    Tem certeza que deseja excluir "{conversationToDelete?.title}"? Esta ação não pode ser desfeita.
+                        <DialogContent className="sm:max-w-md bg-white border-0 shadow-2xl rounded-3xl p-6">
+                            <DialogHeader className="mb-4">
+                                <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                                </div>
+                                <DialogTitle className="text-center text-xl font-semibold text-neutral-900">Excluir Chat</DialogTitle>
+                                <DialogDescription className="text-center text-neutral-500 mt-2 text-[15px]">
+                                    Tem certeza que deseja apagar o chat <strong>"{conversationToDelete?.title}"</strong>?<br/> 
+                                    Essa ação será definitiva e todo o contexto da conversa será perdido.
                                 </DialogDescription>
                             </DialogHeader>
-                            <DialogFooter>
-                                <Button variant="outline" onClick={() => setConversationToDelete(null)}>Cancelar</Button>
-                                <Button variant="destructive" onClick={handleDelete}>Excluir</Button>
+                            <DialogFooter className="flex gap-3 sm:justify-center w-full mt-6">
+                                <Button 
+                                    variant="outline" 
+                                    className="flex-1 rounded-xl h-11 text-[15px] font-medium border-neutral-200 hover:bg-neutral-50"
+                                    onClick={() => setConversationToDelete(null)}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button 
+                                    variant="destructive" 
+                                    className="flex-1 rounded-xl h-11 text-[15px] font-medium bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20"
+                                    onClick={handleDelete}
+                                >
+                                    Excluir Chat
+                                </Button>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
@@ -559,16 +618,17 @@ function MessageInput({
     conversationUuid,
     value,
     onChange,
+    isProcessing
 }: {
     conversationUuid?: string;
     value: string;
     onChange: (v: string) => void;
+    isProcessing: boolean;
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const { post, processing } = useForm({ content: value });
 
     const handleSubmit = () => {
-        if (!value.trim() || processing) return;
+        if (!value.trim() || isProcessing) return;
 
         if (!conversationUuid) {
             router.post(
@@ -605,23 +665,22 @@ function MessageInput({
         ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
     }, [value]);
 
-    const disabled = false; // Never disabled, can type in empty state
     const hasValue = value.trim().length > 0;
 
     return (
         <div className="px-4 pb-8 pt-4 w-full max-w-3xl mx-auto flex-shrink-0 relative bg-white">
-            <div className={`relative bg-neutral-50/50 border rounded-3xl transition-all duration-300 shadow-sm ${
-                !hasValue && !conversationUuid ? 'border-neutral-200 opacity-90' : 'border-neutral-200 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 focus-within:bg-white'
+            <div className={`relative bg-neutral-50/50 border rounded-3xl transition-all duration-300 shadow-sm overflow-hidden ${
+                !hasValue && !conversationUuid ? 'border-neutral-200 opacity-90' : 'border-neutral-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:bg-white'
             }`}>
                 <textarea
                     ref={textareaRef}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    disabled={processing}
-                    placeholder="Mande uma mensagem para a IA..."
+                    disabled={isProcessing}
+                    placeholder="Mande uma pergunta para o Nodal AI."
                     rows={1}
-                    className="w-full bg-transparent text-neutral-900 placeholder:text-neutral-400 text-[15px] resize-none outline-none px-6 pt-5 pb-16 leading-relaxed max-h-[250px] font-medium"
+                    className="w-full bg-transparent text-neutral-900 placeholder:text-neutral-400 text-[15px] resize-none outline-none px-6 pt-5 pb-16 leading-relaxed max-h-[200px] overflow-hidden font-medium"
                 />
 
                 <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between">
@@ -636,18 +695,14 @@ function MessageInput({
 
                     <button
                         onClick={handleSubmit}
-                        disabled={disabled || !hasValue || processing}
+                        disabled={isProcessing || !hasValue}
                         className={`p-2.5 rounded-2xl transition-all duration-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                            hasValue && !disabled
-                                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 shadow-blue-600/20'
+                            hasValue && !isProcessing
+                                ? 'bg-[#0048AA] hover:bg-blue-700 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 shadow-blue-600/20'
                                 : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
                         }`}
                     >
-                        {processing ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                            <ArrowLeft className="w-5 h-5 rotate-[135deg]" />
-                        )}
+                        <ArrowLeft className="w-5 h-5 rotate-[135deg]" />
                     </button>
                 </div>
             </div>
@@ -665,7 +720,18 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Watch Inertia events to show the AI typing indicator
+    useEffect(() => {
+        const removeStart = router.on('start', () => setIsProcessing(true));
+        const removeFinish = router.on('finish', () => setIsProcessing(false));
+        return () => {
+            removeStart();
+            removeFinish();
+        };
+    }, []);
 
     useEffect(() => {
         const timer = setTimeout(() => setIsLoading(false), 500);
@@ -676,7 +742,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
         if (!isLoading) {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [messages, isLoading]);
+    }, [messages, isLoading, isProcessing]);
 
     const handleRename = (title: string) => {
         if (!conversation) return;
@@ -687,9 +753,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
 
     const handleDelete = () => {
         if (!conversation) return;
-        if (confirm('Excluir esta conversa? Esta ação não pode ser desfeita.')) {
-            router.delete(route('assistant.destroy', conversation.uuid));
-        }
+        router.delete(route('assistant.destroy', conversation.uuid));
     };
 
     return (
@@ -738,6 +802,21 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                                     {messages.map((msg) => (
                                         <MessageBubble key={msg.uuid} message={msg} />
                                     ))}
+                                    
+                                    {/* AI Typing Indicator */}
+                                    {isProcessing && (
+                                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4 px-4 py-3 w-full max-w-3xl mx-auto">
+                                            <div className="w-8 h-8 rounded-full bg-blue-50/50 border border-blue-100 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm overflow-hidden">
+                                                <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-5 h-5 object-contain opacity-80 pulse-animation" />
+                                            </div>
+                                            <div className="bg-neutral-50 border border-neutral-100 rounded-3xl rounded-bl-sm px-5 py-4 flex items-center gap-1.5 h-12 shadow-sm">
+                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0 }} className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
+                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.15 }} className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
+                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.3 }} className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
+                                            </div>
+                                        </motion.div>
+                                    )}
+
                                     <div ref={messagesEndRef} className="h-4" />
                                 </motion.div>
                             )}
@@ -749,6 +828,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                         conversationUuid={conversation?.uuid}
                         value={inputValue}
                         onChange={setInputValue}
+                        isProcessing={isProcessing}
                     />
                 </div>
             </div>

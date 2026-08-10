@@ -35,7 +35,7 @@ class GoogleOrganizationSyncService
                     'admin_name' => $data['admin_name'],
                     'total_users' => $data['total_users'],
                     'total_groups' => $data['total_groups'],
-                    'organization_json' => $data['original_response'],
+                    'organization_json' => $data['original_response'] ?? null,
                     'last_synced_at' => now(),
                 ]
             );

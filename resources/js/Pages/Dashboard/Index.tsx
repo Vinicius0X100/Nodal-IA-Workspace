@@ -1,7 +1,9 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Users, Blocks, Activity, ShieldAlert, MailWarning, ShieldCheck, ArrowRight, X } from 'lucide-react';
+import { Users, Blocks, Activity, ShieldAlert, MailWarning, ShieldCheck, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 
 interface Alert {
     type: string;
@@ -84,12 +86,31 @@ function AlertBanner({ alert }: { alert: Alert }) {
     );
 }
 
+/* ── Stat Card Shimmer ────────────────────────── */
+function StatCardSkeleton() {
+    return (
+        <div className="bg-white rounded-2xl px-6 py-5 border border-neutral-100 animate-pulse">
+            <div className="flex items-center justify-between mb-4">
+                <div className="h-3 w-24 bg-neutral-100 rounded-full" />
+                <div className="w-7 h-7 rounded-lg bg-neutral-100" />
+            </div>
+            <div className="h-9 w-16 bg-neutral-100 rounded-lg mb-2" />
+            <div className="h-3 w-20 bg-neutral-100 rounded-full" />
+        </div>
+    );
+}
+
 /* ── Stat Card — Apple style ──────────────────── */
-function StatCard({ label, value, sub, icon: Icon }: {
-    label: string; value: number | string; sub?: string; icon: any;
+function StatCard({ label, value, sub, icon: Icon, delay = 0 }: {
+    label: string; value: number | string; sub?: string; icon: any; delay?: number;
 }) {
     return (
-        <div className="bg-white rounded-2xl px-6 py-5 border border-neutral-100 hover:border-neutral-200 transition-all">
+        <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay, ease: [0.16, 1, 0.3, 1] }}
+            className="bg-white rounded-2xl px-6 py-5 border border-neutral-100 hover:border-neutral-200 hover:shadow-sm transition-all"
+        >
             <div className="flex items-center justify-between mb-4">
                 <span className="text-xs font-semibold uppercase tracking-widest text-neutral-400">{label}</span>
                 <div className="w-7 h-7 rounded-lg bg-neutral-50 flex items-center justify-center">
@@ -98,12 +119,120 @@ function StatCard({ label, value, sub, icon: Icon }: {
             </div>
             <div className="text-3xl font-bold tracking-tighter text-neutral-900">{value}</div>
             {sub && <p className="text-xs text-neutral-400 mt-1">{sub}</p>}
-        </div>
+        </motion.div>
+    );
+}
+
+/* ── Nodal AI Hero Card ───────────────────────── */
+function NodalAIHero({ orgName }: { orgName: string }) {
+    const [query, setQuery] = useState('');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const q = query.trim();
+        if (!q) {
+            router.visit(route('assistant.index'));
+            return;
+        }
+        // Navigate to assistant and carry the message to be pre-filled
+        router.post(route('assistant.store'), { message: q }, {
+            preserveScroll: false,
+        });
+    };
+
+    const handleInputClick = () => {
+        if (!query) {
+            router.visit(route('assistant.index'));
+        }
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="relative overflow-hidden rounded-3xl"
+            style={{
+                background: 'linear-gradient(135deg, #0039A6 0%, #0048AA 30%, #0066FF 70%, #338BFF 100%)',
+            }}
+        >
+            {/* Decorative blobs */}
+            <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-20 -left-10 w-72 h-72 rounded-full bg-blue-300/10 blur-3xl pointer-events-none" />
+            <div className="absolute top-0 right-0 w-full h-full opacity-[0.04] pointer-events-none"
+                style={{ backgroundImage: 'radial-gradient(circle at 80% 20%, white 0%, transparent 60%)' }}
+            />
+
+            <div className="relative px-7 py-7 flex flex-col gap-5">
+                {/* Header */}
+                <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-inner">
+                        <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-6 h-6 object-contain brightness-200" />
+                    </div>
+                    <div>
+                        <h2 className="text-white font-bold text-lg leading-tight tracking-tight">Nodal AI</h2>
+                        <p className="text-blue-200 text-xs font-medium mt-0.5">Assistente inteligente do seu workspace</p>
+                    </div>
+                    <span className="ml-auto text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/15 text-white/80 border border-white/10">
+                        BETA
+                    </span>
+                </div>
+
+                {/* Prompt area */}
+                <form onSubmit={handleSubmit}>
+                    <div
+                        className="relative bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl transition-all duration-200 cursor-text focus-within:bg-white/15 focus-within:border-white/30 focus-within:shadow-lg"
+                        onClick={() => inputRef.current?.focus()}
+                    >
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            onClick={handleInputClick}
+                            placeholder={`Pergunte algo ao Nodal AI...`}
+                            className="w-full bg-transparent text-white placeholder:text-blue-200/70 text-[14px] font-medium outline-none px-5 py-3.5 pr-14"
+                        />
+                        <button
+                            type="submit"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl bg-white/20 hover:bg-white/30 transition-colors flex items-center justify-center"
+                        >
+                            <ArrowRight className="w-4 h-4 text-white" />
+                        </button>
+                    </div>
+                </form>
+
+                {/* Suggestions */}
+                <div className="flex flex-wrap gap-2">
+                    {['Resumir documentos', 'Buscar membros', 'Analisar grupos'].map((s) => (
+                        <button
+                            key={s}
+                            type="button"
+                            onClick={() => {
+                                setQuery(s + ' ');
+                                inputRef.current?.focus();
+                            }}
+                            className="text-xs font-medium px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-blue-100 hover:text-white border border-white/10 transition-all"
+                        >
+                            {s}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </motion.div>
     );
 }
 
 /* ── Main ─────────────────────────────────────── */
 export default function Dashboard({ organization, integrations_status, alerts, email_verified }: DashboardProps) {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        const t = setTimeout(() => setMounted(true), 100);
+        return () => clearTimeout(t);
+    }, []);
+
     const integrationEntries = Object.entries(integrations_status);
     const verified = organization.verification_status === 'verified';
     const underReview = organization.verification_status === 'under_review';
@@ -116,18 +245,31 @@ export default function Dashboard({ organization, integrations_status, alerts, e
 
                 {/* Alertas — topo da página */}
                 {alerts.length > 0 && (
-                    <div className="space-y-3">
+                    <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-3"
+                    >
                         {alerts.map(alert => (
                             <AlertBanner key={alert.type} alert={alert} />
                         ))}
-                    </div>
+                    </motion.div>
                 )}
 
+                {/* Nodal AI Hero */}
+                <NodalAIHero orgName={organization.name} />
+
                 {/* Boas-vindas */}
-                <div className="flex items-center justify-between">
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex items-center justify-between"
+                >
                     <div>
                         <h2 className="text-2xl font-bold tracking-tight text-neutral-900">
-                            Bem-vindo ao workspace da {organization.name}
+                            Workspace da {organization.name}
                         </h2>
                         <p className="text-neutral-500 mt-1 text-sm">Aqui está o resumo das suas conexões e membros.</p>
                     </div>
@@ -144,33 +286,47 @@ export default function Dashboard({ organization, integrations_status, alerts, e
                             <span className="text-xs font-semibold text-amber-700">Em Análise</span>
                         </div>
                     )}
-                </div>
+                </motion.div>
 
                 {/* Stats */}
                 <div className="grid gap-4 md:grid-cols-3">
-                    <StatCard label="Membros Ativos" value={organization.users_count} sub="+1 esta semana" icon={Users} />
-                    <StatCard label="Sistemas Conectados" value={organization.integrations_count} sub="4 disponíveis" icon={Blocks} />
-                    <StatCard label="Eventos Hoje" value={0} sub="Auditoria em tempo real" icon={Activity} />
+                    {!mounted ? (
+                        <>
+                            <StatCardSkeleton />
+                            <StatCardSkeleton />
+                            <StatCardSkeleton />
+                        </>
+                    ) : (
+                        <>
+                            <StatCard label="Membros Ativos" value={organization.users_count} sub="+1 esta semana" icon={Users} delay={0.25} />
+                            <StatCard label="Sistemas Conectados" value={organization.integrations_count} sub="4 disponíveis" icon={Blocks} delay={0.32} />
+                            <StatCard label="Eventos Hoje" value={0} sub="Auditoria em tempo real" icon={Activity} delay={0.39} />
+                        </>
+                    )}
                 </div>
 
                 {/* Integrações */}
                 {integrationEntries.length > 0 && (
-                    <div>
+                    <motion.div
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                    >
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-base font-semibold tracking-tight text-neutral-900">Integrações</h3>
-                            <span className="text-sm font-medium text-primary-600 hover:text-primary-700 cursor-pointer transition-colors">
+                            <Link href={route('integrations.index')} className="text-sm font-medium text-[#0048AA] hover:text-blue-700 cursor-pointer transition-colors">
                                 Ver catálogo →
-                            </span>
+                            </Link>
                         </div>
                         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                             {integrationEntries.map(([provider, status]) => (
                                 <div
                                     key={provider}
-                                    className="bg-white border border-neutral-100 hover:border-neutral-200 rounded-2xl p-5 transition-all cursor-pointer group"
+                                    className="bg-white border border-neutral-100 hover:border-neutral-200 rounded-2xl p-5 transition-all cursor-pointer group hover:shadow-sm"
                                 >
                                     <div className="flex items-start justify-between mb-4">
-                                        <div className="w-9 h-9 rounded-xl bg-neutral-50 flex items-center justify-center group-hover:bg-primary-50 transition-colors">
-                                            <Blocks className="w-4 h-4 text-neutral-400 group-hover:text-primary-500" />
+                                        <div className="w-9 h-9 rounded-xl bg-neutral-50 flex items-center justify-center group-hover:bg-blue-50 transition-colors">
+                                            <Blocks className="w-4 h-4 text-neutral-400 group-hover:text-blue-500" />
                                         </div>
                                         <span className={cn(
                                             'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider',
@@ -186,18 +342,23 @@ export default function Dashboard({ organization, integrations_status, alerts, e
                                 </div>
                             ))}
                         </div>
-                    </div>
+                    </motion.div>
                 )}
 
                 {/* Placeholder se sem integrações */}
                 {integrationEntries.length === 0 && (
-                    <div className="bg-white border border-neutral-100 rounded-2xl px-6 py-10 text-center">
+                    <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: 0.45 }}
+                        className="bg-white border border-neutral-100 rounded-2xl px-6 py-10 text-center"
+                    >
                         <div className="w-12 h-12 bg-neutral-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                             <Blocks className="w-6 h-6 text-neutral-300" />
                         </div>
                         <h3 className="text-sm font-semibold text-neutral-900 mb-1">Nenhuma integração ativa</h3>
                         <p className="text-sm text-neutral-400">Conecte seus sistemas favoritos para começar.</p>
-                    </div>
+                    </motion.div>
                 )}
             </div>
         </AppLayout>

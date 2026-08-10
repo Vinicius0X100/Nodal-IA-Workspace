@@ -54,8 +54,48 @@ interface AppLayoutProps {
     title?: string;
 }
 
+function NodalAISidebarButton({ item }: { item: any }) {
+    return (
+        <Link
+            href={item.href}
+            className={cn(
+                "group relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 overflow-hidden",
+                item.active
+                    ? "bg-gradient-to-r from-[#0048AA] to-[#0066FF] text-white shadow-lg shadow-blue-500/25"
+                    : "bg-gradient-to-r from-[#0048AA]/10 to-[#0066FF]/10 text-[#0048AA] hover:from-[#0048AA]/15 hover:to-[#0066FF]/15 hover:shadow-md hover:shadow-blue-500/10"
+            )}
+        >
+            {/* Shimmer effect */}
+            {!item.active && (
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700 ease-in-out" />
+            )}
+            <div className={cn(
+                "w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden",
+                item.active ? "bg-white/20" : "bg-[#0048AA]/10"
+            )}>
+                <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-4 h-4 object-contain" />
+            </div>
+            <span className="flex-1">Nodal AI</span>
+            {!item.active && (
+                <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-[#0048AA]/10 text-[#0048AA]/70">
+                    NEW
+                </span>
+            )}
+            {item.active && (
+                <span className="flex h-2 w-2">
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white/80"></span>
+                </span>
+            )}
+        </Link>
+    );
+}
+
 function SidebarItem({ item }: { item: any }) {
     const [isOpen, setIsOpen] = useState(item.active);
+
+    if (item.isAI) {
+        return <NodalAISidebarButton item={item} />;
+    }
 
     if (item.subItems) {
         return (
@@ -173,7 +213,7 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
         {
             title: 'Geral',
             items: [
-                { name: 'IA', href: route('assistant.index'), icon: BotMessageSquare, active: route().current('assistant.*') },
+                { name: 'Nodal AI', href: route('assistant.index'), icon: BotMessageSquare, active: route().current('assistant.*'), isAI: true },
                 { name: 'Dashboard', href: route('dashboard'), icon: LayoutDashboard, active: route().current('dashboard') },
                 { name: 'Resources', href: route('resources.index'), icon: Files, active: route().current('resources.*') },
             ]
