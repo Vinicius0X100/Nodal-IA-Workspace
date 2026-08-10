@@ -58,6 +58,13 @@ class GoogleDirectorySyncService
      */
     public function syncGroupMembers(Integration $integration, Group $group): void
     {
+        Log::info('[Google Group Sync] ENTER syncGroupMembers', [
+            'integration_id' => $integration->id,
+            'group_uuid' => $group->uuid,
+            'has_token' => !empty($integration->access_token),
+            'has_external_id' => !empty($group->external_id),
+        ]);
+
         if (!$integration->access_token || !$group->external_id) {
             return;
         }
