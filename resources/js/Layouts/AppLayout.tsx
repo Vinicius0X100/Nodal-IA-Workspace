@@ -477,7 +477,7 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                     </div>
                 </header>
                 <div className="p-8 flex-1">
-                    <div className="max-w-6xl mx-auto">
+                    <div>
                         {children}
                     </div>
                 </div>
