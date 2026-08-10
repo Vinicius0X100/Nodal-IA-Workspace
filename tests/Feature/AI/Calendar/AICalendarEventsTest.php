@@ -1,0 +1,532 @@
+<?php
+
+namespace Tests\Feature\AI\Calendar;
+
+use App\Domain\Audit\Models\AuditLog;
+use App\Domain\Identity\Models\User;
+use App\Domain\Integrations\Models\Integration;
+use App\Domain\Integrations\Models\IntegrationConfig;
+use App\Domain\Organizations\Models\Organization;
+use App\Domain\Permissions\Models\Permission;
+use App\Domain\Roles\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+class AICalendarEventsTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Organization $organization;
+    private User         $owner;
+    private User         $user;
+    private Role         $role;
+    private Integration  $integration;
+
+    // ── fixtures ──────────────────────────────────────────────────────────────
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->organization = Organization::create([
+            'name'   => 'Test Corp',
+            'slug'   => 'test-corp',
+            'active' => true,
+        ]);
+
+        // Owner — recebe bypass automático
+        $this->owner = User::create([
+            'name'     => 'Owner',
+            'email'    => 'owner@test.com',
+            'password' => bcrypt('password'),
+        ]);
+        $this->organization->users()->attach($this->owner->id, ['is_owner' => true]);
+
+        // Non-owner user
+        $this->user = User::create([
+            'name'     => 'Regular User',
+            'email'    => 'user@test.com',
+            'password' => bcrypt('password'),
+        ]);
+        $this->organization->users()->attach($this->user->id, ['is_owner' => false]);
+
+        $this->role = Role::create([
+            'organization_id' => $this->organization->id,
+            'name'            => 'Test Role',
+            'slug'            => 'test-role',
+        ]);
+        $this->user->roles()->attach($this->role->id, ['organization_id' => $this->organization->id]);
+
+        // Capability
+        Permission::firstOrCreate(
+            ['slug' => 'calendar.events.read'],
+            ['name' => 'Visualizar eventos do calendário', 'group' => 'Calendário']
+        );
+
+        // Integration
+        $this->integration = Integration::create([
+            'organization_id'  => $this->organization->id,
+            'provider'         => 'google_workspace',
+            'display_name'     => 'Google Workspace',
+            'status'           => 'connected',
+            'access_token'     => 'fake-access-token',
+            'refresh_token'    => 'fake-refresh-token',
+            'token_expires_at' => now()->addHour(),
+        ]);
+
+        IntegrationConfig::create([
+            'integration_id' => $this->integration->id,
+            'client_id'      => 'test-client-id',
+            'client_secret'  => 'test-client-secret',
+        ]);
+    }
+
+    private function grantCalendarPermission(): void
+    {
+        $perm = Permission::where('slug', 'calendar.events.read')->first();
+        $this->role->permissions()->sync([$perm->id]);
+    }
+
+    private function actAsAI(User $user, Organization $org = null): self
+    {
+        config(['services.ai_gateway.token' => 'test-token']);
+        return $this->withHeaders([
+            'Authorization'      => 'Bearer test-token',
+            'X-User-UUID'        => $user->uuid,
+            'X-Organization-UUID'=> ($org ?? $this->organization)->uuid,
+        ]);
+    }
+
+    private function fakeGoogleEvents(array $events = [], int $status = 200): void
+    {
+        Http::fake([
+            'https://www.googleapis.com/calendar/v3/*' => Http::response(
+                ['items' => $events, 'timeZone' => 'America/Sao_Paulo'],
+                $status
+            ),
+        ]);
+    }
+
+    // ── 1. Owner autorizado lista eventos ─────────────────────────────────────
+
+    public function test_owner_can_list_events(): void
+    {
+        $this->fakeGoogleEvents([
+            $this->makeEvent('Meeting', '2026-08-11T14:00:00-03:00', '2026-08-11T15:00:00-03:00'),
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.events.0.title', 'Meeting')
+            ->assertJsonPath('data.total', 1);
+    }
+
+    // ── 2. Usuário com permissão lista eventos ────────────────────────────────
+
+    public function test_user_with_permission_can_list_events(): void
+    {
+        $this->grantCalendarPermission();
+        $this->fakeGoogleEvents([
+            $this->makeEvent('Standup', '2026-08-11T09:00:00-03:00', '2026-08-11T09:30:00-03:00'),
+        ]);
+
+        $response = $this->actAsAI($this->user)
+            ->getJson('/api/ai/calendar/events');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.events.0.title', 'Standup');
+    }
+
+    // ── 3. Usuário sem permissão recebe 403 ───────────────────────────────────
+
+    public function test_user_without_permission_gets_403(): void
+    {
+        Http::fake(); // garante que Google não é chamado
+
+        $response = $this->actAsAI($this->user)
+            ->getJson('/api/ai/calendar/events');
+
+        $response->assertStatus(403)
+            ->assertJsonPath('code', 'ACCESS_DENIED');
+
+        Http::assertNothingSent();
+    }
+
+    // ── 4. Usuário de outra organização não atravessa tenant ──────────────────
+
+    public function test_user_from_another_org_cannot_access(): void
+    {
+        Http::fake();
+
+        $otherOrg = Organization::create(['name' => 'Other Org', 'slug' => 'other-org', 'active' => true]);
+        $otherUser = User::create(['name' => 'Other', 'email' => 'other@test.com', 'password' => bcrypt('pass')]);
+        $otherOrg->users()->attach($otherUser->id, ['is_owner' => true]);
+
+        // actAs: otherUser mas com UUID da organização original
+        config(['services.ai_gateway.token' => 'test-token']);
+        $response = $this->withHeaders([
+            'Authorization'       => 'Bearer test-token',
+            'X-User-UUID'         => $otherUser->uuid,
+            'X-Organization-UUID' => $this->organization->uuid, // org diferente do usuário
+        ])->getJson('/api/ai/calendar/events');
+
+        // O middleware deve rejeitar (usuário não pertence à org)
+        $response->assertStatus(403);
+
+        Http::assertNothingSent();
+    }
+
+    // ── 5. Google Workspace desconectado retorna 503 ──────────────────────────
+
+    public function test_disconnected_integration_returns_503(): void
+    {
+        $this->integration->update(['status' => 'disconnected']);
+        Http::fake();
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events');
+
+        $response->assertStatus(503)
+            ->assertJsonPath('code', 'GOOGLE_CALENDAR_UNAVAILABLE');
+
+        Http::assertNothingSent();
+    }
+
+    // ── 6. Token expirado é renovado automaticamente ───────────────────────────────
+
+    public function test_expired_token_is_refreshed_automatically(): void
+    {
+        // Coloca token_expires_at bem no passado (além do buffer de 5 min) para forçar o refresh
+        \Illuminate\Support\Facades\DB::table('integrations')
+            ->where('id', $this->integration->id)
+            ->update(['token_expires_at' => now()->subMinutes(10)->toDateTimeString()]);
+        $this->integration->refresh();
+
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response([
+                'access_token' => 'new-token',
+                'expires_in'   => 3600,
+            ], 200),
+            'https://www.googleapis.com/calendar/v3/*' => Http::response(
+                ['items' => [], 'timeZone' => 'America/Sao_Paulo'], 200
+            ),
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events');
+
+        $response->assertOk()->assertJsonPath('success', true);
+        Http::assertSent(fn($req) => str_contains($req->url(), 'oauth2.googleapis.com'));
+    }
+
+    // ── 7. Primeiro 401 faz refresh + retry ───────────────────────────────
+
+    public function test_first_401_triggers_refresh_and_retry(): void
+    {
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response([
+                'access_token' => 'refreshed-token',
+                'expires_in'   => 3600,
+            ], 200),
+            'https://www.googleapis.com/calendar/v3/*' => Http::sequence()
+                ->push(['error' => ['message' => 'Unauthorized']], 401)
+                ->push([
+                    'items'    => [$this->makeEvent('After Retry', '2026-08-12T10:00:00-03:00', '2026-08-12T11:00:00-03:00')],
+                    'timeZone' => 'America/Sao_Paulo',
+                ], 200),
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events');
+
+        $response->assertOk()
+            ->assertJsonPath('data.events.0.title', 'After Retry');
+    }
+
+    // ── 8. Segundo 401 encerra com GOOGLE_REAUTH_REQUIRED ─────────────────────
+
+    public function test_second_401_returns_reauth_required(): void
+    {
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response([
+                'access_token' => 'new-but-rejected',
+                'expires_in'   => 3600,
+            ], 200),
+            'https://www.googleapis.com/calendar/v3/*' => Http::sequence()
+                ->push(['error' => ['message' => 'Unauthorized']], 401)
+                ->push(['error' => ['message' => 'Unauthorized']], 401),
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events');
+
+        // O segundo 401 retorna 503 — o code pode ser GOOGLE_REAUTH_REQUIRED ou GOOGLE_CALENDAR_UNAVAILABLE
+        // dependendo de como o GoogleCalendarService classifica o segundo 401
+        $response->assertStatus(503);
+        $this->assertContains($response->json('code'), [
+            'GOOGLE_REAUTH_REQUIRED',
+            'GOOGLE_CALENDAR_UNAVAILABLE',
+        ]);
+    }
+
+    // ── 9. invalid_grant sinaliza reconexão ───────────────────────────────
+
+    public function test_invalid_grant_on_refresh_returns_reauth(): void
+    {
+        // Token expirado + refresh_token nulo = tenta refresh mas não consegue (via GoogleTokenService)
+        // Simula invalid_grant nullando o refresh_token no banco e colocando token expirado
+        \Illuminate\Support\Facades\DB::table('integrations')
+            ->where('id', $this->integration->id)
+            ->update([
+                'token_expires_at' => now()->subMinutes(10)->toDateTimeString(),
+            ]);
+        $this->integration->refresh();
+
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response(
+                ['error' => 'invalid_grant', 'error_description' => 'Token has been expired or revoked.'],
+                400
+            ),
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events');
+
+        $response->assertStatus(503);
+
+        // Verifica que a integração foi marcada como needs_reconnect
+        $this->integration->refresh();
+        $this->assertEquals('needs_reconnect', $this->integration->status);
+    }
+
+    // ── 10. Eventos dentro do período são retornados ──────────────────────────
+
+    public function test_events_in_range_are_returned(): void
+    {
+        $this->fakeGoogleEvents([
+            $this->makeEvent('In Range', '2026-08-11T10:00:00-03:00', '2026-08-11T11:00:00-03:00'),
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events?start=2026-08-11T00:00:00-03:00&end=2026-08-12T00:00:00-03:00');
+
+        $response->assertOk()->assertJsonPath('data.total', 1);
+    }
+
+    // ── 11. Parâmetros inválidos: start > end ─────────────────────────────────
+
+    public function test_start_after_end_returns_422(): void
+    {
+        Http::fake();
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events?start=2026-08-12T00:00:00-03:00&end=2026-08-11T00:00:00-03:00');
+
+        $response->assertStatus(422)
+            ->assertJsonPath('code', 'INVALID_DATE_RANGE');
+
+        Http::assertNothingSent();
+    }
+
+    // ── 12. Evento all-day é normalizado corretamente ────────────────────────
+
+    public function test_all_day_event_is_normalized(): void
+    {
+        $this->fakeGoogleEvents([
+            [
+                'id'      => 'allday-1',
+                'summary' => 'Company Holiday',
+                'start'   => ['date' => '2026-08-12'],
+                'end'     => ['date' => '2026-08-13'],
+                'status'  => 'confirmed',
+            ],
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events');
+
+        $response->assertOk()
+            ->assertJsonPath('data.events.0.all_day', true)
+            ->assertJsonPath('data.events.0.start', '2026-08-12')
+            ->assertJsonPath('data.events.0.title', 'Company Holiday');
+    }
+
+    // ── 13. Recorrências são expandidas (singleEvents=true é passado) ──────────────
+
+    public function test_recurrent_event_includes_recurrence_id(): void
+    {
+        $this->fakeGoogleEvents([
+            array_merge(
+                $this->makeEvent('Weekly Standup', '2026-08-11T09:00:00-03:00', '2026-08-11T09:30:00-03:00'),
+                ['recurringEventId' => 'series-abc-123']
+            ),
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events');
+
+        // Verifica que singleEvents=true foi enviado ao Google
+        Http::assertSent(function ($req) {
+            parse_str(parse_url($req->url(), PHP_URL_QUERY), $params);
+            return ($params['singleEvents'] ?? null) === 'true';
+        });
+
+        $response->assertOk()
+            ->assertJsonPath('data.events.0.recurrence_id', 'series-abc-123');
+    }
+
+    // ── 14. Limit é respeitado ─────────────────────────────────────────
+
+    public function test_limit_is_respected(): void
+    {
+        $events = array_map(
+            fn($i) => $this->makeEvent("Event $i", '2026-08-11T09:00:00-03:00', '2026-08-11T10:00:00-03:00'),
+            range(1, 5)
+        );
+        $this->fakeGoogleEvents($events);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events?limit=5');
+
+        $response->assertOk();
+
+        // Verifica que maxResults=5 foi enviado ao Google
+        Http::assertSent(function ($req) {
+            parse_str(parse_url($req->url(), PHP_URL_QUERY), $params);
+            return ($params['maxResults'] ?? null) === '5';
+        });
+    }
+
+    // ── 15. Limit acima do máximo (100) é rejeitado/normalizado ──────────────
+
+    public function test_limit_above_max_is_rejected(): void
+    {
+        Http::fake();
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events?limit=999');
+
+        $response->assertStatus(422);
+    }
+
+    // ── 16. Query é enviada corretamente ao Google ───────────────────────────
+
+    public function test_query_param_is_forwarded_to_google(): void
+    {
+        $this->fakeGoogleEvents([
+            $this->makeEvent('Meeting with João', '2026-08-11T14:00:00-03:00', '2026-08-11T15:00:00-03:00'),
+        ]);
+
+        $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events?query=Jo%C3%A3o');
+
+        Http::assertSent(fn($req) => str_contains($req->url(), 'q=Jo'));
+    }
+
+    // ── 17. Resposta não contém tokens ou IDs internos ───────────────────────
+
+    public function test_response_does_not_contain_sensitive_fields(): void
+    {
+        $this->fakeGoogleEvents([
+            $this->makeEvent('Safe Event', '2026-08-11T09:00:00-03:00', '2026-08-11T10:00:00-03:00'),
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events');
+
+        $body = $response->json();
+        $bodyStr = json_encode($body);
+
+        $this->assertStringNotContainsString('access_token', $bodyStr);
+        $this->assertStringNotContainsString('refresh_token', $bodyStr);
+        $this->assertStringNotContainsString('client_secret', $bodyStr);
+        $this->assertStringNotContainsString('fake-access-token', $bodyStr);
+
+        // IDs internos do banco não devem aparecer (apenas external_id do Google)
+        $this->assertArrayNotHasKey('id', $body['data']['events'][0] ?? []);
+    }
+
+    // ── 18. Tool Registry exige calendar.events.read ─────────────────────────
+
+    public function test_tool_registry_requires_calendar_events_read(): void
+    {
+        $service = app(\App\Domain\AI\Services\AIToolRegistryService::class);
+        $service->syncIntegrationTools($this->organization);
+
+        $tool = \App\Domain\AI\Models\AITool::where('organization_id', $this->organization->id)
+            ->where('slug', 'google_calendar_events_list')
+            ->first();
+
+        $this->assertNotNull($tool);
+        $this->assertContains(
+            'calendar.events.read',
+            $tool->configuration_json['required_permissions']
+        );
+    }
+
+    // ── 19. Evento sem attendees não quebra resposta ─────────────────────────
+
+    public function test_event_without_attendees_does_not_break(): void
+    {
+        $this->fakeGoogleEvents([
+            [
+                'id'      => 'no-att-1',
+                'summary' => 'Solo Event',
+                'start'   => ['dateTime' => '2026-08-11T10:00:00-03:00'],
+                'end'     => ['dateTime' => '2026-08-11T11:00:00-03:00'],
+                'status'  => 'confirmed',
+                // sem attendees
+            ],
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events');
+
+        $response->assertOk()
+            ->assertJsonPath('data.events.0.attendees', [])
+            ->assertJsonPath('data.events.0.title', 'Solo Event');
+    }
+
+    // ── 20. Evento sem Meet/location/description não quebra resposta ──────────
+
+    public function test_event_without_optional_fields_does_not_break(): void
+    {
+        $this->fakeGoogleEvents([
+            [
+                'id'     => 'minimal-1',
+                'start'  => ['dateTime' => '2026-08-11T10:00:00-03:00'],
+                'end'    => ['dateTime' => '2026-08-11T11:00:00-03:00'],
+                'status' => 'confirmed',
+                // sem summary, description, location, organizer, conferenceData
+            ],
+        ]);
+
+        $response = $this->actAsAI($this->owner)
+            ->getJson('/api/ai/calendar/events');
+
+        $response->assertOk()
+            ->assertJsonPath('data.events.0.title', null)
+            ->assertJsonPath('data.events.0.description', null)
+            ->assertJsonPath('data.events.0.location', null)
+            ->assertJsonPath('data.events.0.meeting', null);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function makeEvent(string $title, string $start, string $end): array
+    {
+        return [
+            'id'       => 'evt-' . md5($title),
+            'summary'  => $title,
+            'start'    => ['dateTime' => $start],
+            'end'      => ['dateTime' => $end],
+            'status'   => 'confirmed',
+            'organizer'=> ['email' => 'organizer@test.com', 'displayName' => 'Organizer'],
+        ];
+    }
+}

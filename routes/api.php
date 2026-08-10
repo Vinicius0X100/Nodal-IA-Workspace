@@ -45,4 +45,7 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/resources/{uuid}/content', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'content']);
     Route::get('/resources/{uuid}/file', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'file']);
     Route::get('/tools', [\App\Domain\AI\Api\Controllers\AIToolsController::class, 'index']);
+
+    // Calendar (read-only v1)
+    Route::get('/calendar/events', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'events']);
 });

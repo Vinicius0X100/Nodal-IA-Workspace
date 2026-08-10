@@ -1,0 +1,12 @@
+--- tests/Feature/AI/Calendar/AICalendarEventsTest.php
++++ tests/Feature/AI/Calendar/AICalendarEventsTest.php
+@@ -211,6 +211,9 @@
+         $response = $this->actAsAI($this->owner)
+             ->getJson('/api/ai/calendar/events');
+ 
++        if ($response->status() !== 200) {
++            dd(config('logging.channels.single.path'), file_get_contents(storage_path('logs/laravel.log')));
++        }
+         $response->assertOk()->assertJsonPath('success', true);
+         Http::assertSent(fn($req) => str_contains($req->url(), 'oauth2.googleapis.com'));
+     }
