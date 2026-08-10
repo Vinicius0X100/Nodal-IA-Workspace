@@ -130,7 +130,7 @@ function MessageBubble({ message }: { message: Message }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="flex gap-4 px-4 py-3 w-full max-w-3xl mx-auto group"
         >
-            <div className="w-8 h-8 rounded-full bg-blue-50/50 border border-blue-100 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-white border-2 border-[#0048AA]/20 ring-2 ring-[#0048AA]/10 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm overflow-hidden">
                 <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-5 h-5 object-contain" />
             </div>
             <div className="max-w-[85%] text-neutral-800 text-[15px] leading-relaxed prose prose-neutral prose-p:leading-relaxed max-w-none">
@@ -803,7 +803,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                                     {/* AI Typing Indicator */}
                                     {isProcessing && (
                                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4 px-4 py-3 w-full max-w-3xl mx-auto">
-                                            <div className="w-8 h-8 rounded-full bg-blue-50/50 border border-blue-100 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm overflow-hidden">
+                                            <div className="w-8 h-8 rounded-full bg-white border-2 border-[#0048AA]/20 ring-2 ring-[#0048AA]/10 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm overflow-hidden">
                                                 <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-5 h-5 object-contain opacity-80 pulse-animation" />
                                             </div>
                                             <div className="bg-neutral-50 border border-neutral-100 rounded-3xl rounded-bl-sm px-5 py-4 flex items-center gap-1.5 h-12 shadow-sm">
