@@ -6,11 +6,15 @@ use App\Domain\Directory\Models\Group;
 use App\Domain\Identity\Models\User;
 use App\Domain\Integrations\Models\Integration;
 use App\Domain\Integrations\Models\IntegrationLog;
+use App\Domain\Integrations\Services\GoogleTokenService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class GoogleDirectorySyncService
 {
+    public function __construct(
+        protected GoogleTokenService $tokenService
+    ) {}
     /**
      * Sincroniza dados e membros de todos os grupos previamente importados.
      */
@@ -65,11 +69,10 @@ class GoogleDirectorySyncService
             'has_external_id' => !empty($group->external_id),
         ]);
 
-        if (!$integration->access_token || !$group->external_id) {
+        if (!$group->external_id) {
             return;
         }
 
-        $token = $integration->access_token;
         $pageToken = null;
         $memberEmails = [];
         
@@ -89,11 +92,13 @@ class GoogleDirectorySyncService
 
         try {
             do {
-                $response = Http::withToken($token)
-                    ->get("https://admin.googleapis.com/admin/directory/v1/groups/{$group->external_id}/members", [
-                        'maxResults' => 200,
-                        'pageToken' => $pageToken,
-                    ]);
+                $response = $this->tokenService->executeWithRetry($integration, function ($accessToken) use ($group, $pageToken) {
+                    return Http::withToken($accessToken)
+                        ->get("https://admin.googleapis.com/admin/directory/v1/groups/{$group->external_id}/members", [
+                            'maxResults' => 200,
+                            'pageToken' => $pageToken,
+                        ]);
+                });
                     
                 $diagnosticLogs['http_status'] = $response->status();
 

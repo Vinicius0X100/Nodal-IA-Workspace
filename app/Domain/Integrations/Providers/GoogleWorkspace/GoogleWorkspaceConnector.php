@@ -4,6 +4,7 @@ namespace App\Domain\Integrations\Providers\GoogleWorkspace;
 
 use App\Domain\Integrations\Contracts\ConnectorInterface;
 use App\Domain\Integrations\Services\GoogleOAuthService;
+use App\Domain\Integrations\Services\GoogleTokenService;
 use App\Domain\Organizations\Models\Organization;
 use Exception;
 use Illuminate\Support\Facades\Log;
@@ -11,7 +12,8 @@ use Illuminate\Support\Facades\Log;
 class GoogleWorkspaceConnector implements ConnectorInterface
 {
     public function __construct(
-        protected GoogleOAuthService $oauthService
+        protected GoogleOAuthService $oauthService,
+        protected GoogleTokenService $tokenService
     ) {}
 
     public function getProviderName(): string
@@ -126,50 +128,13 @@ class GoogleWorkspaceConnector implements ConnectorInterface
             return false;
         }
 
-        $config = $integration->config;
-        if (!$config || !$config->client_id || !$config->client_secret) {
-            \App\Domain\Integrations\Models\IntegrationLog::create([
-                'integration_id' => $integration->id,
-                'event' => 'token_refresh',
-                'status' => 'error',
-                'message' => 'Faltam credenciais (client_id, client_secret) para renovar o token.',
-            ]);
+        try {
+            // Usa o serviço centralizado forçando o refresh
+            $this->tokenService->getValidAccessToken($integration, true);
+            return true;
+        } catch (\Exception $e) {
             return false;
         }
-
-        $response = \Illuminate\Support\Facades\Http::post('https://oauth2.googleapis.com/token', [
-            'client_id' => $config->client_id,
-            'client_secret' => $config->client_secret,
-            'refresh_token' => $integration->refresh_token,
-            'grant_type' => 'refresh_token',
-        ]);
-
-        if ($response->successful()) {
-            $data = $response->json();
-            $integration->update([
-                'access_token' => $data['access_token'],
-                'token_expires_at' => now()->addSeconds($data['expires_in']),
-                'status' => 'connected'
-            ]);
-            
-            \App\Domain\Integrations\Models\IntegrationLog::create([
-                'integration_id' => $integration->id,
-                'event' => 'token_refresh',
-                'status' => 'success',
-                'message' => 'Token renovado com sucesso.',
-            ]);
-
-            return true;
-        }
-
-        \App\Domain\Integrations\Models\IntegrationLog::create([
-            'integration_id' => $integration->id,
-            'event' => 'token_refresh',
-            'status' => 'error',
-            'message' => 'Falha ao renovar token: ' . $response->body(),
-        ]);
-
-        return false;
     }
 
     public function getStatus(Organization $organization): string
@@ -203,11 +168,8 @@ class GoogleWorkspaceConnector implements ConnectorInterface
      */
     public function getOrganizationData(\App\Domain\Integrations\Models\Integration $integration): array
     {
-        if (!$integration->access_token) {
-            throw new Exception("Integração não possui token de acesso válido.");
-        }
-
-        $token = $integration->access_token;
+        // Usa o serviço centralizado que cuida de buffer e refresh automático se necessário
+        $token = $this->tokenService->getValidAccessToken($integration);
         
         try {
             // 1. Obter domínios
