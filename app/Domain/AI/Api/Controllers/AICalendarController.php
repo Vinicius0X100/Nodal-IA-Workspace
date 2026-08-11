@@ -368,8 +368,8 @@ class AICalendarController
     {
         try {
             // ── 1. Contexto injetado pelo middleware ai.gateway ────────────────
-            $organization = $request->get('_active_organization');
-            $user         = $request->get('_active_user');
+            $organization = $request->attributes->get('_active_organization') ?? app(Organization::class);
+            $user         = $request->attributes->get('_active_user') ?? app(\App\Domain\Identity\Models\User::class);
 
             // ── 2. Validação de parâmetros ────────────────────────────────────
             $validator = Validator::make($request->json()->all(), [
@@ -410,6 +410,15 @@ class AICalendarController
                 ->where('provider', 'google_workspace')
                 ->where('status', 'connected')
                 ->first();
+
+            \Illuminate\Support\Facades\Log::info('[DEBUG_INTEGRATION_RESOLUTION] createEvent:', [
+                'organization_uuid_received' => is_object($organization) ? $organization->uuid : null,
+                'organization_id_resolved' => is_object($organization) ? $organization->id : null,
+                'integration_found' => $integration ? true : false,
+                'provider_searched' => 'google_workspace',
+                'status_searched' => 'connected',
+                'integration_id' => $integration ? $integration->id : null,
+            ]);
 
             if (!$integration) {
                 return response()->json([
