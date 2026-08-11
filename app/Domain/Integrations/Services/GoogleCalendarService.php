@@ -108,8 +108,240 @@ class GoogleCalendarService
         }
     }
 
+    /**
+     * Consulta disponibilidade (Free/Busy) do calendário.
+     *
+     * @param Organization $organization
+     * @param Integration  $integration
+     * @param array        $filters      [start, end, calendar_id, slot_duration_minutes]
+     * @param int|null     $actingUserId
+     * @param string|null  $conversationUuid
+     * @return array
+     */
+    public function getFreeBusy(
+        Organization $organization,
+        Integration $integration,
+        array $filters,
+        ?int $actingUserId = null,
+        ?string $conversationUuid = null
+    ): array {
+        $calendarId          = $filters['calendar_id'] ?? 'primary';
+        $timeZone            = $this->resolveTimezone($organization, null);
+        $start               = $filters['start']; // Já validado como RFC3339
+        $end                 = $filters['end'];   // Já validado como RFC3339
+        $slotDurationMinutes = (int) ($filters['slot_duration_minutes'] ?? 30);
+
+        try {
+            $response = $this->tokenService->executeWithRetry(
+                $integration,
+                function (string $accessToken) use ($calendarId, $start, $end, $timeZone) {
+                    return Http::withToken($accessToken)
+                        ->post(self::CALENDAR_API_BASE . '/freeBusy', [
+                            'timeMin'  => $start,
+                            'timeMax'  => $end,
+                            'timeZone' => $timeZone,
+                            'items'    => [['id' => $calendarId]],
+                        ]);
+                }
+            );
+
+            return $this->handleFreeBusyResponse($response, $calendarId, $timeZone, $start, $end, $slotDurationMinutes, $organization, $actingUserId, $conversationUuid);
+
+        } catch (GoogleCalendarException|GoogleReauthRequiredException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('[GoogleCalendarService] Falha inesperada ao consultar FreeBusy.', [
+                'organization_id' => $organization->id,
+                'calendar_id'     => $calendarId,
+                'message'         => $e->getMessage(),
+            ]);
+            throw new GoogleCalendarException('GOOGLE_CALENDAR_UNAVAILABLE', 'Não foi possível consultar a disponibilidade no momento.');
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Private Helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Trata a resposta de FreeBusy e calcula janelas livres.
+     */
+    private function handleFreeBusyResponse(
+        \Illuminate\Http\Client\Response $response,
+        string $calendarId,
+        string $timeZone,
+        string $start,
+        string $end,
+        int $slotDurationMinutes,
+        Organization $organization,
+        ?int $actingUserId,
+        ?string $conversationUuid
+    ): array {
+        if ($response->status() === 401) {
+            $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, $start, $end, 0, false, 'GOOGLE_REAUTH_REQUIRED', 'ai_calendar_freebusy_read');
+            throw new GoogleReauthRequiredException('A integração Google precisa ser reconectada. O token não é mais válido.');
+        }
+
+        if ($response->status() === 403) {
+            $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, $start, $end, 0, false, 'ACCESS_DENIED', 'ai_calendar_freebusy_read');
+            throw new GoogleCalendarException('ACCESS_DENIED', 'Acesso negado ao Google Calendar.');
+        }
+
+        if ($response->status() === 404) {
+            $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, $start, $end, 0, false, 'CALENDAR_NOT_FOUND', 'ai_calendar_freebusy_read');
+            throw new GoogleCalendarException('CALENDAR_NOT_FOUND', "Calendário '{$calendarId}' não encontrado.");
+        }
+
+        if (!$response->successful()) {
+            $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, $start, $end, 0, false, 'GOOGLE_CALENDAR_UNAVAILABLE', 'ai_calendar_freebusy_read');
+            throw new GoogleCalendarException('GOOGLE_CALENDAR_UNAVAILABLE', 'O Google Calendar retornou um erro inesperado.');
+        }
+
+        $body = $response->json();
+        
+        // Em freeBusy, se o calendarId não for reconhecido, o Google às vezes retorna na chave de erro.
+        if (isset($body['calendars'][$calendarId]['errors'])) {
+            $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, $start, $end, 0, false, 'CALENDAR_NOT_FOUND', 'ai_calendar_freebusy_read');
+            throw new GoogleCalendarException('CALENDAR_NOT_FOUND', "Erro ao acessar a agenda '{$calendarId}'.");
+        }
+
+        $busyIntervalsRaw = $body['calendars'][$calendarId]['busy'] ?? [];
+        
+        // 1. Parse, Sort, and Merge Busy Intervals
+        $busyIntervals = $this->mergeBusyIntervals($busyIntervalsRaw);
+
+        // 2. Calculate Free Intervals
+        $freeIntervals = $this->calculateFreeIntervals($start, $end, $busyIntervals, $slotDurationMinutes);
+
+        // 3. Flags
+        $startCarbon = Carbon::parse($start);
+        $endCarbon   = Carbon::parse($end);
+        $totalDurationMinutes = $startCarbon->diffInMinutes($endCarbon);
+
+        $isFullyFree = empty($busyIntervals);
+        
+        // É fully busy se não sobrou nenhuma janela livre de pelo menos $slotDurationMinutes (ou nenhuma em absoluto se passarmos 0)
+        // Para ser perfeitamente "fully busy", todos os free_intervals devem estar vazios
+        $isFullyBusy = empty($freeIntervals);
+
+        $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, $start, $end, count($busyIntervals), true, null, 'ai_calendar_freebusy_read');
+
+        return [
+            'calendar' => [
+                'id'        => $calendarId,
+                'time_zone' => $timeZone,
+            ],
+            'range' => [
+                'start' => $start,
+                'end'   => $end,
+            ],
+            'busy' => array_map(fn($b) => [
+                'start' => $b['start']->toRfc3339String(),
+                'end'   => $b['end']->toRfc3339String()
+            ], $busyIntervals),
+            'free' => array_map(fn($f) => [
+                'start' => $f['start']->toRfc3339String(),
+                'end'   => $f['end']->toRfc3339String(),
+                'duration_minutes' => $f['duration_minutes']
+            ], $freeIntervals),
+            'is_fully_free' => $isFullyFree,
+            'is_fully_busy' => $isFullyBusy,
+        ];
+    }
+
+    /**
+     * Ordena e une (merge) intervalos ocupados que se sobrepõem ou se tocam.
+     */
+    private function mergeBusyIntervals(array $rawBusy): array
+    {
+        if (empty($rawBusy)) return [];
+
+        $intervals = array_map(function($b) {
+            return [
+                'start' => Carbon::parse($b['start']),
+                'end'   => Carbon::parse($b['end']),
+            ];
+        }, $rawBusy);
+
+        usort($intervals, fn($a, $b) => $a['start']->lt($b['start']) ? -1 : 1);
+
+        $merged = [$intervals[0]];
+        for ($i = 1; $i < count($intervals); $i++) {
+            $last = &$merged[count($merged) - 1];
+            $current = $intervals[$i];
+
+            // Se o atual começa antes ou no mesmo instante que o anterior termina
+            if ($current['start']->lte($last['end'])) {
+                // Estende o final se necessário
+                if ($current['end']->gt($last['end'])) {
+                    $last['end'] = $current['end'];
+                }
+            } else {
+                $merged[] = $current;
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Subtrai os intervalos ocupados do período total e descarta janelas menores que o slot mínimo.
+     */
+    private function calculateFreeIntervals(string $start, string $end, array $mergedBusy, int $slotDurationMinutes): array
+    {
+        $globalStart = Carbon::parse($start);
+        $globalEnd   = Carbon::parse($end);
+        
+        $free = [];
+        $currentStart = $globalStart->copy();
+
+        foreach ($mergedBusy as $busy) {
+            // Se o bloco busy está totalmente antes do range de busca (não deveria, a API já filtra, mas por segurança)
+            if ($busy['end']->lte($currentStart)) {
+                continue;
+            }
+
+            // Se houver espaço entre o começo atual e o começo do bloco busy
+            if ($busy['start']->gt($currentStart)) {
+                // Mas o busy não pode ultrapassar o globalEnd
+                $freeEnd = $busy['start']->copy();
+                if ($freeEnd->gt($globalEnd)) {
+                    $freeEnd = $globalEnd->copy();
+                }
+
+                $diff = $currentStart->diffInMinutes($freeEnd);
+                if ($diff >= $slotDurationMinutes) {
+                    $free[] = [
+                        'start' => $currentStart->copy(),
+                        'end'   => $freeEnd,
+                        'duration_minutes' => $diff,
+                    ];
+                }
+            }
+
+            // Avança o começo atual para o fim do bloco busy
+            if ($busy['end']->gt($currentStart)) {
+                $currentStart = $busy['end']->copy();
+            }
+        }
+
+        // Checa do fim do último bloco busy até o globalEnd
+        if ($currentStart->lt($globalEnd)) {
+            $diff = $currentStart->diffInMinutes($globalEnd);
+            if ($diff >= $slotDurationMinutes) {
+                $free[] = [
+                    'start' => $currentStart->copy(),
+                    'end'   => $globalEnd->copy(),
+                    'duration_minutes' => $diff,
+                ];
+            }
+        }
+
+        return $free;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Internal API Helpers
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
@@ -306,13 +538,14 @@ class GoogleCalendarService
         string $end,
         int $eventCount,
         bool $allowed,
-        ?string $errorCode
+        ?string $errorCode,
+        string $action = 'ai_calendar_events_read'
     ): void {
         try {
             AuditLog::create([
                 'organization_id' => $organization->id,
                 'user_id'         => $actingUserId,
-                'action'          => 'ai_calendar_events_read',
+                'action'          => $action,
                 'entity_type'     => Organization::class,
                 'entity_id'       => $organization->id,
                 'metadata'        => array_filter([

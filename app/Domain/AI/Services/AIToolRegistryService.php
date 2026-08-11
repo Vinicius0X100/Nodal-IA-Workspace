@@ -81,6 +81,16 @@ class AIToolRegistryService
                 'required_permissions' => ['calendar.events.read'],
             ],
             [
+                'slug'                 => 'google_calendar_freebusy',
+                'name'                 => 'Consultar Disponibilidade do Calendário',
+                'description'          => 'Consulta disponibilidade (horários livres e ocupados) no Google Calendar sem revelar os detalhes ou títulos dos eventos. Aceita um JSON no body: start (RFC3339 obrigatório), end (RFC3339 obrigatório), calendar_id (opcional, padrão primary), slot_duration_minutes (opcional, calcula apenas janelas livres maiores ou iguais a este valor).',
+                'endpoint'             => '/api/ai/calendar/freebusy',
+                'http_method'          => 'POST',
+                'tool_type'            => 'read',
+                'requires_confirmation' => false,
+                'required_permissions' => ['calendar.freebusy.read'],
+            ],
+            [
                 'slug' => 'google_read_resource',
                 'name' => 'Ler Conteúdo de Arquivo do Google Drive',
                 'description' => 'Lê e extrai o texto do conteúdo de um arquivo específico do Google Drive usando seu UUID. Use esta ferramenta quando precisar analisar o conteúdo textual de um relatório, planilha ou documento.',
