@@ -35,6 +35,7 @@ Route::prefix('v1')->group(function () {
 // AI Gateway API (n8n)
 Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/organization', [\App\Domain\AI\Api\Controllers\AIOrganizationController::class, 'index']);
+    Route::get('/current-user', [\App\Domain\AI\Api\Controllers\AIUsersController::class, 'currentUser']);
     Route::get('/users', [\App\Domain\AI\Api\Controllers\AIUsersController::class, 'index']);
     Route::get('/users/{uuid}/groups', [\App\Domain\AI\Api\Controllers\AIUsersController::class, 'groups']);
     Route::get('/groups', [\App\Domain\AI\Api\Controllers\AIGroupsController::class, 'index']);

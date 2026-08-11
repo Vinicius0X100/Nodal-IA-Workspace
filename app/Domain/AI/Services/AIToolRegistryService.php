@@ -23,10 +23,15 @@ class AIToolRegistryService
             $expectedSlugs = array_merge($expectedSlugs, $slugs);
         }
 
+        // Registrar e manter também as ferramentas core (nativas do Nodal)
+        $coreSlugs = $this->registerCoreTools($organization);
+        $expectedSlugs = array_merge($expectedSlugs, $coreSlugs);
+
         // 2. Remover tools que pertencem a integrações (integration_id != null)
         // mas cujo slug não está na lista dos esperados.
+        // mas cujo slug não está na lista dos esperados.
+        // E remover tools core (integration_id == null) que não estão mais na lista de coreSlugs.
         AITool::where('organization_id', $organization->id)
-            ->whereNotNull('integration_id')
             ->whereNotIn('slug', $expectedSlugs)
             ->delete();
     }
@@ -55,6 +60,53 @@ class AIToolRegistryService
         // Futuras integrações podem ser adicionadas aqui (Slack, Jira, Notion, etc).
 
         return $slugs;
+    }
+
+    private function registerCoreTools(Organization $organization): array
+    {
+        $tools = [
+            [
+                'slug'                 => 'current_user',
+                'name'                 => 'Consultar Usuário Atual',
+                'description'          => 'Permite que a Inteligência Artificial consulte, de forma segura, os dados de identidade corporativa do usuário ativo que iniciou a conversa (como UUID, nome, e-mail, roles e contas corporativas vinculadas como Google ou Microsoft). Não aceita parâmetros e retorna sempre o usuário ativo da sessão.',
+                'endpoint'             => '/api/ai/current-user',
+                'http_method'          => 'GET',
+                'tool_type'            => 'read',
+                'requires_confirmation' => false,
+                'required_permissions' => [],
+                'requires_external_identity' => false,
+            ],
+        ];
+
+        $registeredSlugs = [];
+
+        foreach ($tools as $toolData) {
+            $slug = $toolData['slug'];
+            $registeredSlugs[] = $slug;
+
+            AITool::updateOrCreate(
+                [
+                    'organization_id' => $organization->id,
+                    'slug' => $slug,
+                ],
+                [
+                    'integration_id' => null,
+                    'provider' => 'nodal',
+                    'name' => $toolData['name'],
+                    'description' => $toolData['description'],
+                    'endpoint' => $toolData['endpoint'],
+                    'http_method' => $toolData['http_method'],
+                    'tool_type' => $toolData['tool_type'],
+                    'requires_confirmation' => $toolData['requires_confirmation'],
+                    'configuration_json' => [
+                        'required_permissions' => $toolData['required_permissions'] ?? [],
+                        'requires_external_identity' => $toolData['requires_external_identity'] ?? false,
+                    ],
+                ]
+            );
+        }
+
+        return $registeredSlugs;
     }
 
     private function registerGoogleWorkspaceTools(Organization $organization, Integration $integration): array
