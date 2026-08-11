@@ -23,6 +23,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
         client_id: config?.client_id || '',
         client_secret: config?.client_secret || '',
         tenant: config?.tenant || '',
+        delegation_credentials_json: '',
     });
 
     const [activeTab, setActiveTab] = useState('general');
@@ -374,6 +375,25 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                                                 onChange={e => setData('tenant', e.target.value)}
                                                 placeholder="Ex: sacratech.com" 
                                             />
+                                        </div>
+                                        <div className="space-y-2 pt-2">
+                                            <div className="flex items-center justify-between">
+                                                <Label htmlFor="delegation_credentials_json">Chave JSON (Service Account - IA)</Label>
+                                                {config?.delegation_credentials_json && (
+                                                    <span className="text-[10px] font-bold tracking-wider text-green-700 bg-green-100 px-2 py-0.5 rounded uppercase">Já Configurada</span>
+                                                )}
+                                            </div>
+                                            <textarea 
+                                                id="delegation_credentials_json"
+                                                className="flex min-h-[100px] w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 disabled:cursor-not-allowed disabled:opacity-50 font-mono text-xs"
+                                                value={data.delegation_credentials_json}
+                                                onChange={e => setData('delegation_credentials_json', e.target.value)}
+                                                placeholder={config?.delegation_credentials_json ? "Cole aqui um novo JSON caso queira sobrescrever a chave existente..." : 'Cole o conteúdo completo do arquivo JSON baixado no Passo 5 da documentação...'}
+                                            />
+                                            {errors.delegation_credentials_json && <p className="text-red-500 text-xs mt-1">{errors.delegation_credentials_json}</p>}
+                                            <p className="text-xs text-neutral-500 leading-relaxed">
+                                                Necessário para que a Inteligência Artificial consiga consultar dados em nome dos funcionários (Domain-Wide Delegation).
+                                            </p>
                                         </div>
                                     </div>
                                     <div className="pt-4 border-t border-neutral-100 mt-4 flex justify-between items-center">

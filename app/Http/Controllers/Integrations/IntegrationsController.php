@@ -83,27 +83,50 @@ class IntegrationsController extends Controller
 
     public function saveConfig(Request $request, string $provider)
     {
-        $request->validate([
+        $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
+
+        $config = \App\Domain\Integrations\Models\IntegrationConfig::whereHas('integration', function ($query) use ($organization, $provider) {
+            $query->where('organization_id', $organization->id)->where('provider', $provider);
+        })->first();
+
+        $rules = [
             'client_id' => 'required|string',
             'client_secret' => 'required|string',
             'tenant' => 'nullable|string',
-        ]);
+        ];
 
-        $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
+        if ($provider === 'google_workspace') {
+            if (!$config || empty($config->delegation_credentials_json)) {
+                $rules['delegation_credentials_json'] = 'required|json';
+            } else {
+                $rules['delegation_credentials_json'] = 'nullable|json';
+            }
+        }
+
+        $request->validate($rules, [
+            'delegation_credentials_json.required' => 'O arquivo JSON da Service Account (Domain-Wide Delegation) é obrigatório.',
+            'delegation_credentials_json.json' => 'O formato do JSON fornecido é inválido.'
+        ]);
         
         $integration = \App\Domain\Integrations\Models\Integration::firstOrCreate(
             ['organization_id' => $organization->id, 'provider' => $provider],
             ['display_name' => ucwords(str_replace('_', ' ', $provider)), 'status' => 'configuring']
         );
 
+        $updates = [
+            'client_id' => $request->client_id,
+            'client_secret' => $request->client_secret,
+            'tenant' => $request->tenant,
+            'redirect_uri' => config('app.url') . "/oauth/{$provider}/callback",
+        ];
+
+        if ($provider === 'google_workspace' && $request->filled('delegation_credentials_json')) {
+            $updates['delegation_credentials_json'] = json_decode($request->delegation_credentials_json, true);
+        }
+
         \App\Domain\Integrations\Models\IntegrationConfig::updateOrCreate(
             ['integration_id' => $integration->id],
-            [
-                'client_id' => $request->client_id,
-                'client_secret' => $request->client_secret,
-                'tenant' => $request->tenant,
-                'redirect_uri' => config('app.url') . "/oauth/{$provider}/callback",
-            ]
+            $updates
         );
 
         // Se estava não conectado, vai pra configuring para liberar o botão
