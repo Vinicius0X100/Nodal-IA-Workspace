@@ -13,6 +13,14 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from '@/Components/ui/accordion';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/Components/ui/dialog";
 import ImportWizard from './Components/ImportWizard';
 import CreateRoleWizard from '@/Pages/Directory/Partials/CreateRoleWizard';
 
@@ -29,6 +37,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
     const [activeTab, setActiveTab] = useState('general');
     const [copied, setCopied] = useState(false);
     const [wizardOpen, setWizardOpen] = useState(false);
+    const [isJsonErrorModalOpen, setIsJsonErrorModalOpen] = useState(false);
     
     // Role Wizard State
     const [roleWizardOpen, setRoleWizardOpen] = useState(false);
@@ -42,7 +51,13 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
 
     const handleSaveConfig = (e: React.FormEvent) => {
         e.preventDefault();
-        post(route('integrations.config', { provider: 'google_workspace' }));
+        post(route('integrations.config', { provider: 'google_workspace' }), {
+            onError: (errs) => {
+                if (errs.delegation_credentials_json === 'INVALID_SERVICE_ACCOUNT_JSON') {
+                    setIsJsonErrorModalOpen(true);
+                }
+            }
+        });
     };
 
     const handleConnect = () => {
@@ -385,12 +400,12 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                                             </div>
                                             <textarea 
                                                 id="delegation_credentials_json"
-                                                className="flex min-h-[100px] w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 disabled:cursor-not-allowed disabled:opacity-50 font-mono text-xs"
+                                                className={cn("flex min-h-[100px] w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 disabled:cursor-not-allowed disabled:opacity-50 font-mono text-xs", errors.delegation_credentials_json ? "border-red-500 focus-visible:ring-red-500" : "")}
                                                 value={data.delegation_credentials_json}
                                                 onChange={e => setData('delegation_credentials_json', e.target.value)}
                                                 placeholder={config?.delegation_credentials_json ? "Cole aqui um novo JSON caso queira sobrescrever a chave existente..." : 'Cole o conteúdo completo do arquivo JSON baixado no Passo 5 da documentação...'}
                                             />
-                                            {errors.delegation_credentials_json && <p className="text-red-500 text-xs mt-1">{errors.delegation_credentials_json}</p>}
+                                            {errors.delegation_credentials_json && errors.delegation_credentials_json !== 'INVALID_SERVICE_ACCOUNT_JSON' && <p className="text-red-500 text-xs mt-1">{errors.delegation_credentials_json}</p>}
                                             <p className="text-xs text-neutral-500 leading-relaxed">
                                                 Necessário para que a Inteligência Artificial consiga consultar dados em nome dos funcionários (Domain-Wide Delegation).
                                             </p>
@@ -622,6 +637,32 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                     }}
                 />
             )}
+
+            <Dialog open={isJsonErrorModalOpen} onOpenChange={setIsJsonErrorModalOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-red-600 flex items-center gap-2">
+                            <ShieldCheck className="w-5 h-5" />
+                            Arquivo JSON Inválido
+                        </DialogTitle>
+                        <DialogDescription className="pt-2 text-neutral-600 leading-relaxed">
+                            O conteúdo que você colou não parece ser uma chave de Service Account válida do Google Cloud.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="bg-neutral-50 border border-neutral-100 rounded-lg p-4 my-2 text-sm text-neutral-700">
+                        Certifique-se de que o JSON copiado contenha:
+                        <ul className="list-disc ml-5 mt-2 space-y-1 font-medium">
+                            <li><code className="text-neutral-900 bg-white px-1 py-0.5 rounded border border-neutral-200">client_email</code></li>
+                            <li><code className="text-neutral-900 bg-white px-1 py-0.5 rounded border border-neutral-200">private_key</code> (começando com "-----BEGIN PRIVATE KEY-----")</li>
+                        </ul>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsJsonErrorModalOpen(false)}>
+                            Entendi, vou corrigir
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

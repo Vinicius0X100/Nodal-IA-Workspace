@@ -121,7 +121,15 @@ class IntegrationsController extends Controller
         ];
 
         if ($provider === 'google_workspace' && $request->filled('delegation_credentials_json')) {
-            $updates['delegation_credentials_json'] = json_decode($request->delegation_credentials_json, true);
+            $json = json_decode($request->delegation_credentials_json, true);
+            
+            if (!is_array($json) || empty($json['client_email']) || empty($json['private_key']) || !str_starts_with(trim($json['private_key']), '-----BEGIN PRIVATE KEY-----')) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'delegation_credentials_json' => 'INVALID_SERVICE_ACCOUNT_JSON'
+                ]);
+            }
+            
+            $updates['delegation_credentials_json'] = $json;
         }
 
         \App\Domain\Integrations\Models\IntegrationConfig::updateOrCreate(
