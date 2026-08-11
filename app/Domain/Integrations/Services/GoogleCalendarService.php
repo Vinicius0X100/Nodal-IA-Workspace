@@ -165,6 +165,94 @@ class GoogleCalendarService
         }
     }
 
+    /**
+     * Cria um evento no Google Calendar.
+     *
+     * @param Organization $organization
+     * @param Integration  $integration
+     * @param array        $eventData    Dados do evento a ser criado
+     * @param int|null     $actingUserId
+     * @param string|null  $conversationUuid
+     * @param \App\Domain\Identities\Models\ExternalIdentity|null $identity
+     * @return array
+     */
+    public function createEvent(
+        Organization $organization,
+        Integration $integration,
+        array $eventData,
+        ?int $actingUserId = null,
+        ?string $conversationUuid = null,
+        ?\App\Domain\Identities\Models\ExternalIdentity $identity = null
+    ): array {
+        $calendarId = 'primary'; // DWD operando sempre no primário por design desta feature
+        $timeZone   = $this->resolveTimezone($organization, $eventData['time_zone'] ?? null);
+
+        try {
+            $response = $this->tokenService->executeWithRetry(
+                $integration,
+                function (string $accessToken) use ($calendarId, $eventData, $timeZone) {
+                    $payload = [
+                        'summary' => $eventData['summary'],
+                        'start'   => [
+                            'dateTime' => $eventData['start'],
+                            'timeZone' => $timeZone,
+                        ],
+                        'end'     => [
+                            'dateTime' => $eventData['end'],
+                            'timeZone' => $timeZone,
+                        ],
+                    ];
+
+                    if (!empty($eventData['description'])) {
+                        $payload['description'] = $eventData['description'];
+                    }
+
+                    if (!empty($eventData['location'])) {
+                        $payload['location'] = $eventData['location'];
+                    }
+
+                    if (!empty($eventData['attendees'])) {
+                        $payload['attendees'] = $eventData['attendees'];
+                    }
+
+                    if (!empty($eventData['create_meeting'])) {
+                        $payload['conferenceData'] = [
+                            'createRequest' => [
+                                'requestId' => 'nodal-' . \Illuminate\Support\Str::uuid()->toString(),
+                                'conferenceSolutionKey' => [
+                                    'type' => 'hangoutsMeet',
+                                ],
+                            ],
+                        ];
+                    }
+
+                    $queryParams = ['sendUpdates' => 'all']; // Dispara convite por padrão
+                    if (!empty($eventData['create_meeting'])) {
+                        $queryParams['conferenceDataVersion'] = 1;
+                    }
+
+                    return Http::withToken($accessToken)
+                        ->post(self::CALENDAR_API_BASE . '/calendars/' . urlencode($calendarId) . '/events?' . http_build_query($queryParams), $payload);
+                },
+                $identity,
+                ['https://www.googleapis.com/auth/calendar.events'] // Escopo de escrita necessário
+            );
+
+            return $this->handleCreateEventResponse($response, $calendarId, $timeZone, $organization, $actingUserId, $conversationUuid, $identity);
+
+        } catch (GoogleCalendarException|GoogleReauthRequiredException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('[GoogleCalendarService] Falha inesperada ao criar evento.', [
+                'organization_id' => $organization->id,
+                'calendar_id'     => $calendarId,
+                'message'         => $e->getMessage(),
+            ]);
+
+            throw new GoogleCalendarException('GOOGLE_CALENDAR_UNAVAILABLE', 'Não foi possível criar o evento no momento.');
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Private Helpers
     // ─────────────────────────────────────────────────────────────────────────
@@ -432,6 +520,62 @@ class GoogleCalendarService
             ],
             'events'   => $normalized,
             'total'    => count($normalized),
+        ];
+    }
+
+    /**
+     * Trata a resposta de Criação de Evento.
+     */
+    private function handleCreateEventResponse(
+        \Illuminate\Http\Client\Response $response,
+        string $calendarId,
+        string $timeZone,
+        Organization $organization,
+        ?int $actingUserId,
+        ?string $conversationUuid,
+        ?\App\Domain\Identities\Models\ExternalIdentity $identity
+    ): array {
+        if ($response->status() === 401) {
+            $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, '', '', 0, false, 'GOOGLE_REAUTH_REQUIRED', 'ai_calendar_event_create');
+            throw new GoogleReauthRequiredException('A integração Google precisa ser reconectada. O token não é mais válido.');
+        }
+
+        if ($response->status() === 403) {
+            $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, '', '', 0, false, 'ACCESS_DENIED', 'ai_calendar_event_create');
+            throw new GoogleCalendarException('ACCESS_DENIED', 'Acesso negado ao Google Calendar. Verifique os escopos da integração.');
+        }
+
+        if ($response->status() === 404) {
+            $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, '', '', 0, false, 'CALENDAR_NOT_FOUND', 'ai_calendar_event_create');
+            throw new GoogleCalendarException('CALENDAR_NOT_FOUND', "Calendário '{$calendarId}' não encontrado na conta Google da organização.");
+        }
+
+        if (!$response->successful()) {
+            $body = $response->json();
+            $reason = $body['error']['message'] ?? ('HTTP ' . $response->status());
+
+            Log::warning('[GoogleCalendarService] Resposta inesperada ao criar evento no Google Calendar.', [
+                'organization_id' => $organization->id,
+                'calendar_id'     => $calendarId,
+                'http_status'     => $response->status(),
+                'reason'          => $reason,
+            ]);
+
+            $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, '', '', 0, false, 'GOOGLE_CALENDAR_UNAVAILABLE', 'ai_calendar_event_create');
+            throw new GoogleCalendarException('GOOGLE_CALENDAR_UNAVAILABLE', 'O Google Calendar retornou um erro inesperado.');
+        }
+
+        $event = $this->normalizeEvent($response->json());
+        
+        $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, $event['start'] ?? '', $event['end'] ?? '', 1, true, null, 'ai_calendar_event_create');
+
+        return [
+            'event' => array_merge($event, [
+                'calendar' => [
+                    'owner_user_uuid' => $identity ? $identity->user->uuid : null,
+                    'provider' => 'google_workspace'
+                ]
+            ]),
         ];
     }
 

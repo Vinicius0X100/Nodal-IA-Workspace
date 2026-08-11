@@ -146,6 +146,17 @@ class AIToolRegistryService
                 'requires_external_identity' => true,
             ],
             [
+                'slug'                 => 'google_calendar_event_create',
+                'name'                 => 'Criar Evento no Calendário',
+                'description'          => 'Permite criar eventos no calendário autorizado através do Nodal. É necessário confirmação do usuário (requires_confirmation=true).',
+                'endpoint'             => '/api/ai/calendar/events',
+                'http_method'          => 'POST',
+                'tool_type'            => 'write',
+                'requires_confirmation' => true,
+                'required_permissions' => ['calendar.events.create'],
+                'requires_external_identity' => true,
+            ],
+            [
                 'slug' => 'google_read_resource',
                 'name' => 'Ler Conteúdo de Arquivo do Google Drive',
                 'description' => 'Lê e extrai o texto do conteúdo de um arquivo específico do Google Drive usando seu UUID. A consulta utiliza a conta corporativa (External Identity) vinculada ao usuário solicitante (via Impersonation) garantindo que apenas arquivos que o usuário tem acesso no Google Drive possam ser lidos.',
