@@ -135,11 +135,13 @@ export default function GoogleWorkspaceUsers({ integration, all_users }: { integ
                 </div>
             </div>
 
-            <ImportWizard 
-                open={wizardOpen} 
-                onOpenChange={setWizardOpen}
-                integration={integration}
-            />
+            {integration && (
+                <ImportWizard 
+                    isOpen={wizardOpen} 
+                    onClose={() => setWizardOpen(false)}
+                    integrationId={integration.id}
+                />
+            )}
         </AppLayout>
     );
 }

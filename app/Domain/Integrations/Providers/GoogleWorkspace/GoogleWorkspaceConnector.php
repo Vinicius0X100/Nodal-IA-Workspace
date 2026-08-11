@@ -197,6 +197,7 @@ class GoogleWorkspaceConnector implements ConnectorInterface
             $totalUsers = 0;
             $pageToken = null;
             $customerId = null;
+            $allUsers = [];
 
             do {
                 $usersResponse = \Illuminate\Support\Facades\Http::withToken($token)
@@ -214,6 +215,7 @@ class GoogleWorkspaceConnector implements ConnectorInterface
                 $users = $data['users'] ?? [];
                 
                 $totalUsers += count($users);
+                $allUsers = array_merge($allUsers, $users);
                 
                 if (!$customerId && !empty($users)) {
                     $customerId = $users[0]['customerId'] ?? null;
@@ -238,6 +240,7 @@ class GoogleWorkspaceConnector implements ConnectorInterface
             // 3. Obter grupos (Com Paginação)
             $totalGroups = 0;
             $groupPageToken = null;
+            $allGroups = [];
             do {
                 $groupsResponse = \Illuminate\Support\Facades\Http::withToken($token)
                     ->get('https://admin.googleapis.com/admin/directory/v1/groups', [
@@ -248,7 +251,9 @@ class GoogleWorkspaceConnector implements ConnectorInterface
                     
                 if ($groupsResponse->successful()) {
                     $groupData = $groupsResponse->json();
-                    $totalGroups += count($groupData['groups'] ?? []);
+                    $groups = $groupData['groups'] ?? [];
+                    $totalGroups += count($groups);
+                    $allGroups = array_merge($allGroups, $groups);
                     $groupPageToken = $groupData['nextPageToken'] ?? null;
                 } else {
                     $groupPageToken = null;
@@ -273,6 +278,10 @@ class GoogleWorkspaceConnector implements ConnectorInterface
                 'admin_name' => $adminName,
                 'total_users' => $totalUsers,
                 'total_groups' => $totalGroups,
+                'original_response' => [
+                    'users' => ['users' => $allUsers],
+                    'groups' => ['groups' => $allGroups],
+                ],
             ];
         } catch (\Exception $e) {
             \App\Domain\Integrations\Models\IntegrationLog::create([
