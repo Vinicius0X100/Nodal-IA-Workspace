@@ -226,7 +226,11 @@ class GoogleCalendarService
                         ];
                     }
 
-                    $queryParams = ['sendUpdates' => 'all']; // Dispara convite por padrão
+                    $queryParams = [];
+                    if (!empty($eventData['attendees'])) {
+                        $queryParams['sendUpdates'] = 'all'; // Dispara convite por padrão somente se houver convidados
+                    }
+                    
                     if (!empty($eventData['create_meeting'])) {
                         $queryParams['conferenceDataVersion'] = 1;
                     }
@@ -553,6 +557,21 @@ class GoogleCalendarService
         if (!$response->successful()) {
             $body = $response->json();
             $reason = $body['error']['message'] ?? ('HTTP ' . $response->status());
+            
+            // LOG TEMPORÁRIO PARA DEBUG DWD
+            Log::warning('[DEBUG_DWD] Falha na criação do evento.', [
+                'http_status' => $response->status(),
+                'error.message' => $body['error']['message'] ?? null,
+                'error.errors' => array_map(function($err) {
+                    return [
+                        'reason' => $err['reason'] ?? null,
+                        'domain' => $err['domain'] ?? null,
+                    ];
+                }, $body['error']['errors'] ?? []),
+                'response_body_sanitized' => $body,
+                'subject_email' => $identity ? $identity->primary_email : null,
+                'calendarId' => $calendarId,
+            ]);
 
             Log::warning('[GoogleCalendarService] Resposta inesperada ao criar evento no Google Calendar.', [
                 'organization_id' => $organization->id,
