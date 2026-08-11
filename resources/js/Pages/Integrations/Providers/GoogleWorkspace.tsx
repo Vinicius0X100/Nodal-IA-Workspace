@@ -493,7 +493,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                                                 <li>No campo <strong>Client ID</strong>, cole o ID do Cliente da Service Account que você anotou no passo anterior.</li>
                                                 <li>No campo <strong>OAuth scopes</strong>, adicione os escopos estritamente necessários, separados por vírgula. Por exemplo:
                                                     <code className="block mt-2 p-2 bg-neutral-100 rounded text-xs break-all">
-                                                        https://www.googleapis.com/auth/calendar.readonly, https://www.googleapis.com/auth/admin.directory.resource.calendar.readonly
+                                                        https://www.googleapis.com/auth/calendar.readonly, https://www.googleapis.com/auth/admin.directory.resource.calendar.readonly, https://www.googleapis.com/auth/calendar.events
                                                     </code>
                                                 </li>
                                                 <li>Clique em <strong>Authorize</strong>.</li>
