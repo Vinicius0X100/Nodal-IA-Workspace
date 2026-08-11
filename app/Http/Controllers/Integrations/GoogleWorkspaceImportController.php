@@ -158,6 +158,24 @@ class GoogleWorkspaceImportController extends Controller
                         $organizationId => ['joined_at' => now()]
                     ]);
 
+                    // Criar/Atualizar vínculo de Identidade Externa (ExternalIdentity)
+                    \App\Domain\Identities\Models\ExternalIdentity::updateOrCreate(
+                        [
+                            'integration_id' => $integration->id,
+                            'external_id' => $googleUser['id'],
+                        ],
+                        [
+                            'organization_id' => $organizationId,
+                            'user_id' => $existingUser->id,
+                            'provider' => 'google_workspace',
+                            'primary_email' => $email,
+                            'display_name' => $name,
+                            'status' => 'linked',
+                            'linked_at' => now(),
+                            'last_synced_at' => now(),
+                        ]
+                    );
+
                     // Se for novo, enviar email
                     if ($isNewUser) {
                         Mail::to($existingUser->email)->send(
