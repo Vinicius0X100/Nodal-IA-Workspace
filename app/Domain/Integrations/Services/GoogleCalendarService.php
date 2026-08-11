@@ -62,7 +62,8 @@ class GoogleCalendarService
         Integration $integration,
         array $filters = [],
         ?int $actingUserId = null,
-        ?string $conversationUuid = null
+        ?string $conversationUuid = null,
+        ?\App\Domain\Identities\Models\ExternalIdentity $identity = null
     ): array {
         $calendarId = $filters['calendar_id'] ?? 'primary';
         $timeZone   = $this->resolveTimezone($organization, $filters['time_zone'] ?? null);
@@ -90,7 +91,9 @@ class GoogleCalendarService
 
                     return Http::withToken($accessToken)
                         ->get(self::CALENDAR_API_BASE . '/calendars/' . urlencode($calendarId) . '/events', $params);
-                }
+                },
+                $identity,
+                ['https://www.googleapis.com/auth/calendar.readonly']
             );
 
             return $this->handleResponse($response, $calendarId, $timeZone, $start, $end, $organization, $actingUserId, $conversationUuid, $limit);
@@ -123,7 +126,8 @@ class GoogleCalendarService
         Integration $integration,
         array $filters,
         ?int $actingUserId = null,
-        ?string $conversationUuid = null
+        ?string $conversationUuid = null,
+        ?\App\Domain\Identities\Models\ExternalIdentity $identity = null
     ): array {
         $calendarId          = $filters['calendar_id'] ?? 'primary';
         $timeZone            = $this->resolveTimezone($organization, null);
@@ -142,7 +146,9 @@ class GoogleCalendarService
                             'timeZone' => $timeZone,
                             'items'    => [['id' => $calendarId]],
                         ]);
-                }
+                },
+                $identity,
+                ['https://www.googleapis.com/auth/calendar.readonly']
             );
 
             return $this->handleFreeBusyResponse($response, $calendarId, $timeZone, $start, $end, $slotDurationMinutes, $organization, $actingUserId, $conversationUuid);

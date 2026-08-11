@@ -85,7 +85,10 @@ class GoogleDirectorySyncService
                     
                     foreach ($pageMembers as $member) {
                         if (isset($member['email'])) {
-                            $memberEmails[] = strtolower(trim($member['email']));
+                            $memberEmails[] = [
+                                'email' => strtolower(trim($member['email'])),
+                                'id' => $member['id'] ?? null,
+                            ];
                         }
                     }
                     
@@ -108,8 +111,11 @@ class GoogleDirectorySyncService
             $userIds = [];
             $organizationId = $integration->organization_id;
 
-            foreach ($memberEmails as $email) {
-                // Busca o usuário existente ou cria um novo
+            foreach ($memberEmails as $memberData) {
+                $email = $memberData['email'];
+                $externalId = $memberData['id'];
+
+                // 1. Resolvemos o User (Busca o usuário existente ou cria um novo)
                 $user = User::firstOrCreate(
                     ['email' => $email],
                     [
@@ -124,6 +130,26 @@ class GoogleDirectorySyncService
                 $user->organizations()->syncWithoutDetaching([
                     $organizationId => ['joined_at' => now()]
                 ]);
+                
+                // 2. Materializa a ExternalIdentity (Garante vínculo seguro)
+                if ($externalId) {
+                    \App\Domain\Identities\Models\ExternalIdentity::updateOrCreate(
+                        [
+                            'integration_id' => $integration->id,
+                            'external_id' => $externalId,
+                        ],
+                        [
+                            'organization_id' => $organizationId,
+                            'user_id' => $user->id,
+                            'provider' => 'google_workspace',
+                            'primary_email' => $email,
+                            'display_name' => $user->name,
+                            'status' => 'linked',
+                            'linked_at' => now(),
+                            'last_synced_at' => now(),
+                        ]
+                    );
+                }
 
                 $userIds[] = $user->id;
             }

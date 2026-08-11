@@ -20,6 +20,7 @@ class IntegrationConfig extends Model
         'configuration_json',
         'is_active',
         'last_validated_at',
+        'delegation_credentials_json',
     ];
 
     protected $casts = [
@@ -27,6 +28,7 @@ class IntegrationConfig extends Model
         'configuration_json' => 'array',
         'is_active' => 'boolean',
         'last_validated_at' => 'datetime',
+        'delegation_credentials_json' => 'encrypted:array',
     ];
 
     public function integration(): BelongsTo

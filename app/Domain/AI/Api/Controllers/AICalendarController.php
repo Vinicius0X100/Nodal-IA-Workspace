@@ -51,8 +51,8 @@ class AICalendarController
             $organization = $request->get('_active_organization');
             $user         = $request->get('_active_user');
 
-            // ── 2. Autorização ────────────────────────────────────────────────
-            $this->authorizationService->authorize($user, $organization, 'calendar.events.read');
+            // ── 2. Autorização (Substituído pelo novo modelo) ─────────────────
+            // A autorização final com scopes e identidades ocorrerá logo após validarmos o input.
 
             // ── 3. Validação de parâmetros ────────────────────────────────────
             $validator = Validator::make($request->all(), [
@@ -104,6 +104,17 @@ class AICalendarController
                 ], 503);
             }
 
+            // ── 5.5. Resolver Contexto de Acesso & Identidade ──────────────────
+            $targetUser = null; // No futuro, se a tool aceitar "target_user_id", nós instanciaríamos o alvo aqui
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'calendar.events.read',
+                $integration,
+                'google_workspace',
+                $targetUser
+            );
+
             // ── 6. Delegar ao Service ─────────────────────────────────────────
             $filters = array_filter([
                 'start'       => $startRaw       ?: null,
@@ -122,6 +133,7 @@ class AICalendarController
                 $filters,
                 $user->id,
                 $conversationUuid,
+                $accessContext->getResolvedIdentity()
             );
 
             return response()->json([
@@ -135,6 +147,20 @@ class AICalendarController
                 'code'    => 'ACCESS_DENIED',
                 'message' => 'Você não possui permissão para acessar o calendário.',
             ], 403);
+
+        } catch (\App\Domain\Identities\Exceptions\ExternalIdentityRequiredException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'EXTERNAL_IDENTITY_REQUIRED',
+                'message' => $e->getMessage(),
+            ], 403);
+            
+        } catch (\App\Domain\Identities\Exceptions\ProviderDelegationRequiredException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'PROVIDER_DELEGATION_REQUIRED',
+                'message' => $e->getMessage(),
+            ], 503);
 
         } catch (GoogleReauthRequiredException $e) {
             return response()->json([
@@ -190,8 +216,8 @@ class AICalendarController
             $organization = $request->get('_active_organization');
             $user         = $request->get('_active_user');
 
-            // ── 2. Autorização ────────────────────────────────────────────────
-            $this->authorizationService->authorize($user, $organization, 'calendar.freebusy.read');
+            // ── 2. Autorização (Substituído pelo novo modelo) ─────────────────
+            // A autorização final com scopes e identidades ocorrerá logo após validarmos o input.
 
             // ── 3. Validação de parâmetros ────────────────────────────────────
             $validator = Validator::make($request->json()->all(), [
@@ -239,6 +265,17 @@ class AICalendarController
                 ], 503);
             }
 
+            // ── 5.5. Resolver Contexto de Acesso & Identidade ──────────────────
+            $targetUser = null; // No futuro, se a tool aceitar "target_user_id", nós instanciaríamos o alvo aqui
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'calendar.freebusy.read',
+                $integration,
+                'google_workspace',
+                $targetUser
+            );
+
             // ── 6. Delegar ao Service ─────────────────────────────────────────
             $filters = array_filter([
                 'start'                 => $startRaw,
@@ -255,6 +292,7 @@ class AICalendarController
                 $filters,
                 $user->id,
                 $conversationUuid,
+                $accessContext->getResolvedIdentity()
             );
 
             return response()->json([
@@ -268,6 +306,20 @@ class AICalendarController
                 'code'    => 'ACCESS_DENIED',
                 'message' => 'Você não possui permissão para consultar a disponibilidade do calendário.',
             ], 403);
+
+        } catch (\App\Domain\Identities\Exceptions\ExternalIdentityRequiredException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'EXTERNAL_IDENTITY_REQUIRED',
+                'message' => $e->getMessage(),
+            ], 403);
+            
+        } catch (\App\Domain\Identities\Exceptions\ProviderDelegationRequiredException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'PROVIDER_DELEGATION_REQUIRED',
+                'message' => $e->getMessage(),
+            ], 503);
 
         } catch (GoogleReauthRequiredException $e) {
             return response()->json([

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Collection;
 
 use App\Domain\Integrations\Services\IntegrationManager;
 use App\Domain\Audit\Actions\LogAuditAction;
+use App\Domain\Integrations\Services\GoogleTokenService;
 use Illuminate\Support\Facades\Http;
 use Exception;
 
@@ -15,7 +16,8 @@ class AIResourcesService
 {
     public function __construct(
         private IntegrationManager $integrationManager,
-        private LogAuditAction $logAuditAction
+        private LogAuditAction $logAuditAction,
+        private GoogleTokenService $googleTokenService
     ) {}
     /**
      * Search resources for the given organization.
@@ -59,7 +61,7 @@ class AIResourcesService
             ->first();
     }
 
-    public function getContent(Organization $organization, string $uuid, ?string $userId = null): array
+    public function getContent(Organization $organization, string $uuid, ?string $userId = null, ?\App\Domain\Identities\Models\ExternalIdentity $identity = null): array
     {
         $resource = $this->findByUuid($organization, $uuid);
         if (!$resource) {
@@ -79,13 +81,13 @@ class AIResourcesService
         ]);
 
         if ($integration->provider === 'google_workspace' || $integration->provider === 'google') {
-            return $this->extractGoogleContent($integration, $resource, $fileId);
+            return $this->extractGoogleContent($integration, $resource, $fileId, $identity);
         }
 
         throw new Exception("Content extraction not implemented for provider {$integration->provider}.", 501);
     }
 
-    public function getFileStream(Organization $organization, string $uuid, ?string $userId = null)
+    public function getFileStream(Organization $organization, string $uuid, ?string $userId = null, ?\App\Domain\Identities\Models\ExternalIdentity $identity = null)
     {
         $resource = $this->findByUuid($organization, $uuid);
         if (!$resource) {
@@ -105,7 +107,7 @@ class AIResourcesService
         ]);
 
         if ($integration->provider === 'google_workspace' || $integration->provider === 'google') {
-            return $this->streamGoogleFile($integration, $resource, $fileId);
+            return $this->streamGoogleFile($integration, $resource, $fileId, $identity);
         }
 
         throw new Exception("File streaming not implemented for provider {$integration->provider}.", 501);
@@ -141,7 +143,7 @@ class AIResourcesService
         return $response;
     }
 
-    private function extractGoogleContent($integration, $resource, string $fileId): array
+    private function extractGoogleContent($integration, $resource, string $fileId, ?\App\Domain\Identities\Models\ExternalIdentity $identity = null): array
     {
         $mime = $resource->mime_type;
         $exportMime = null;
@@ -164,9 +166,13 @@ class AIResourcesService
             throw new Exception("This resource format ({$mime}) cannot be safely extracted as text. Use the /file endpoint for binary/multimodal processing.", 415);
         }
 
-        $response = $this->handleGoogleApiCall($integration, function ($token) use ($url) {
+        $response = $this->googleTokenService->executeWithRetry($integration, function ($token) use ($url) {
             return Http::withToken($token)->get($url);
-        });
+        }, $identity, ['https://www.googleapis.com/auth/drive.readonly']);
+
+        if (!$response->successful()) {
+            throw new Exception("Provider API Error: " . $response->body(), $response->status());
+        }
 
         return [
             'uuid' => $resource->uuid,
@@ -177,7 +183,7 @@ class AIResourcesService
         ];
     }
 
-    private function streamGoogleFile($integration, $resource, string $fileId)
+    private function streamGoogleFile($integration, $resource, string $fileId, ?\App\Domain\Identities\Models\ExternalIdentity $identity = null)
     {
         $mime = $resource->mime_type;
         // Se for um arquivo nativo do Google, o download binário direto não funciona. Precisamos exportar como PDF.
@@ -188,9 +194,13 @@ class AIResourcesService
             $url = "https://www.googleapis.com/drive/v3/files/{$fileId}?alt=media";
         }
 
-        $response = $this->handleGoogleApiCall($integration, function ($token) use ($url) {
+        $response = $this->googleTokenService->executeWithRetry($integration, function ($token) use ($url) {
             return Http::withToken($token)->get($url);
-        });
+        }, $identity, ['https://www.googleapis.com/auth/drive.readonly']);
+
+        if (!$response->successful()) {
+            throw new Exception("Provider API Error: " . $response->body(), $response->status());
+        }
 
         return response($response->body(), 200, [
             'Content-Type' => $mime,

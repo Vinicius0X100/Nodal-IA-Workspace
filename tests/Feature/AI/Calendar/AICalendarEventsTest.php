@@ -79,6 +79,31 @@ class AICalendarEventsTest extends TestCase
             'integration_id' => $this->integration->id,
             'client_id'      => 'test-client-id',
             'client_secret'  => 'test-client-secret',
+            'delegation_credentials_json' => [
+                'client_email' => 'test@test.com',
+                'private_key' => "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC8DxlwWbLxYnGG\n4Wa7BvXSyyS8yk9U7YNe0LkBtnVk8EHVBH5COPfov7Gn3n++1soPRfOXIRvXutvt\nVOPN57Y9S31SB9RcrLWzYR0mhvLAqBU2nqEw0/OBC9B5GxTPaTf/z7A28jnm7akz\nxvBp+qOzsK9LyD3KCoOWKW1ddhfFar3AU+1KYuG8SJzAUJ2RMAEoah6wW+4B1hVC\nUSUbbVTqxpK0xw7obW38XA1PgHHe0QEYjC9cAmTFKQRTFWduxtgEzCUbb8T8TUk5\nvuogTERm9pAxVIEJG75XvRv5OePAOVbDhVDWB2fG84ztDubiZ+zxFGpWnUhOTq33\nCZmyY3YbAgMBAAECggEAQMZcp0emLKGRY/mQZnw7wOsK0OJIWALlXIu9JbtgjS96\nJXLCQHIZ5ffdK+qmCqg1+fPItvYG/pQUu5chTiNxMISnelFLEs7EWTBql4Ik7DoY\n8HLMJ6LhvUHCAWzUCqr9yGWTlyFw0ztqK/Tqiz5zE2oYvxwOOGDNuTO0wVvzTSJj\nXN8M9Y2ZWF+UngLrhFYzEhGcTZT93/x0Ggajff/Pjfdz5mHR74vx3ZJpuF8nBKNi\n6boqHEk4N7JuLSmx3RLHoD4HCXnGuWpOEFZSi8m/HYtySKZFIVwANcO2l/OJJv3x\nBt/OrLW/pypL5HDjMOXaH2J06ackHhMxd+3LB6pufQKBgQDhDyzftieiY6BPK+yT\nxdkPKckvgaPK5DIuKGsnALNqbdudiOn1K/Q/6wOjImnR4bj7jm3GwBeY/yVICBjY\n4s3d038cbSEzGFvS+ZTJgoVCCYuQIFvrXsYjHDWMcmXc0LH6PR3vgU9BRklvo1jV\nNCndscp0puiOEeo6dFGcIXEOHQKBgQDV6biaFupq4626zRr4OAszm+wrkGTHEakk\nIyCFm4lXzzkbspsn/6sl8SJw3p4dKhJ/hOay+fk0UDSU3DHaL7hCWQUkUALHCtAw\nPiFUDQssfg/CpkP2mr69Zi7SL4UoJBj/tu1RwRYpM+H2EDXlBfTyFPP7dSFnE9n2\noAafNjc/lwKBgQCLmGgTEt8eoIDs2qfROOTbvOVnLBg2XripXLSp6otetmmEG0pS\nokLL6q/E3jGY11Nv5PY+UyPP6GJtfWg8DuH2d5rePOpc0P0TrW8WVnjlbxo7+XZK\nVey8FmE4jjSUdHYQaxxIVIKeUER4lG8jP0nAkuiq1mRkysPoIgIEv9FqGQKBgA08\nS97E4jZA5iPzwuJu3UqRMDi103Z5wkRpI/8AU6wqNzdegrkj2ZwcYmwnahMV4lUf\njQKv8tpoyAgZ47/DShxY07eed72HDsCdZ4SC1hknp6P8k6Hziy++3dDFffCw4xcX\nY3G2h79+5VFLSXplNvWvlDUP10RAdzEKT76UJTD7AoGACLL9/KG+zvh0uPzq4+0S\nr3oRSPEXvbeFcHarwIhG3C5KJVEABSlfi7bDAFml6ZS4kqYljlF7CkTEPuBKH2aB\nyaTMH0B/2vf2u2ul+HUdkua0FrLOWLoJVANce/t9eNDW7oKAbe3SUpkrsW2c4qHj\n8YI937GvlchTp6XvlwRYgwQ=\n-----END PRIVATE KEY-----\n"
+            ]
+        ]);
+
+        // External Identities
+        \App\Domain\Identities\Models\ExternalIdentity::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $this->owner->id,
+            'integration_id' => $this->integration->id,
+            'provider' => 'google_workspace',
+            'external_id' => 'ext-owner-123',
+            'primary_email' => 'owner@test.com',
+            'status' => 'linked'
+        ]);
+
+        \App\Domain\Identities\Models\ExternalIdentity::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $this->user->id,
+            'integration_id' => $this->integration->id,
+            'provider' => 'google_workspace',
+            'external_id' => 'ext-user-123',
+            'primary_email' => 'user@test.com',
+            'status' => 'linked'
         ]);
     }
 
@@ -88,7 +113,7 @@ class AICalendarEventsTest extends TestCase
         $this->role->permissions()->sync([$perm->id]);
     }
 
-    private function actAsAI(User $user, Organization $org = null): self
+    private function actAsAI(User $user, ?Organization $org = null): self
     {
         config(['services.ai_gateway.token' => 'test-token']);
         return $this->withHeaders([
@@ -101,6 +126,10 @@ class AICalendarEventsTest extends TestCase
     private function fakeGoogleEvents(array $events = [], int $status = 200): void
     {
         Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response([
+                'access_token' => 'fake-delegated-token',
+                'expires_in'   => 3600,
+            ], 200),
             'https://www.googleapis.com/calendar/v3/*' => Http::response(
                 ['items' => $events, 'timeZone' => 'America/Sao_Paulo'],
                 $status
@@ -153,6 +182,26 @@ class AICalendarEventsTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJsonPath('code', 'ACCESS_DENIED');
+
+        Http::assertNothingSent();
+    }
+    
+    // ── 3.5. Usuário sem identidade externa recebe 403 ────────────────────────
+
+    public function test_user_without_external_identity_gets_403(): void
+    {
+        $this->grantCalendarPermission();
+        
+        // Remove a identidade externa do usuário
+        $this->user->externalIdentities()->delete();
+
+        Http::fake();
+
+        $response = $this->actAsAI($this->user)
+            ->getJson('/api/ai/calendar/events');
+
+        $response->assertStatus(403)
+            ->assertJsonPath('code', 'EXTERNAL_IDENTITY_REQUIRED');
 
         Http::assertNothingSent();
     }

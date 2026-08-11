@@ -56,6 +56,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->belongsToMany(\App\Domain\Directory\Models\Group::class);
     }
 
+    public function externalIdentities(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Domain\Identities\Models\ExternalIdentity::class);
+    }
+
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class);

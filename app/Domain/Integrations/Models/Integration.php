@@ -64,4 +64,9 @@ class Integration extends Model
     {
         return $this->hasMany(\App\Domain\Directory\Models\Group::class);
     }
+
+    public function externalIdentities(): HasMany
+    {
+        return $this->hasMany(\App\Domain\Identities\Models\ExternalIdentity::class);
+    }
 }

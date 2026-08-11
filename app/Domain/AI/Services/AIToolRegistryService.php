@@ -69,36 +69,40 @@ class AIToolRegistryService
                 'tool_type' => 'search',
                 'requires_confirmation' => false,
                 'required_permissions' => ['resources.search'],
+                'requires_external_identity' => false, // O search de metadados não bate no google
             ],
             [
                 'slug'                 => 'google_calendar_events_list',
                 'name'                 => 'Buscar Eventos do Calendarário',
-                'description'          => 'Consulta eventos do Google Calendar da organização. Parâmetros opcionais (query string): start (RFC3339), end (RFC3339), query (busca textual), calendar_id (padrão: primary), limit (máx: 100, padrão: 20), time_zone (IANA, ex: America/Sao_Paulo). Expande recorrências automaticamente e normaliza eventos all-day.',
+                'description'          => 'Consulta eventos do Google Calendar. Parâmetros opcionais (query string): start (RFC3339), end (RFC3339), query (busca textual), calendar_id (padrão: primary), limit (máx: 100, padrão: 20), time_zone (IANA, ex: America/Sao_Paulo). A consulta utiliza a conta corporativa (External Identity) vinculada ao usuário solicitante.',
                 'endpoint'             => '/api/ai/calendar/events',
                 'http_method'          => 'GET',
                 'tool_type'            => 'search',
                 'requires_confirmation' => false,
                 'required_permissions' => ['calendar.events.read'],
+                'requires_external_identity' => true,
             ],
             [
                 'slug'                 => 'google_calendar_freebusy',
                 'name'                 => 'Consultar Disponibilidade do Calendário',
-                'description'          => 'Consulta disponibilidade (horários livres e ocupados) no Google Calendar sem revelar os detalhes ou títulos dos eventos. Aceita um JSON no body: start (RFC3339 obrigatório), end (RFC3339 obrigatório), calendar_id (opcional, padrão primary), slot_duration_minutes (opcional, calcula apenas janelas livres maiores ou iguais a este valor).',
+                'description'          => 'Consulta disponibilidade (horários livres e ocupados) no Google Calendar sem revelar os detalhes ou títulos dos eventos. Aceita um JSON no body: start (RFC3339 obrigatório), end (RFC3339 obrigatório), calendar_id (opcional, padrão primary), slot_duration_minutes (opcional). A consulta utiliza a conta corporativa (External Identity) vinculada.',
                 'endpoint'             => '/api/ai/calendar/freebusy',
                 'http_method'          => 'POST',
                 'tool_type'            => 'read',
                 'requires_confirmation' => false,
                 'required_permissions' => ['calendar.freebusy.read'],
+                'requires_external_identity' => true,
             ],
             [
                 'slug' => 'google_read_resource',
                 'name' => 'Ler Conteúdo de Arquivo do Google Drive',
-                'description' => 'Lê e extrai o texto do conteúdo de um arquivo específico do Google Drive usando seu UUID. Use esta ferramenta quando precisar analisar o conteúdo textual de um relatório, planilha ou documento.',
+                'description' => 'Lê e extrai o texto do conteúdo de um arquivo específico do Google Drive usando seu UUID. A consulta utiliza a conta corporativa (External Identity) vinculada ao usuário solicitante (via Impersonation) garantindo que apenas arquivos que o usuário tem acesso no Google Drive possam ser lidos.',
                 'endpoint' => '/api/ai/resources/{uuid}/content', // O {uuid} deve ser substituído pelo UUID do recurso
                 'http_method' => 'GET',
                 'tool_type' => 'action',
                 'requires_confirmation' => false,
                 'required_permissions' => ['resources.read'],
+                'requires_external_identity' => true,
             ],
         ];
 
@@ -149,7 +153,8 @@ class AIToolRegistryService
                     'tool_type' => $toolData['tool_type'],
                     'requires_confirmation' => $toolData['requires_confirmation'],
                     'configuration_json' => [
-                        'required_permissions' => $toolData['required_permissions'] ?? []
+                        'required_permissions' => $toolData['required_permissions'] ?? [],
+                        'requires_external_identity' => $toolData['requires_external_identity'] ?? false,
                     ],
                 ]
             );

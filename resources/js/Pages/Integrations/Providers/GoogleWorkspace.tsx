@@ -426,11 +426,46 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                                         </AccordionContent>
                                     </AccordionItem>
                                     <AccordionItem value="item-4">
-                                        <AccordionTrigger className="text-left font-semibold">4. Gerar Credenciais</AccordionTrigger>
+                                        <AccordionTrigger className="text-left font-semibold">4. Gerar Credenciais OAuth 2.0</AccordionTrigger>
                                         <AccordionContent className="text-neutral-600 leading-relaxed pt-2 pb-4">
                                             Vá na aba "Credenciais". Clique em "Criar credenciais" e escolha "ID do cliente OAuth".
                                             Selecione "Aplicativo da Web". Adicione a <strong>URI de Redirecionamento</strong> que fornecemos na aba de Configuração.
-                                            Copie o Client ID e Client Secret gerados.
+                                            Copie o Client ID e Client Secret gerados e cole na aba de Configuração.
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                    <AccordionItem value="item-5">
+                                        <AccordionTrigger className="text-left font-semibold">5. Criar uma Service Account (Para IA)</AccordionTrigger>
+                                        <AccordionContent className="text-neutral-600 leading-relaxed pt-2 pb-4">
+                                            Para que as ferramentas de IA do Nodal possam consultar os dados em nome dos usuários sem exigir que cada um se autentique individualmente, é necessário criar uma Service Account:
+                                            <ol className="list-decimal ml-5 mt-2 space-y-2">
+                                                <li>Ainda na aba "Credenciais" do Google Cloud, clique em "Criar credenciais" e escolha <strong>Conta de serviço (Service Account)</strong>.</li>
+                                                <li>Nomeie como "Nodal AI Delegation" e conclua a criação.</li>
+                                                <li>Na lista de contas de serviço, clique na conta recém-criada, vá na aba <strong>Chaves</strong>, clique em "Adicionar chave" &gt; "Criar nova chave".</li>
+                                                <li>Selecione o formato <strong>JSON</strong>. Um arquivo será baixado para o seu computador. Salve este arquivo com segurança.</li>
+                                                <li>Anote o <strong>Client ID</strong> (ID do Cliente) desta Service Account, você precisará dele no próximo passo.</li>
+                                            </ol>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                    <AccordionItem value="item-6">
+                                        <AccordionTrigger className="text-left font-semibold">6. Configurar Domain-Wide Delegation no Google Workspace</AccordionTrigger>
+                                        <AccordionContent className="text-neutral-600 leading-relaxed pt-2 pb-4">
+                                            Este é o passo mais importante. Sem ele, a Service Account não terá permissão para operar em nome dos seus usuários:
+                                            <ol className="list-decimal ml-5 mt-2 space-y-2">
+                                                <li>Acesse o <a href="https://admin.google.com" target="_blank" rel="noreferrer" className="text-primary-600 underline">Google Admin Console</a>.</li>
+                                                <li>Navegue até <strong>Security</strong> &gt; <strong>Access and data control</strong> &gt; <strong>API controls</strong>.</li>
+                                                <li>Na seção inferior "Domain wide delegation", clique em <strong>Manage Domain Wide Delegation</strong>.</li>
+                                                <li>Clique em <strong>Add new</strong>.</li>
+                                                <li>No campo <strong>Client ID</strong>, cole o ID do Cliente da Service Account que você anotou no passo anterior.</li>
+                                                <li>No campo <strong>OAuth scopes</strong>, adicione os escopos estritamente necessários, separados por vírgula. Por exemplo:
+                                                    <code className="block mt-2 p-2 bg-neutral-100 rounded text-xs break-all">
+                                                        https://www.googleapis.com/auth/calendar.readonly, https://www.googleapis.com/auth/admin.directory.resource.calendar.readonly
+                                                    </code>
+                                                </li>
+                                                <li>Clique em <strong>Authorize</strong>.</li>
+                                            </ol>
+                                            <p className="mt-4 text-sm bg-yellow-50 text-yellow-800 p-3 rounded-lg border border-yellow-200">
+                                                <strong>Atenção:</strong> Após concluir estes passos, lembre-se de configurar a chave JSON da Service Account nas configurações de integração do Nodal para ativar completamente as capacidades de Inteligência Artificial.
+                                            </p>
                                         </AccordionContent>
                                     </AccordionItem>
                                 </Accordion>

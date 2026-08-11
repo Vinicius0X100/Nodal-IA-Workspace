@@ -20,7 +20,18 @@ class AIResourcesController
             $organization = $request->get('_active_organization');
             $user = $request->get('_active_user');
 
-            $this->authorizationService->authorize($user, $organization, 'resources.search');
+            // ── Resolve Contexto de Acesso & Identidade ──────────────────
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', $request->query('provider', 'google_workspace')) // Ajuste provisório
+                ->first();
+                
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'resources.search',
+                $integration,
+                $integration ? $integration->provider : 'google_workspace'
+            );
 
             $query = $request->query('q', '');
             $provider = $request->query('provider');
@@ -58,7 +69,17 @@ class AIResourcesController
             $organization = $request->get('_active_organization');
             $user = $request->get('_active_user');
 
-            $this->authorizationService->authorize($user, $organization, 'resources.read');
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace') // Por enquanto apenas Google
+                ->first();
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'resources.read',
+                $integration,
+                $integration ? $integration->provider : 'google_workspace'
+            );
 
             $resource = $this->service->findByUuid($organization, $uuid);
 
@@ -77,6 +98,12 @@ class AIResourcesController
                 'success' => true,
                 'data' => new AIResourceResource($resource),
             ]);
+        } catch (\App\Domain\Identities\Exceptions\ExternalIdentityRequiredException $e) {
+            return response()->json([
+                'success' => false,
+                'code' => 'EXTERNAL_IDENTITY_REQUIRED',
+                'message' => $e->getMessage()
+            ], 403);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return response()->json([
                 'success' => false,
@@ -97,7 +124,17 @@ class AIResourcesController
             $organization = $request->get('_active_organization');
             $user = $request->get('_active_user');
 
-            $this->authorizationService->authorize($user, $organization, 'resources.read');
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace')
+                ->first();
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'resources.read',
+                $integration,
+                $integration ? $integration->provider : 'google_workspace'
+            );
 
             $resource = $this->service->findByUuid($organization, $uuid);
             if (!$resource) {
@@ -113,7 +150,7 @@ class AIResourcesController
             
             // O serviço antigo usa auth()->id() que pode ser nulo se não houver Sanctum cookie.
             // Para AI API, o dono da ação é o $user->id
-            $contentData = $this->service->getContent($organization, $uuid, $user->id);
+            $contentData = $this->service->getContent($organization, $uuid, $user->id, $accessContext->getResolvedIdentity());
             
             return response()->json([
                 'success' => true,
@@ -139,7 +176,17 @@ class AIResourcesController
             $organization = $request->get('_active_organization');
             $user = $request->get('_active_user');
 
-            $this->authorizationService->authorize($user, $organization, 'resources.read');
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace')
+                ->first();
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'resources.read',
+                $integration,
+                $integration ? $integration->provider : 'google_workspace'
+            );
 
             $resource = $this->service->findByUuid($organization, $uuid);
             if (!$resource) {
@@ -153,7 +200,7 @@ class AIResourcesController
                 throw new \Illuminate\Auth\Access\AuthorizationException("Você não possui permissão para acessar o arquivo deste recurso.");
             }
             
-            return $this->service->getFileStream($organization, $uuid, $user->id);
+            return $this->service->getFileStream($organization, $uuid, $user->id, $accessContext->getResolvedIdentity());
             
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return response()->json([
