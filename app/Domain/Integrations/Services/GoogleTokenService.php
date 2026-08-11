@@ -69,8 +69,12 @@ class GoogleTokenService
             throw new ProviderDelegationRequiredException("O JSON da Service Account configurado é inválido.");
         }
 
-        // Cache o token delegado por e-mail e por integração para não ficar pedindo todo o tempo (dura 1 hr)
-        $cacheKey = "google_delegated_token:{$integration->id}:{$externalIdentity->primary_email}";
+        // Ordena e gera hash dos scopes para garantir que scopes diferentes tenham tokens diferentes em cache
+        $scopesStr = empty($scopes) ? 'default' : implode(',', $scopes);
+        $scopesHash = md5($scopesStr);
+
+        // Cache o token delegado por e-mail, integração e scopes para não ficar pedindo todo o tempo (dura 1 hr)
+        $cacheKey = "google_delegated_token:{$integration->id}:{$externalIdentity->primary_email}:{$scopesHash}";
         if ($cachedToken = \Illuminate\Support\Facades\Cache::get($cacheKey)) {
             return $cachedToken;
         }
