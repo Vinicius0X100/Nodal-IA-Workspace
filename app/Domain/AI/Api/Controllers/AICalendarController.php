@@ -368,7 +368,7 @@ class AICalendarController
     {
         try {
             // ── 1. Contexto injetado pelo middleware ai.gateway ────────────────
-            $organization = $request->attributes->get('_active_organization') ?? app(Organization::class);
+            $organization = $request->attributes->get('_active_organization') ?? app(\App\Domain\Organizations\Models\Organization::class);
             $user         = $request->attributes->get('_active_user') ?? app(\App\Domain\Identity\Models\User::class);
 
             // ── 2. Validação de parâmetros ────────────────────────────────────

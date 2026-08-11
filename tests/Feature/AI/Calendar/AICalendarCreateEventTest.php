@@ -29,7 +29,7 @@ class AICalendarCreateEventTest extends TestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
+        parent::setUp(); $this->withoutExceptionHandling();
 
         $this->organization = Organization::create([
             'name'   => 'Test Corp',
