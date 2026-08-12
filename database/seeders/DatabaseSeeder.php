@@ -34,5 +34,9 @@ class DatabaseSeeder extends Seeder
         $user->organizations()->attach($organization->id, [
             'is_owner' => true,
         ]);
+
+        $this->call([
+            CapabilitiesSeeder::class,
+        ]);
     }
 }

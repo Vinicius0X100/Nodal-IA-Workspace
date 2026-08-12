@@ -46,6 +46,7 @@ class GoogleWorkspaceConnector implements ConnectorInterface
             'https://www.googleapis.com/auth/documents.readonly', // Ler Docs
             'https://www.googleapis.com/auth/spreadsheets.readonly', // Ler Sheets
             'https://www.googleapis.com/auth/calendar.readonly', // Consultar Agenda
+            'https://www.googleapis.com/auth/gmail.readonly', // Pesquisar e Ler Emails
         ];
 
         return $provider

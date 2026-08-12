@@ -53,4 +53,8 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::patch('/calendar/events/{eventId}', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'updateEvent']);
     Route::delete('/calendar/events/{eventId}', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'deleteEvent']);
     Route::post('/calendar/freebusy', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'freebusy']);
+
+    // Gmail (read-only v1)
+    Route::get('/gmail/messages', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'index']);
+    Route::get('/gmail/messages/{messageId}', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'show']);
 });
