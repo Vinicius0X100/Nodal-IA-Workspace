@@ -168,6 +168,17 @@ class AIToolRegistryService
                 'requires_external_identity' => true,
             ],
             [
+                'slug'                 => 'google_calendar_event_delete',
+                'name'                 => 'Excluir Evento do Calendário',
+                'description'          => 'Cancela ou exclui um evento existente no Google Calendar do usuário autorizado (ação destrutiva). Requer confirmação explícita (requires_confirmation=true). Parâmetros obrigatórios no path: {event_id}. Opcional no body: target_user_uuid (se diferente do ativo), send_updates ("all", "none"). Usa a API events.delete com checagem de concorrência por ETag. Retorna erro estruturado caso tente deletar série inteira de eventos recorrentes.',
+                'endpoint'             => '/api/ai/calendar/events/{event_id}',
+                'http_method'          => 'DELETE',
+                'tool_type'            => 'write',
+                'requires_confirmation' => true,
+                'required_permissions' => ['calendar.events.delete'],
+                'requires_external_identity' => true,
+            ],
+            [
                 'slug' => 'google_read_resource',
                 'name' => 'Ler Conteúdo de Arquivo do Google Drive',
                 'description' => 'Lê e extrai o texto do conteúdo de um arquivo específico do Google Drive usando seu UUID. A consulta utiliza a conta corporativa (External Identity) vinculada ao usuário solicitante (via Impersonation) garantindo que apenas arquivos que o usuário tem acesso no Google Drive possam ser lidos.',

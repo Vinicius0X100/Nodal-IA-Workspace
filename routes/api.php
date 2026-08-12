@@ -51,5 +51,6 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/calendar/events', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'events']);
     Route::post('/calendar/events', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'createEvent']);
     Route::patch('/calendar/events/{eventId}', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'updateEvent']);
+    Route::delete('/calendar/events/{eventId}', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'deleteEvent']);
     Route::post('/calendar/freebusy', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'freebusy']);
 });

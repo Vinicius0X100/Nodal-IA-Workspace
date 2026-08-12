@@ -8,6 +8,7 @@ use App\Domain\Audit\Models\AuditLog;
 use App\Domain\Integrations\Exceptions\GoogleCalendarException;
 use App\Domain\Integrations\Exceptions\GoogleReauthRequiredException;
 use App\Domain\Integrations\Exceptions\IntegrationUnavailableException;
+use App\Domain\Identities\Exceptions\TargetIdentityNotFoundException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -1101,6 +1102,167 @@ class GoogleCalendarService
     /**
      * Registra auditoria segura — nunca loga tokens, conteúdo de descrições completo ou IDs internos desnecessários.
      */
+    /**
+     * Exclui um evento do Google Calendar.
+     * Requer confirmação prévia e manipulação segura de estado e master.
+     *
+     * @param string|null $sendUpdatesParam 'all' ou nulo, override da requisição
+     */
+    public function deleteEvent(
+        Organization $organization,
+        Integration $integration,
+        string $googleEventId,
+        ?int $actingUserId = null,
+        ?string $conversationUuid = null,
+        ?\App\Domain\Identities\Models\ExternalIdentity $identity = null,
+        ?string $sendUpdatesParam = null
+    ): array {
+        $calendarId = 'primary';
+
+        try {
+            // ── 1. GET Pré-validação ───────────────────────────────────────────────
+            $getResponse = $this->tokenService->executeWithRetry(
+                $integration,
+                function (string $accessToken) use ($calendarId, $googleEventId) {
+                    return Http::withToken($accessToken)
+                        ->get(self::CALENDAR_API_BASE . '/calendars/' . urlencode($calendarId) . '/events/' . urlencode($googleEventId));
+                },
+                $identity,
+                ['https://www.googleapis.com/auth/calendar.events']
+            );
+
+            if ($getResponse->status() === 404) {
+                $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, '', '', 0, false, 'EVENT_NOT_FOUND', 'ai_calendar_event_delete');
+                throw new GoogleCalendarException('EVENT_NOT_FOUND', 'O evento não foi encontrado no calendário.');
+            }
+            if ($getResponse->status() === 403) {
+                $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, '', '', 0, false, 'ACCESS_DENIED', 'ai_calendar_event_delete');
+                throw new GoogleCalendarException('ACCESS_DENIED', 'Acesso negado ao evento. Verifique os escopos da integração.');
+            }
+            if (!$getResponse->successful()) {
+                throw new GoogleCalendarException('GOOGLE_CALENDAR_UNAVAILABLE', 'Não foi possível obter o evento atual.');
+            }
+
+            $current = $getResponse->json();
+            
+            if (($current['status'] ?? '') === 'cancelled') {
+                $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, '', '', 0, false, 'EVENT_ALREADY_DELETED', 'ai_calendar_event_delete');
+                throw new GoogleCalendarException('EVENT_ALREADY_DELETED', 'O evento já foi excluído do calendário.');
+            }
+
+            // ── 2. Validação de Recorrência ─────────────────────────────────────────
+            // Se possui `recurrence` mas NÃO é uma instância (`recurringEventId` ausente),
+            // trata-se da série master. Em V1, bloqueamos exclusão em lote.
+            if (isset($current['recurrence']) && !isset($current['recurringEventId'])) {
+                $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, '', '', 0, false, 'RECURRING_EVENT_SCOPE_REQUIRED', 'ai_calendar_event_delete');
+                throw new GoogleCalendarException('RECURRING_EVENT_SCOPE_REQUIRED', 'O ID informado corresponde a uma série de eventos recorrentes inteira. A exclusão de séries não é permitida sem um escopo recorrente explícito.');
+            }
+
+            $etag = $getResponse->header('ETag') ?: ($current['etag'] ?? null);
+
+            // ── 3. Verificar Status de Organizer vs Attendee ────────────────────────
+            // Identificar se o targetUser atual é o organizer (para refletir no escopo da resposta)
+            $isOrganizer = false;
+            $deletionScope = 'attendee_copy';
+
+            if (isset($current['organizer'])) {
+                if (($current['organizer']['self'] ?? false) === true) {
+                    $isOrganizer = true;
+                } else if ($identity && strtolower($current['organizer']['email'] ?? '') === strtolower($identity->external_id)) {
+                    $isOrganizer = true;
+                }
+            }
+            if ($isOrganizer) {
+                $deletionScope = 'organizer_event';
+            }
+
+            // ── 4. Configurar sendUpdates ──────────────────────────────────────────
+            $hasAttendees = !empty($current['attendees']);
+            $sendUpdates = $sendUpdatesParam;
+            if ($sendUpdates === null && $hasAttendees) {
+                $sendUpdates = 'all';
+            }
+
+            // ── 5. DELETE Evento (API do Google) ───────────────────────────────────
+            $deleteResponse = $this->tokenService->executeWithRetry(
+                $integration,
+                function (string $accessToken) use ($calendarId, $googleEventId, $etag, $sendUpdates) {
+                    $request = Http::withToken($accessToken);
+                    if ($etag) {
+                        $request->withHeaders(['If-Match' => $etag]);
+                    }
+                    
+                    $url = self::CALENDAR_API_BASE . '/calendars/' . urlencode($calendarId) . '/events/' . urlencode($googleEventId);
+                    if ($sendUpdates) {
+                        $url .= '?sendUpdates=' . urlencode($sendUpdates);
+                    }
+                    
+                    return $request->delete($url);
+                },
+                $identity,
+                ['https://www.googleapis.com/auth/calendar.events']
+            );
+
+            // Tratamento de conflito (ETag modificado entre GET e DELETE)
+            if ($deleteResponse->status() === 412) {
+                $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, '', '', 0, false, 'EVENT_CHANGED', 'ai_calendar_event_delete');
+                throw new GoogleCalendarException('EVENT_CHANGED', 'O evento foi alterado por outra sessão desde que foi consultado.');
+            }
+
+            if ($deleteResponse->status() === 404) {
+                $this->audit($organization, $actingUserId, $conversationUuid, $calendarId, '', '', 0, false, 'EVENT_NOT_FOUND', 'ai_calendar_event_delete');
+                throw new GoogleCalendarException('EVENT_NOT_FOUND', 'O evento não foi encontrado no calendário.');
+            }
+
+            if (!$deleteResponse->successful()) {
+                throw new GoogleCalendarException('GOOGLE_CALENDAR_UNAVAILABLE', 'Não foi possível excluir o evento.');
+            }
+
+            // ── 6. Auditoria de Sucesso ────────────────────────────────────────────
+            $startVal = $current['start']['dateTime'] ?? $current['start']['date'] ?? '';
+            $endVal   = $current['end']['dateTime'] ?? $current['end']['date'] ?? '';
+            $this->audit(
+                $organization, 
+                $actingUserId, 
+                $conversationUuid, 
+                $calendarId, 
+                $startVal, 
+                $endVal, 
+                isset($current['attendees']) ? count($current['attendees']) : 0, 
+                true, 
+                null, 
+                'ai_calendar_event_delete'
+            );
+
+            return [
+                'event' => [
+                    'external_id' => $current['id'] ?? $googleEventId,
+                    'title'       => $current['summary'] ?? '',
+                    'start'       => $startVal,
+                    'end'         => $endVal,
+                ],
+                'deleted'        => true,
+                'deletion_scope' => $deletionScope,
+            ];
+
+        } catch (GoogleCalendarException $e) {
+            throw $e;
+        } catch (GoogleReauthRequiredException | TargetIdentityNotFoundException | IntegrationUnavailableException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('[GoogleCalendarService] Erro inesperado ao excluir evento.', [
+                'organization_id' => $organization->id,
+                'event_id'        => $googleEventId,
+                'error'           => $e->getMessage(),
+                'trace'           => $e->getTraceAsString(),
+            ]);
+            if (app()->environment('testing')) {
+                dump(get_class($e), $e->getMessage(), $e->getTraceAsString());
+            }
+            throw new GoogleCalendarException('INTERNAL_ERROR', 'Falha interna ao tentar excluir o evento.');
+        }
+    }
+
     private function audit(
         Organization $organization,
         ?int $actingUserId,

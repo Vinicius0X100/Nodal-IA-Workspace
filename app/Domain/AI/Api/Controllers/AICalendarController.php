@@ -944,4 +944,172 @@ class AICalendarController
             ], 500);
         }
     }
+
+    /**
+     * Exclui (ou cancela) um evento do Google Calendar de um usuário.
+     * Operação destrutiva: Exige confirmação explícita.
+     */
+    public function deleteEvent(Request $request, string $eventId)
+    {
+        try {
+            // ── 1. Contexto Base ───────────────────────────────────────────────────
+            $organization = $request->get('_active_organization');
+            $user         = $request->get('_active_user');
+
+            if (!$organization || !$user) {
+                return response()->json([
+                    'success' => false,
+                    'code'    => 'UNAUTHORIZED',
+                    'message' => 'Contexto de organização ou usuário não encontrado.'
+                ], 401);
+            }
+
+            // ── 2. Confirmação Explícita Obrigatória ──────────────────────────────
+            if ($request->header('X-Nodal-Action-Confirmed') !== 'true') {
+                return response()->json([
+                    'success' => false,
+                    'code'    => 'CONFIRMATION_REQUIRED',
+                    'message' => 'A exclusão de eventos exige confirmação explícita do usuário.'
+                ], 400);
+            }
+
+            $targetUserUuid = $request->input('target_user_uuid');
+            $sendUpdatesParam = $request->input('send_updates');
+
+            // ── 3. Resolução de Target e Identity ──────────────────────────────────
+            $targetUser = null;
+            if ($targetUserUuid && $targetUserUuid !== $user->uuid) {
+                $targetUser = \App\Domain\Identity\Models\User::where('uuid', $targetUserUuid)
+                    ->where('organization_id', $organization->id)
+                    ->first();
+
+                if (!$targetUser) {
+                    return response()->json([
+                        'success' => false,
+                        'code'    => 'TARGET_USER_NOT_FOUND',
+                        'message' => 'Usuário alvo não encontrado na organização.'
+                    ], 404);
+                }
+            }
+
+            $contextUser = $targetUser ?: $user;
+
+            $integration = Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace')
+                ->where('status', 'connected')
+                ->first();
+
+            if (!$integration) {
+                return response()->json([
+                    'success' => false,
+                    'code'    => 'GOOGLE_CALENDAR_UNAVAILABLE',
+                    'message' => 'A integração com o Google Workspace não está conectada para esta organização.'
+                ], 503);
+            }
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'calendar.events.delete',
+                $integration,
+                'google_workspace',
+                $targetUser
+            );
+
+            $targetIdentity = $accessContext->getResolvedIdentity();
+            if (!$targetIdentity) {
+                return response()->json([
+                    'success' => false,
+                    'code'    => 'EXTERNAL_IDENTITY_REQUIRED',
+                    'message' => 'O usuário alvo não possui uma conta Google Workspace (ExternalIdentity) vinculada nesta organização.'
+                ], 403);
+            }
+
+            // ── 4. Idempotência ────────────────────────────────────────────────────
+            $idempotencyKey = $request->header('X-Idempotency-Key');
+            $cacheKey = null;
+
+            if ($idempotencyKey) {
+                $cacheKey = "calendar_event_delete:{$organization->id}:{$contextUser->id}:{$eventId}:{$idempotencyKey}";
+                
+                if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+                    return response()->json([
+                        'success' => true,
+                        'data'    => \Illuminate\Support\Facades\Cache::get($cacheKey),
+                    ], 200);
+                }
+            }
+
+            // ── 5. Delegação ao Service ────────────────────────────────────────────
+            $result = $this->calendarService->deleteEvent(
+                $organization,
+                $integration,
+                $eventId,
+                $user->id,
+                $request->header('X-Conversation-UUID'),
+                $targetIdentity,
+                $sendUpdatesParam
+            );
+
+            // ── 6. Sucesso e Cache ─────────────────────────────────────────────────
+            if ($cacheKey) {
+                \Illuminate\Support\Facades\Cache::put($cacheKey, $result, now()->addHours(24));
+            }
+
+            return response()->json([
+                'success' => true,
+                'data'    => $result,
+            ], 200);
+
+        } catch (GoogleReauthRequiredException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'GOOGLE_REAUTH_REQUIRED',
+                'message' => $e->getMessage(),
+            ], 503);
+
+        } catch (TargetIdentityNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'EXTERNAL_IDENTITY_REQUIRED',
+                'message' => $e->getMessage(),
+            ], 403);
+
+        } catch (GoogleCalendarException $e) {
+            $httpStatus = match ($e->errorCode) {
+                'EVENT_NOT_FOUND'             => 404,
+                'EVENT_ALREADY_DELETED'       => 404,
+                'ACCESS_DENIED'               => 403,
+                'EVENT_NOT_ALLOWED'           => 403,
+                'EVENT_CHANGED'               => 409,
+                'RECURRING_EVENT_SCOPE_REQUIRED' => 403,
+                'CALENDAR_NOT_FOUND'          => 404,
+                'GOOGLE_CALENDAR_UNAVAILABLE' => 503,
+                default                       => 500,
+            };
+
+            return response()->json([
+                'success' => false,
+                'code'    => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], $httpStatus);
+
+        } catch (IntegrationUnavailableException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'GOOGLE_CALENDAR_UNAVAILABLE',
+                'message' => $e->getMessage(),
+            ], 503);
+
+        } catch (\Exception $e) {
+            if (app()->environment('testing')) {
+                throw $e;
+            }
+            return response()->json([
+                'success' => false,
+                'code'    => 'INTERNAL_ERROR',
+                'message' => 'Ocorreu um erro interno ao excluir o evento no calendário.',
+            ], 500);
+        }
+    }
 }
