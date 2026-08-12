@@ -450,6 +450,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                                                 <li><strong>Google Docs API</strong></li>
                                                 <li><strong>Google Sheets API</strong></li>
                                                 <li><strong>Google Calendar API</strong></li>
+                                                <li><strong>Gmail API</strong></li>
                                             </ul>
                                         </AccordionContent>
                                     </AccordionItem>
