@@ -47,8 +47,9 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/resources/{uuid}/file', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'file']);
     Route::get('/tools', [\App\Domain\AI\Api\Controllers\AIToolsController::class, 'index']);
 
-    // Calendar (read-only v1)
+    // Calendar (read-only v1 + write v1)
     Route::get('/calendar/events', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'events']);
     Route::post('/calendar/events', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'createEvent']);
+    Route::patch('/calendar/events/{eventId}', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'updateEvent']);
     Route::post('/calendar/freebusy', [\App\Domain\AI\Api\Controllers\AICalendarController::class, 'freebusy']);
 });
