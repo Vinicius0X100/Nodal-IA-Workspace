@@ -68,6 +68,20 @@ class GoogleGmailService
                 ['https://www.googleapis.com/auth/gmail.readonly']
             );
 
+            if ($response->status() === 403) {
+                \Illuminate\Support\Facades\Log::debug('GMAIL_DWD_DEBUG', [
+                    'service_account_client_id' => $integration->credentials['client_id'] ?? $integration->credentials['client_email'] ?? 'N/A',
+                    'subject'                   => $identity ? $identity->provider_id : 'null',
+                    'scopes'                    => ['https://www.googleapis.com/auth/gmail.readonly'],
+                    'organization_id'           => $organization->id,
+                    'integration_id'            => $integration->id,
+                    'http_status'               => $response->status(),
+                    'error_message'             => $response->json('error.message'),
+                    'error_reasons'             => collect($response->json('error.errors', []))->pluck('reason')->toArray(),
+                    'url'                       => self::GMAIL_API_BASE . '/messages'
+                ]);
+            }
+
             $this->handleResponseErrors($response, 'ai_gmail_messages_search', $organization, $actingUserId, $conversationUuid);
 
             $data = $response->json();

@@ -493,7 +493,7 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                                                 <li>No campo <strong>Client ID</strong>, cole o ID do Cliente da Service Account que você anotou no passo anterior.</li>
                                                 <li>No campo <strong>OAuth scopes</strong>, adicione os escopos estritamente necessários, separados por vírgula. Por exemplo:
                                                     <code className="block mt-2 p-2 bg-neutral-100 rounded text-xs break-all">
-                                                        https://www.googleapis.com/auth/calendar.readonly, https://www.googleapis.com/auth/admin.directory.resource.calendar.readonly, https://www.googleapis.com/auth/calendar.events
+                                                        https://www.googleapis.com/auth/calendar.readonly, https://www.googleapis.com/auth/admin.directory.resource.calendar.readonly, https://www.googleapis.com/auth/calendar.events, https://www.googleapis.com/auth/gmail.readonly
                                                     </code>
                                                 </li>
                                                 <li>Clique em <strong>Authorize</strong>.</li>
@@ -554,6 +554,13 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                                         <div>
                                             <p className="font-semibold text-neutral-900 text-sm">Admin SDK API</p>
                                             <p className="text-sm text-neutral-600 mt-2">Vai permitir: ler informações do diretório e sincronizar usuários da organização.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-4 p-4 rounded-xl border border-neutral-100 bg-neutral-50/50">
+                                        {integration?.status === 'connected' ? <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" /> : <ShieldCheck className="w-5 h-5 text-neutral-500 mt-0.5" />}
+                                        <div>
+                                            <p className="font-semibold text-neutral-900 text-sm">Gmail API</p>
+                                            <p className="text-sm text-neutral-600 mt-2">Vai permitir: pesquisar e ler emails da caixa de entrada de forma restrita e segura.</p>
                                         </div>
                                     </div>
                                 </div>
