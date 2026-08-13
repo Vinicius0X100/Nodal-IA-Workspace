@@ -201,6 +201,17 @@ class AIToolRegistryService
                 'requires_external_identity' => true,
             ],
             [
+                'slug'                 => 'google_gmail_attachment_read',
+                'name'                 => 'Ler Anexo do Email',
+                'description'          => 'Lê o conteúdo real de um anexo de um e-mail do Gmail, extraindo seu texto. Suporta PDF, DOCX, XLSX, CSV, JSON, HTML e Texto Puro. Respeita limites rigorosos de tamanho e caracteres. Parâmetros obrigatórios no path: {messageId} e {attachmentId}.',
+                'endpoint'             => '/api/ai/gmail/messages/{messageId}/attachments/{attachmentId}',
+                'http_method'          => 'GET',
+                'tool_type'            => 'read',
+                'requires_confirmation' => false,
+                'required_permissions' => ['gmail.messages.read'],
+                'requires_external_identity' => true,
+            ],
+            [
                 'slug' => 'google_read_resource',
                 'name' => 'Ler Conteúdo de Arquivo do Google Drive',
                 'description' => 'Lê e extrai o texto do conteúdo de um arquivo específico do Google Drive usando seu UUID. A consulta utiliza a conta corporativa (External Identity) vinculada ao usuário solicitante (via Impersonation) garantindo que apenas arquivos que o usuário tem acesso no Google Drive possam ser lidos.',

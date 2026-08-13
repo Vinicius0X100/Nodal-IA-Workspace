@@ -183,6 +183,126 @@ class GoogleGmailService
         }
     }
 
+    public function readAttachment(
+        Organization $organization,
+        Integration $integration,
+        string $messageId,
+        string $attachmentId,
+        ?int $actingUserId = null,
+        ?string $conversationUuid = null,
+        ?\App\Domain\Identities\Models\ExternalIdentity $identity = null
+    ): array {
+        try {
+            // 1. Busca os metadados da mensagem pra validar que o anexo existe e pegar tamanho/mime type
+            $response = $this->tokenService->executeWithRetry(
+                $integration,
+                function (string $accessToken) use ($messageId) {
+                    $url = self::GMAIL_API_BASE . '/messages/' . urlencode($messageId);
+                    return Http::withToken($accessToken)->get($url, ['format' => 'full']);
+                },
+                $identity,
+                ['https://www.googleapis.com/auth/gmail.readonly']
+            );
+
+            $this->handleResponseErrors($response, 'ai_gmail_attachment_read', $organization, $actingUserId, $conversationUuid, $messageId);
+
+            $data = $response->json();
+            $parsedMessage = $this->parseFullMessage($data);
+
+            $targetAttachment = null;
+            foreach ($parsedMessage['attachments'] as $att) {
+                if ($att['attachment_id'] === $attachmentId) {
+                    $targetAttachment = $att;
+                    break;
+                }
+            }
+
+            if (!$targetAttachment) {
+                $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'GMAIL_ATTACHMENT_NOT_FOUND', 'ai_gmail_attachment_read', ['attachment_id' => $attachmentId]);
+                throw new GoogleGmailException('GMAIL_ATTACHMENT_NOT_FOUND', 'O anexo especificado não pertence a esta mensagem ou não existe.');
+            }
+
+            if (($targetAttachment['size'] ?? 0) > 10485760) { // 10MB
+                $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'ATTACHMENT_TOO_LARGE', 'ai_gmail_attachment_read', ['attachment_id' => $attachmentId, 'size' => $targetAttachment['size'] ?? 0]);
+                throw new GoogleGmailException('ATTACHMENT_TOO_LARGE', 'O anexo excede o limite de tamanho suportado (10MB).');
+            }
+
+            // 2. Busca o anexo real
+            $attachResponse = $this->tokenService->executeWithRetry(
+                $integration,
+                function (string $accessToken) use ($messageId, $attachmentId) {
+                    $url = self::GMAIL_API_BASE . '/messages/' . urlencode($messageId) . '/attachments/' . urlencode($attachmentId);
+                    return Http::withToken($accessToken)->get($url);
+                },
+                $identity,
+                ['https://www.googleapis.com/auth/gmail.readonly']
+            );
+
+            $this->handleResponseErrors($attachResponse, 'ai_gmail_attachment_read', $organization, $actingUserId, $conversationUuid, $messageId);
+
+            $attachData = $attachResponse->json();
+            if (empty($attachData['data'])) {
+                $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'ATTACHMENT_CONTENT_UNAVAILABLE', 'ai_gmail_attachment_read', ['attachment_id' => $attachmentId]);
+                throw new GoogleGmailException('ATTACHMENT_CONTENT_UNAVAILABLE', 'O anexo não possui dados.');
+            }
+
+            $base64 = str_replace(['-', '_'], ['+', '/'], $attachData['data']);
+            $binaryData = base64_decode($base64);
+            if ($binaryData === false) {
+                throw new GoogleGmailException('INTERNAL_ERROR', 'Falha ao decodificar os dados do anexo.');
+            }
+
+            // 3. Extração
+            $extractor = \App\Domain\Integrations\Services\Gmail\Extractors\AttachmentExtractorFactory::make(
+                $targetAttachment['mime_type'] ?? '',
+                $targetAttachment['filename'] ?? ''
+            );
+
+            $extractedContent = $extractor->extract($binaryData, $targetAttachment['mime_type'] ?? '', $targetAttachment['filename'] ?? '');
+
+            $this->audit(
+                $organization,
+                $actingUserId,
+                $conversationUuid,
+                $messageId,
+                1,
+                true,
+                null,
+                'ai_gmail_attachment_read',
+                [
+                    'attachment_id' => $attachmentId,
+                    'filename' => $targetAttachment['filename'] ?? '',
+                    'mime_type' => $targetAttachment['mime_type'] ?? '',
+                    'size' => $targetAttachment['size'] ?? 0,
+                    'extraction_type' => $extractedContent['type'],
+                    'truncated' => $extractedContent['truncated'],
+                ]
+            );
+
+            return [
+                'attachment' => [
+                    'message_id' => $messageId,
+                    'attachment_id' => $attachmentId,
+                    'filename' => $targetAttachment['filename'] ?? '',
+                    'mime_type' => $targetAttachment['mime_type'] ?? '',
+                    'size' => $targetAttachment['size'] ?? 0,
+                    'content' => $extractedContent
+                ]
+            ];
+
+        } catch (GoogleReauthRequiredException | TargetIdentityNotFoundException | IntegrationUnavailableException | GoogleGmailException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('[GoogleGmailService] Erro inesperado ao ler anexo.', [
+                'organization_id' => $organization->id,
+                'message_id'      => $messageId,
+                'attachment_id'   => $attachmentId,
+                'error'           => $e->getMessage(),
+            ]);
+            throw new GoogleGmailException('INTERNAL_ERROR', 'Falha interna ao tentar ler o anexo.');
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Private Helpers
     // ─────────────────────────────────────────────────────────────────────────

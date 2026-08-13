@@ -57,4 +57,5 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     // Gmail (read-only v1)
     Route::get('/gmail/messages', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'index']);
     Route::get('/gmail/messages/{messageId}', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'show']);
+    Route::get('/gmail/messages/{messageId}/attachments/{attachmentId}', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'readAttachment']);
 });
