@@ -372,10 +372,11 @@ class AIGmailController
     }
 
     /**
-     * POST /api/ai/gmail/messages/{messageId}/attachments/{attachmentId}/download-link
+     * POST /api/ai/gmail/messages/{messageId}/attachments/download-link
      */
-    public function downloadLink(Request $request, string $messageId, string $attachmentId): JsonResponse
+    public function downloadLink(Request $request, string $messageId): JsonResponse
     {
+        $filename = $request->input('filename');
         try {
             $organization = $request->get('_active_organization');
             $activeUser   = $request->get('_active_user');
@@ -416,7 +417,7 @@ class AIGmailController
                 organization: $organization,
                 integration: $integration,
                 messageId: $messageId,
-                attachmentId: $attachmentId,
+                filename: $filename,
                 actingUserId: $activeUser->id,
                 conversationUuid: $conversationUuid,
                 identity: $identity
@@ -451,14 +452,23 @@ class AIGmailController
                 'GMAIL_MESSAGE_NOT_FOUND'        => 404,
                 'GMAIL_ATTACHMENT_NOT_FOUND'     => 404,
                 'ATTACHMENT_TOO_LARGE'           => 413,
+                'ATTACHMENT_SELECTION_REQUIRED'  => 400,
+                'ATTACHMENT_AMBIGUOUS'           => 400,
                 'GMAIL_UNAVAILABLE'              => 502,
                 default                          => 500,
             };
-            return response()->json([
+
+            $errorResponse = [
                 'success' => false,
                 'code'    => $e->errorCode,
                 'message' => $e->getMessage()
-            ], $httpStatus);
+            ];
+
+            if (!empty($e->additionalData)) {
+                $errorResponse = array_merge($errorResponse, $e->additionalData);
+            }
+
+            return response()->json($errorResponse, $httpStatus);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return response()->json([
                 'success' => false,

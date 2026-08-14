@@ -307,7 +307,7 @@ class GoogleGmailService
         Organization $organization,
         Integration $integration,
         string $messageId,
-        string $attachmentId,
+        ?string $filename = null,
         ?int $actingUserId = null,
         ?string $conversationUuid = null,
         ?\App\Domain\Identities\Models\ExternalIdentity $identity = null
@@ -327,37 +327,68 @@ class GoogleGmailService
 
             $data = $response->json();
             
-            // Diagnóstico: Listar todos os attachmentIds encontrados no payload atual
-            $allAttachmentIds = [];
-            $extractAllIds = function($part) use (&$extractAllIds, &$allAttachmentIds) {
+            $allAttachments = [];
+            $extractAllAttachments = function($part) use (&$extractAllAttachments, &$allAttachments) {
                 if (!empty($part['body']['attachmentId'])) {
-                    $allAttachmentIds[] = $part['body']['attachmentId'];
+                    $allAttachments[] = $part;
                 }
                 foreach (($part['parts'] ?? []) as $child) {
-                    $extractAllIds($child);
+                    $extractAllAttachments($child);
                 }
             };
-            $extractAllIds($data['payload'] ?? []);
+            $extractAllAttachments($data['payload'] ?? []);
 
-            $targetPart = $this->findAttachmentPart($data['payload'] ?? [], $attachmentId);
-
-            \Illuminate\Support\Facades\Log::info('Gmail Diagnostic: generateAttachmentDownloadLink', [
-                'message_id' => $messageId,
-                'requested_attachment_id' => $attachmentId,
-                'available_attachment_ids_in_payload' => $allAttachmentIds,
-                'target_part_found' => $targetPart !== null,
-                'target_part_filename' => $targetPart['filename'] ?? null,
-                'target_part_mime_type' => $targetPart['mimeType'] ?? null,
-                'target_part_body_has_attachment_id' => !empty($targetPart['body']['attachmentId']),
-                'target_part_body_size' => $targetPart['body']['size'] ?? null,
-                'attachment_id_match' => ($targetPart['body']['attachmentId'] ?? null) === $attachmentId,
-            ]);
-
-            if (!$targetPart) {
-                \Illuminate\Support\Facades\Log::warning('GMAIL_ATTACHMENT_NOT_FOUND thrown because findAttachmentPart returned null');
-                $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'GMAIL_ATTACHMENT_NOT_FOUND', 'ai_gmail_attachment_download_link', ['attachment_id' => $attachmentId]);
-                throw new GoogleGmailException('GMAIL_ATTACHMENT_NOT_FOUND', 'O anexo especificado não pertence a esta mensagem ou não existe.');
+            if (count($allAttachments) === 0) {
+                $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'GMAIL_ATTACHMENT_NOT_FOUND', 'ai_gmail_attachment_download_link', ['filename' => $filename]);
+                throw new GoogleGmailException('GMAIL_ATTACHMENT_NOT_FOUND', 'Nenhum anexo encontrado nesta mensagem.');
             }
+
+            $targetPart = null;
+
+            if (count($allAttachments) === 1) {
+                $targetPart = $allAttachments[0];
+            } else {
+                if (empty($filename)) {
+                    $available = array_map(fn($p) => [
+                        'filename' => $p['filename'] ?? '',
+                        'mime_type' => $p['mimeType'] ?? '',
+                        'size' => $p['body']['size'] ?? 0,
+                    ], $allAttachments);
+                    
+                    $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'ATTACHMENT_SELECTION_REQUIRED', 'ai_gmail_attachment_download_link');
+                    throw new GoogleGmailException(
+                        'ATTACHMENT_SELECTION_REQUIRED', 
+                        'A mensagem possui mais de um anexo. Informe qual arquivo deseja.',
+                        ['available_attachments' => array_values($available)]
+                    );
+                }
+
+                $matchedParts = array_filter($allAttachments, fn($p) => ($p['filename'] ?? '') === $filename);
+
+                if (count($matchedParts) === 0) {
+                    $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'GMAIL_ATTACHMENT_NOT_FOUND', 'ai_gmail_attachment_download_link', ['filename' => $filename]);
+                    throw new GoogleGmailException('GMAIL_ATTACHMENT_NOT_FOUND', 'Nenhum anexo encontrado com o filename especificado.');
+                }
+
+                if (count($matchedParts) > 1) {
+                    $available = array_map(fn($p) => [
+                        'filename' => $p['filename'] ?? '',
+                        'mime_type' => $p['mimeType'] ?? '',
+                        'size' => $p['body']['size'] ?? 0,
+                    ], $allAttachments);
+
+                    $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'ATTACHMENT_AMBIGUOUS', 'ai_gmail_attachment_download_link', ['filename' => $filename]);
+                    throw new GoogleGmailException(
+                        'ATTACHMENT_AMBIGUOUS',
+                        'Mais de um anexo possui o mesmo nome. Não foi possível determinar qual anexo baixar.',
+                        ['available_attachments' => array_values($available)]
+                    );
+                }
+
+                $targetPart = reset($matchedParts);
+            }
+
+            $attachmentId = $targetPart['body']['attachmentId'] ?? null;
 
             $targetAttachment = [
                 'attachment_id' => $targetPart['body']['attachmentId'] ?? null,

@@ -168,7 +168,7 @@ class AIGmailNestedAttachmentTest extends TestCase
                 'X-User-UUID' => $this->user->uuid,
                 'X-Conversation-UUID' => 'conv-123',
             ])
-            ->postJson("/api/ai/gmail/messages/{$messageId}/attachments/{$attachmentId}/download-link");
+            ->postJson("/api/ai/gmail/messages/{$messageId}/attachments/download-link");
 
         $responseLink->assertStatus(200);
         $this->assertTrue($responseLink->json('success'));

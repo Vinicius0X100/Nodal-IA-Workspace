@@ -214,8 +214,8 @@ class AIToolRegistryService
             [
                 'slug'                 => 'google_gmail_attachment_download_link',
                 'name'                 => 'Obter Link do Anexo',
-                'description'          => 'Gera um link temporário e seguro para download de um anexo real de uma mensagem do Gmail. Use somente quando o usuário solicitar o arquivo ou o download de um anexo. Esta Tool não lê nem interpreta o conteúdo interno do arquivo.',
-                'endpoint'             => '/api/ai/gmail/messages/{messageId}/attachments/{attachmentId}/download-link',
+                'description'          => 'Gera um link temporário e seguro para download de um anexo real de uma mensagem do Gmail. Use somente quando o usuário solicitar o arquivo ou o download de um anexo. O input "filename" no body (JSON) é obrigatório caso a mensagem contenha mais de um anexo. O {attachmentId} não é mais necessário no endpoint.',
+                'endpoint'             => '/api/ai/gmail/messages/{messageId}/attachments/download-link',
                 'http_method'          => 'POST',
                 'tool_type'            => 'read',
                 'requires_confirmation' => false,

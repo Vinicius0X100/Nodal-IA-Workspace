@@ -150,7 +150,7 @@ class AIGmailAttachmentDownloadTest extends TestCase
 
         // 1. Gera o link via API AI
         $response = $this->actAsAI()
-            ->postJson("/api/ai/gmail/messages/{$messageId}/attachments/{$attachmentId}/download-link");
+            ->postJson("/api/ai/gmail/messages/{$messageId}/attachments/download-link");
 
         $response->assertStatus(200);
         $response->assertJsonStructure([
@@ -247,5 +247,116 @@ class AIGmailAttachmentDownloadTest extends TestCase
                                  ->get("/downloads/{$uuid}");
 
         $downloadResponse->assertStatus(410);
+    }
+
+    public function test_requires_filename_when_multiple_attachments_exist()
+    {
+        $messageId = 'msg_multi';
+        
+        Http::fake([
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/{$messageId}*" => Http::response([
+                'id' => $messageId,
+                'payload' => [
+                    'mimeType' => 'multipart/mixed',
+                    'parts' => [
+                        [
+                            'mimeType' => 'application/pdf',
+                            'filename' => 'invoice.pdf',
+                            'body' => ['attachmentId' => 'att1', 'size' => 100]
+                        ],
+                        [
+                            'mimeType' => 'image/png',
+                            'filename' => 'logo.png',
+                            'body' => ['attachmentId' => 'att2', 'size' => 200]
+                        ]
+                    ]
+                ]
+            ], 200),
+        ]);
+
+        $response = $this->actAsAI()
+            ->postJson("/api/ai/gmail/messages/{$messageId}/attachments/download-link");
+
+        $response->assertStatus(400);
+        $response->assertJson([
+            'success' => false,
+            'code' => 'ATTACHMENT_SELECTION_REQUIRED',
+        ]);
+        $this->assertCount(2, $response->json('available_attachments'));
+    }
+
+    public function test_selects_correct_attachment_when_filename_provided()
+    {
+        $messageId = 'msg_multi';
+        
+        Http::fake([
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/{$messageId}/attachments/att2*" => Http::response([
+                'size' => 200,
+                'data' => 'YmluYXJ5'
+            ], 200),
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/{$messageId}*" => Http::response([
+                'id' => $messageId,
+                'payload' => [
+                    'mimeType' => 'multipart/mixed',
+                    'parts' => [
+                        [
+                            'mimeType' => 'application/pdf',
+                            'filename' => 'invoice.pdf',
+                            'body' => ['attachmentId' => 'att1', 'size' => 100]
+                        ],
+                        [
+                            'mimeType' => 'image/png',
+                            'filename' => 'logo.png',
+                            'body' => ['attachmentId' => 'att2', 'size' => 200]
+                        ]
+                    ]
+                ]
+            ], 200),
+        ]);
+
+        $response = $this->actAsAI()
+            ->postJson("/api/ai/gmail/messages/{$messageId}/attachments/download-link", [
+                'filename' => 'logo.png'
+            ]);
+
+        $response->assertStatus(200);
+        $this->assertEquals('logo.png', $response->json('data.filename'));
+    }
+
+    public function test_throws_ambiguous_when_multiple_attachments_have_same_name()
+    {
+        $messageId = 'msg_amb';
+        
+        Http::fake([
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/{$messageId}*" => Http::response([
+                'id' => $messageId,
+                'payload' => [
+                    'mimeType' => 'multipart/mixed',
+                    'parts' => [
+                        [
+                            'mimeType' => 'application/pdf',
+                            'filename' => 'doc.pdf',
+                            'body' => ['attachmentId' => 'att1', 'size' => 100]
+                        ],
+                        [
+                            'mimeType' => 'application/pdf',
+                            'filename' => 'doc.pdf',
+                            'body' => ['attachmentId' => 'att2', 'size' => 200]
+                        ]
+                    ]
+                ]
+            ], 200),
+        ]);
+
+        $response = $this->actAsAI()
+            ->postJson("/api/ai/gmail/messages/{$messageId}/attachments/download-link", [
+                'filename' => 'doc.pdf'
+            ]);
+
+        $response->assertStatus(400);
+        $response->assertJson([
+            'success' => false,
+            'code' => 'ATTACHMENT_AMBIGUOUS',
+        ]);
     }
 }
