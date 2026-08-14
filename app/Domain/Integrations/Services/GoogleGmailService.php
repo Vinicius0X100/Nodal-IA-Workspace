@@ -207,15 +207,8 @@ class GoogleGmailService
             $this->handleResponseErrors($response, 'ai_gmail_attachment_read', $organization, $actingUserId, $conversationUuid, $messageId);
 
             $data = $response->json();
-            $parsedMessage = $this->parseFullMessage($data);
-
-            $targetAttachment = null;
-            foreach ($parsedMessage['attachments'] as $att) {
-                if ($att['attachment_id'] === $attachmentId) {
-                    $targetAttachment = $att;
-                    break;
-                }
-            }
+            
+            $targetAttachment = $this->findAttachmentPart($data['payload'] ?? [], $attachmentId);
 
             if (!$targetAttachment) {
                 $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'GMAIL_ATTACHMENT_NOT_FOUND', 'ai_gmail_attachment_read', ['attachment_id' => $attachmentId]);
@@ -573,6 +566,34 @@ class GoogleGmailService
         }
 
         return false;
+    }
+
+    /**
+     * Procura recursivamente pela part de anexo que corresponda ao attachmentId.
+     */
+    private function findAttachmentPart(array $payload, string $attachmentId): ?array
+    {
+        $body = $payload['body'] ?? [];
+        
+        if (isset($body['attachmentId']) && $body['attachmentId'] === $attachmentId) {
+            return [
+                'attachment_id' => $body['attachmentId'],
+                'filename'      => $payload['filename'] ?? '',
+                'mime_type'     => $payload['mimeType'] ?? '',
+                'size'          => $body['size'] ?? 0,
+            ];
+        }
+
+        if (!empty($payload['parts'])) {
+            foreach ($payload['parts'] as $part) {
+                $found = $this->findAttachmentPart($part, $attachmentId);
+                if ($found) {
+                    return $found;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

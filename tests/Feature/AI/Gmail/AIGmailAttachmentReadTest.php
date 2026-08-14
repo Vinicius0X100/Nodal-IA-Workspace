@@ -249,4 +249,68 @@ class AIGmailAttachmentReadTest extends TestCase
             'code' => 'ATTACHMENT_TOO_LARGE',
         ]);
     }
+
+    public function test_can_read_nested_multipart_attachment()
+    {
+        $messageId = 'msg123';
+        $attachmentId = 'att123_nested';
+        $plainTextContent = 'Nested PDF Content Fake';
+        $base64Content = str_replace(['+', '/'], ['-', '_'], base64_encode($plainTextContent));
+
+        Http::fake([
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/{$messageId}/attachments/{$attachmentId}*" => Http::response([
+                'size' => strlen($plainTextContent),
+                'data' => $base64Content
+            ], 200),
+
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/{$messageId}*" => Http::response([
+                'id' => $messageId,
+                'payload' => [
+                    'mimeType' => 'multipart/mixed',
+                    'parts' => [
+                        [
+                            'partId' => '1',
+                            'mimeType' => 'multipart/alternative',
+                            'parts' => [
+                                [
+                                    'partId' => '1.1',
+                                    'mimeType' => 'text/plain',
+                                    'body' => [
+                                        'size' => 10,
+                                        'data' => 'SGVsbG8=' // Hello
+                                    ]
+                                ],
+                                [
+                                    'partId' => '1.2',
+                                    'mimeType' => 'text/plain',
+                                    'filename' => 'nested.txt',
+                                    'body' => [
+                                        'attachmentId' => $attachmentId,
+                                        'size' => strlen($plainTextContent),
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ], 200),
+        ]);
+
+        $response = $this->actAsAI()
+            ->getJson("/api/ai/gmail/messages/{$messageId}/attachments/{$attachmentId}");
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'data' => [
+                'attachment' => [
+                    'message_id' => $messageId,
+                    'attachment_id' => $attachmentId,
+                    'filename' => 'nested.txt',
+                    'mime_type' => 'text/plain',
+                    'size' => strlen($plainTextContent)
+                ]
+            ]
+        ]);
+    }
 }
