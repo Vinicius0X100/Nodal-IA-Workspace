@@ -109,6 +109,9 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/{uuid}/messages', [\App\Http\Controllers\AI\MessageController::class, 'store'])->name('messages.store');
         });
 
+        // Downloads Temporários
+        Route::get('/downloads/{uuid}', [\App\Http\Controllers\Downloads\DownloadController::class, 'show'])->name('downloads.show');
+
         // As demais rotas serão implementadas nos respectivos controllers depois:
         // Audit
     });

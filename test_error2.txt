@@ -1,0 +1,1 @@
+{"error":"Falha ao baixar anexo da API do Google: O anexo n\u00e3o possui dados: {\"id\":\"msg123\",\"payload\":{\"mimeType\":\"multipart\\\/mixed\",\"parts\":[{\"partId\":\"1\",\"mimeType\":\"application\\\/pdf\",\"filename\":\"invoice.pdf\",\"body\":{\"attachmentId\":\"att123\",\"size\":35}}]}}"}

@@ -212,6 +212,17 @@ class AIToolRegistryService
                 'requires_external_identity' => true,
             ],
             [
+                'slug'                 => 'google_gmail_attachment_download_link',
+                'name'                 => 'Obter Link do Anexo',
+                'description'          => 'Gera um link temporário e seguro para download de um anexo real de uma mensagem do Gmail. Use somente quando o usuário solicitar o arquivo ou o download de um anexo. Esta Tool não lê nem interpreta o conteúdo interno do arquivo.',
+                'endpoint'             => '/api/ai/gmail/messages/{messageId}/attachments/{attachmentId}/download-link',
+                'http_method'          => 'POST',
+                'tool_type'            => 'read',
+                'requires_confirmation' => false,
+                'required_permissions' => ['gmail.attachments.download'],
+                'requires_external_identity' => true,
+            ],
+            [
                 'slug' => 'google_read_resource',
                 'name' => 'Ler Conteúdo de Arquivo do Google Drive',
                 'description' => 'Lê e extrai o texto do conteúdo de um arquivo específico do Google Drive usando seu UUID. A consulta utiliza a conta corporativa (External Identity) vinculada ao usuário solicitante (via Impersonation) garantindo que apenas arquivos que o usuário tem acesso no Google Drive possam ser lidos.',

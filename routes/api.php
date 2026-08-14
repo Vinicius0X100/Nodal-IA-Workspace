@@ -58,4 +58,5 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/gmail/messages', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'index']);
     Route::get('/gmail/messages/{messageId}', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'show']);
     Route::get('/gmail/messages/{messageId}/attachments/{attachmentId}', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'readAttachment']);
+    Route::post('/gmail/messages/{messageId}/attachments/{attachmentId}/download-link', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'downloadLink']);
 });

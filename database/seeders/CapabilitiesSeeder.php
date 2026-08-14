@@ -21,5 +21,15 @@ class CapabilitiesSeeder extends Seeder
                 'is_system' => true,
             ]
         );
+
+        \App\Domain\Permissions\Models\Permission::updateOrCreate(
+            ['slug' => 'gmail.attachments.download'],
+            [
+                'name' => 'Download de Anexos',
+                'description' => 'Permissão para baixar anexos do Gmail.',
+                'group' => 'Gmail',
+                'is_system' => true,
+            ]
+        );
     }
 }

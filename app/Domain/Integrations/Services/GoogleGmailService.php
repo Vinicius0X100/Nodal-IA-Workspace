@@ -9,8 +9,11 @@ use App\Domain\Integrations\Exceptions\GoogleReauthRequiredException;
 use App\Domain\Integrations\Exceptions\IntegrationUnavailableException;
 use App\Domain\Integrations\Models\Integration;
 use App\Domain\Organizations\Models\Organization;
+use App\Domain\Downloads\Models\TemporaryDownload;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * GoogleGmailService — READ-ONLY v1
@@ -294,6 +297,158 @@ class GoogleGmailService
             ]);
             throw new GoogleGmailException('INTERNAL_ERROR', 'Falha interna ao tentar ler o anexo.');
         }
+    }
+
+    public function generateAttachmentDownloadLink(
+        Organization $organization,
+        Integration $integration,
+        string $messageId,
+        string $attachmentId,
+        ?int $actingUserId = null,
+        ?string $conversationUuid = null,
+        ?\App\Domain\Identities\Models\ExternalIdentity $identity = null
+    ): array {
+        try {
+            $response = $this->tokenService->executeWithRetry(
+                $integration,
+                function (string $accessToken) use ($messageId) {
+                    $url = self::GMAIL_API_BASE . '/messages/' . urlencode($messageId);
+                    return Http::withToken($accessToken)->get($url, ['format' => 'full']);
+                },
+                $identity,
+                ['https://www.googleapis.com/auth/gmail.readonly']
+            );
+
+            $this->handleResponseErrors($response, 'ai_gmail_attachment_download_link', $organization, $actingUserId, $conversationUuid, $messageId);
+
+            $data = $response->json();
+            
+            $targetPart = $this->findAttachmentPart($data['payload'] ?? [], $attachmentId);
+
+            if (!$targetPart) {
+                $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'GMAIL_ATTACHMENT_NOT_FOUND', 'ai_gmail_attachment_download_link', ['attachment_id' => $attachmentId]);
+                throw new GoogleGmailException('GMAIL_ATTACHMENT_NOT_FOUND', 'O anexo especificado não pertence a esta mensagem ou não existe.');
+            }
+
+            $targetAttachment = [
+                'attachment_id' => $targetPart['attachment_id'] ?? null,
+                'filename'      => $targetPart['filename'] ?? '',
+                'mime_type'     => $targetPart['mime_type'] ?? '',
+                'size'          => $targetPart['size'] ?? 0,
+            ];
+
+            if (($targetAttachment['size'] ?? 0) > 25000000) { // Limite do Gmail de 25MB
+                $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'ATTACHMENT_TOO_LARGE', 'ai_gmail_attachment_download_link', ['attachment_id' => $attachmentId, 'size' => $targetAttachment['size'] ?? 0]);
+                throw new GoogleGmailException('ATTACHMENT_TOO_LARGE', 'O anexo excede o limite de tamanho suportado para download (25MB).');
+            }
+
+            $uuid = (string) Str::uuid();
+            $expiresAt = now()->addMinutes(10);
+
+            $payload = [
+                'message_id' => $messageId,
+                'attachment_id' => $attachmentId,
+                'identity_id' => $identity?->id,
+            ];
+
+            TemporaryDownload::create([
+                'uuid' => $uuid,
+                'organization_id' => $organization->id,
+                'user_id' => $actingUserId,
+                'provider' => 'google_workspace',
+                'resource_type' => 'gmail_attachment',
+                'payload' => Crypt::encrypt(json_encode($payload)),
+                'filename' => $targetAttachment['filename'] ?? 'attachment',
+                'mime_type' => $targetAttachment['mime_type'],
+                'size' => $targetAttachment['size'],
+                'expires_at' => $expiresAt,
+            ]);
+
+            $downloadUrl = url("/downloads/{$uuid}");
+
+            $this->audit(
+                $organization,
+                $actingUserId,
+                $conversationUuid,
+                $messageId,
+                1,
+                true,
+                null,
+                'ai_gmail_attachment_download_link',
+                [
+                    'attachment_id' => $attachmentId,
+                    'filename' => $targetAttachment['filename'] ?? '',
+                    'mime_type' => $targetAttachment['mime_type'] ?? '',
+                    'size' => $targetAttachment['size'] ?? 0,
+                ]
+            );
+
+            return [
+                'filename' => $targetAttachment['filename'] ?? 'attachment',
+                'mime_type' => $targetAttachment['mime_type'],
+                'size' => $targetAttachment['size'],
+                'download_url' => $downloadUrl,
+                'expires_at' => $expiresAt->toIso8601String()
+            ];
+
+        } catch (GoogleReauthRequiredException | TargetIdentityNotFoundException | IntegrationUnavailableException | GoogleGmailException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('[GoogleGmailService] Erro inesperado ao gerar link de download de anexo.', [
+                'organization_id' => $organization->id,
+                'message_id'      => $messageId,
+                'attachment_id'   => $attachmentId,
+                'error'           => $e->getMessage(),
+            ]);
+            throw new GoogleGmailException('INTERNAL_ERROR', 'Falha interna ao tentar gerar o link de download.');
+        }
+    }
+
+    public function downloadAttachmentReal(
+        Integration $integration,
+        string $messageId,
+        string $attachmentId,
+        ?\App\Domain\Identities\Models\ExternalIdentity $identity = null
+    ): string {
+        $response = $this->tokenService->executeWithRetry(
+            $integration,
+            function (string $accessToken) use ($messageId, $attachmentId) {
+                $url = self::GMAIL_API_BASE . '/messages/' . urlencode($messageId) . '/attachments/' . urlencode($attachmentId);
+                return Http::withToken($accessToken)->get($url);
+            },
+            $identity,
+            ['https://www.googleapis.com/auth/gmail.readonly']
+        );
+
+        if ($response->status() === 401) {
+            throw new GoogleReauthRequiredException('A integração Google precisa ser reconectada. O token não é mais válido.');
+        }
+
+        if ($response->status() === 403) {
+            throw new GoogleGmailException('ACCESS_DENIED', 'Acesso negado ao Gmail.');
+        }
+
+        if ($response->status() === 404) {
+            throw new GoogleGmailException('GMAIL_ATTACHMENT_NOT_FOUND', 'O anexo não foi encontrado no Gmail.');
+        }
+
+        if (!$response->successful()) {
+            throw new GoogleGmailException('GMAIL_UNAVAILABLE', 'O Gmail retornou um erro inesperado.');
+        }
+
+        $attachData = $response->json();
+        if (empty($attachData['data'])) {
+            throw new GoogleGmailException('ATTACHMENT_CONTENT_UNAVAILABLE', 'O anexo não possui dados: ' . json_encode($attachData));
+        }
+
+        $base64 = str_replace(['-', '_'], ['+', '/'], $attachData['data']);
+        $binaryData = base64_decode($base64);
+
+        if ($binaryData === false) {
+            throw new GoogleGmailException('INTERNAL_ERROR', 'Falha ao decodificar os dados do anexo.');
+        }
+
+        return $binaryData;
     }
 
     // ─────────────────────────────────────────────────────────────────────────

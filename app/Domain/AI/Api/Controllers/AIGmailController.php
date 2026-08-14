@@ -370,4 +370,108 @@ class AIGmailController
             ], 500);
         }
     }
+
+    /**
+     * POST /api/ai/gmail/messages/{messageId}/attachments/{attachmentId}/download-link
+     */
+    public function downloadLink(Request $request, string $messageId, string $attachmentId): JsonResponse
+    {
+        try {
+            $organization = $request->get('_active_organization');
+            $activeUser   = $request->get('_active_user');
+
+            $targetUserUuid = $request->query('target_user_uuid');
+            $conversationUuid = $request->header('X-Conversation-UUID');
+
+            $integration = Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace')
+                ->where('status', 'connected')
+                ->first();
+
+            if (!$integration) {
+                return response()->json([
+                    'success' => false,
+                    'code'    => 'INTEGRATION_UNAVAILABLE',
+                    'message' => 'Integração com Google Workspace não configurada.'
+                ], 404);
+            }
+
+            $targetUser = null;
+            if ($targetUserUuid) {
+                $targetUser = \App\Domain\Identity\Models\User::where('uuid', $targetUserUuid)->first();
+            }
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $activeUser,
+                $organization,
+                'gmail.attachments.download',
+                $integration,
+                'google_workspace',
+                $targetUser
+            );
+
+            $identity = $accessContext->getResolvedIdentity();
+
+            $result = $this->gmailService->generateAttachmentDownloadLink(
+                organization: $organization,
+                integration: $integration,
+                messageId: $messageId,
+                attachmentId: $attachmentId,
+                actingUserId: $activeUser->id,
+                conversationUuid: $conversationUuid,
+                identity: $identity
+            );
+
+            return response()->json([
+                'success' => true,
+                'data'    => $result,
+            ]);
+
+        } catch (GoogleReauthRequiredException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'GOOGLE_REAUTH_REQUIRED',
+                'message' => $e->getMessage()
+            ], 401);
+        } catch (IntegrationUnavailableException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'INTEGRATION_UNAVAILABLE',
+                'message' => $e->getMessage()
+            ], 404);
+        } catch (\App\Domain\Identities\Exceptions\TargetIdentityNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'EXTERNAL_IDENTITY_REQUIRED',
+                'message' => $e->getMessage()
+            ], 403);
+        } catch (GoogleGmailException $e) {
+            $httpStatus = match ($e->errorCode) {
+                'ACCESS_DENIED'                  => 403,
+                'GMAIL_MESSAGE_NOT_FOUND'        => 404,
+                'GMAIL_ATTACHMENT_NOT_FOUND'     => 404,
+                'ATTACHMENT_TOO_LARGE'           => 413,
+                'GMAIL_UNAVAILABLE'              => 502,
+                default                          => 500,
+            };
+            return response()->json([
+                'success' => false,
+                'code'    => $e->errorCode,
+                'message' => $e->getMessage()
+            ], $httpStatus);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'TARGET_USER_NOT_ALLOWED',
+                'message' => $e->getMessage()
+            ], 403);
+        } catch (\Exception $e) {
+            \Log::error('Download link error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return response()->json([
+                'success' => false,
+                'code'    => 'INTERNAL_ERROR',
+                'message' => 'Ocorreu um erro interno ao gerar o link de download.'
+            ], 500);
+        }
+    }
 }
