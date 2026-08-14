@@ -394,12 +394,23 @@ class GoogleGmailService
         } catch (GoogleReauthRequiredException | TargetIdentityNotFoundException | IntegrationUnavailableException | GoogleGmailException $e) {
             throw $e;
         } catch (\Exception $e) {
-            Log::error('[GoogleGmailService] Erro inesperado ao gerar link de download de anexo.', [
-                'organization_id' => $organization->id,
-                'message_id'      => $messageId,
-                'attachment_id'   => $attachmentId,
-                'error'           => $e->getMessage(),
-            ]);
+            $logData = [
+                'exception_class' => get_class($e),
+                'exception_message' => $e->getMessage(),
+                'exception_code' => $e->getCode(),
+                'message_id' => $messageId,
+                'organization_id' => $organization->id ?? null,
+                'user_id' => $actingUserId ?? null,
+            ];
+
+            if (class_exists('\Google\Service\Exception') && $e instanceof \Google\Service\Exception) {
+                $logData['errors'] = $e->getErrors();
+                $logData['status_code'] = $e->getCode();
+                $logData['google_api_reason'] = json_encode($e->getErrors());
+            }
+
+            \Illuminate\Support\Facades\Log::error('Gmail attachment download link failed', $logData);
+
             throw new GoogleGmailException('INTERNAL_ERROR', 'Falha interna ao tentar gerar o link de download.');
         }
     }
@@ -480,6 +491,18 @@ class GoogleGmailService
 
         if (!$response->successful()) {
             $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'GMAIL_UNAVAILABLE', $action);
+            
+            \Illuminate\Support\Facades\Log::error('Gmail attachment download link failed', [
+                'exception_class' => 'HttpResponseException',
+                'exception_message' => 'O Gmail retornou um erro inesperado: ' . $response->body(),
+                'exception_code' => $response->status(),
+                'status_code' => $response->status(),
+                'google_api_reason' => $response->json('error.message') ?? $response->body(),
+                'message_id' => $messageId,
+                'organization_id' => $organization->id ?? null,
+                'user_id' => $actingUserId ?? null,
+            ]);
+
             throw new GoogleGmailException('GMAIL_UNAVAILABLE', 'O Gmail retornou um erro inesperado.');
         }
     }
