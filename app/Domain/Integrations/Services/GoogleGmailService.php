@@ -211,15 +211,16 @@ class GoogleGmailService
 
             $data = $response->json();
             
-            $targetAttachment = $this->findAttachmentPart($data['payload'] ?? [], $attachmentId);
+            $targetPart = $this->findAttachmentPart($data['payload'] ?? [], $attachmentId);
 
-            if (!$targetAttachment) {
+            if (!$targetPart) {
                 $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'GMAIL_ATTACHMENT_NOT_FOUND', 'ai_gmail_attachment_read', ['attachment_id' => $attachmentId]);
                 throw new GoogleGmailException('GMAIL_ATTACHMENT_NOT_FOUND', 'O anexo especificado não pertence a esta mensagem ou não existe.');
             }
 
-            if (($targetAttachment['size'] ?? 0) > 10485760) { // 10MB
-                $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'ATTACHMENT_TOO_LARGE', 'ai_gmail_attachment_read', ['attachment_id' => $attachmentId, 'size' => $targetAttachment['size'] ?? 0]);
+            $size = $targetPart['body']['size'] ?? 0;
+            if ($size > 10485760) { // 10MB
+                $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'ATTACHMENT_TOO_LARGE', 'ai_gmail_attachment_read', ['attachment_id' => $attachmentId, 'size' => $size]);
                 throw new GoogleGmailException('ATTACHMENT_TOO_LARGE', 'O anexo excede o limite de tamanho suportado (10MB).');
             }
 
@@ -249,12 +250,15 @@ class GoogleGmailService
             }
 
             // 3. Extração
+            $mimeType = $targetPart['mimeType'] ?? '';
+            $filename = $targetPart['filename'] ?? '';
+            
             $extractor = \App\Domain\Integrations\Services\Gmail\Extractors\AttachmentExtractorFactory::make(
-                $targetAttachment['mime_type'] ?? '',
-                $targetAttachment['filename'] ?? ''
+                $mimeType,
+                $filename
             );
 
-            $extractedContent = $extractor->extract($binaryData, $targetAttachment['mime_type'] ?? '', $targetAttachment['filename'] ?? '');
+            $extractedContent = $extractor->extract($binaryData, $mimeType, $filename);
 
             $this->audit(
                 $organization,
@@ -267,9 +271,9 @@ class GoogleGmailService
                 'ai_gmail_attachment_read',
                 [
                     'attachment_id' => $attachmentId,
-                    'filename' => $targetAttachment['filename'] ?? '',
-                    'mime_type' => $targetAttachment['mime_type'] ?? '',
-                    'size' => $targetAttachment['size'] ?? 0,
+                    'filename' => $filename,
+                    'mime_type' => $mimeType,
+                    'size' => $size,
                     'extraction_type' => $extractedContent['type'],
                     'truncated' => $extractedContent['truncated'],
                 ]
@@ -279,9 +283,9 @@ class GoogleGmailService
                 'attachment' => [
                     'message_id' => $messageId,
                     'attachment_id' => $attachmentId,
-                    'filename' => $targetAttachment['filename'] ?? '',
-                    'mime_type' => $targetAttachment['mime_type'] ?? '',
-                    'size' => $targetAttachment['size'] ?? 0,
+                    'filename' => $filename,
+                    'mime_type' => $mimeType,
+                    'size' => $size,
                     'content' => $extractedContent
                 ]
             ];
@@ -331,10 +335,10 @@ class GoogleGmailService
             }
 
             $targetAttachment = [
-                'attachment_id' => $targetPart['attachment_id'] ?? null,
+                'attachment_id' => $targetPart['body']['attachmentId'] ?? null,
                 'filename'      => $targetPart['filename'] ?? '',
-                'mime_type'     => $targetPart['mime_type'] ?? '',
-                'size'          => $targetPart['size'] ?? 0,
+                'mime_type'     => $targetPart['mimeType'] ?? '',
+                'size'          => $targetPart['body']['size'] ?? 0,
             ];
 
             if (($targetAttachment['size'] ?? 0) > 25000000) { // Limite do Gmail de 25MB
@@ -749,25 +753,17 @@ class GoogleGmailService
     /**
      * Procura recursivamente pela part de anexo que corresponda ao attachmentId.
      */
-    private function findAttachmentPart(array $payload, string $attachmentId): ?array
+    private function findAttachmentPart(array $part, string $attachmentId): ?array
     {
-        $body = $payload['body'] ?? [];
-        
-        if (isset($body['attachmentId']) && $body['attachmentId'] === $attachmentId) {
-            return [
-                'attachment_id' => $body['attachmentId'],
-                'filename'      => $payload['filename'] ?? '',
-                'mime_type'     => $payload['mimeType'] ?? '',
-                'size'          => $body['size'] ?? 0,
-            ];
+        if (($part['body']['attachmentId'] ?? null) === $attachmentId) {
+            return $part;
         }
 
-        if (!empty($payload['parts'])) {
-            foreach ($payload['parts'] as $part) {
-                $found = $this->findAttachmentPart($part, $attachmentId);
-                if ($found) {
-                    return $found;
-                }
+        foreach (($part['parts'] ?? []) as $child) {
+            $found = $this->findAttachmentPart($child, $attachmentId);
+
+            if ($found !== null) {
+                return $found;
             }
         }
 
