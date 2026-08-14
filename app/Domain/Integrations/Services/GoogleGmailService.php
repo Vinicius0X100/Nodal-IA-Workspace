@@ -327,9 +327,34 @@ class GoogleGmailService
 
             $data = $response->json();
             
+            // Diagnóstico: Listar todos os attachmentIds encontrados no payload atual
+            $allAttachmentIds = [];
+            $extractAllIds = function($part) use (&$extractAllIds, &$allAttachmentIds) {
+                if (!empty($part['body']['attachmentId'])) {
+                    $allAttachmentIds[] = $part['body']['attachmentId'];
+                }
+                foreach (($part['parts'] ?? []) as $child) {
+                    $extractAllIds($child);
+                }
+            };
+            $extractAllIds($data['payload'] ?? []);
+
             $targetPart = $this->findAttachmentPart($data['payload'] ?? [], $attachmentId);
 
+            \Illuminate\Support\Facades\Log::info('Gmail Diagnostic: generateAttachmentDownloadLink', [
+                'message_id' => $messageId,
+                'requested_attachment_id' => $attachmentId,
+                'available_attachment_ids_in_payload' => $allAttachmentIds,
+                'target_part_found' => $targetPart !== null,
+                'target_part_filename' => $targetPart['filename'] ?? null,
+                'target_part_mime_type' => $targetPart['mimeType'] ?? null,
+                'target_part_body_has_attachment_id' => !empty($targetPart['body']['attachmentId']),
+                'target_part_body_size' => $targetPart['body']['size'] ?? null,
+                'attachment_id_match' => ($targetPart['body']['attachmentId'] ?? null) === $attachmentId,
+            ]);
+
             if (!$targetPart) {
+                \Illuminate\Support\Facades\Log::warning('GMAIL_ATTACHMENT_NOT_FOUND thrown because findAttachmentPart returned null');
                 $this->audit($organization, $actingUserId, $conversationUuid, $messageId, 0, false, 'GMAIL_ATTACHMENT_NOT_FOUND', 'ai_gmail_attachment_download_link', ['attachment_id' => $attachmentId]);
                 throw new GoogleGmailException('GMAIL_ATTACHMENT_NOT_FOUND', 'O anexo especificado não pertence a esta mensagem ou não existe.');
             }
