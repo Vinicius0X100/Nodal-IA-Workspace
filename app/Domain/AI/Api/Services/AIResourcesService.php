@@ -17,7 +17,8 @@ class AIResourcesService
     public function __construct(
         private IntegrationManager $integrationManager,
         private LogAuditAction $logAuditAction,
-        private GoogleTokenService $googleTokenService
+        private GoogleTokenService $googleTokenService,
+        private \App\Domain\Permissions\Services\AuthorizationService $authorizationService
     ) {}
     /**
      * Search resources for the given organization.
@@ -206,5 +207,75 @@ class AIResourcesService
             'Content-Type' => $mime,
             'Content-Disposition' => 'attachment; filename="' . str_replace('"', '', $resource->name) . '"'
         ]);
+    }
+
+    /**
+     * Read multiple resources, structuring success and error for each.
+     */
+    public function readMultipleResources(array $resourceUuids, Organization $organization, \App\Domain\Identity\Models\User $user, \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext): array
+    {
+        $results = [];
+
+        foreach ($resourceUuids as $uuid) {
+            try {
+                $resource = $this->findByUuid($organization, $uuid);
+                
+                if (!$resource) {
+                    $results[] = [
+                        'resource_uuid' => $uuid,
+                        'success' => false,
+                        'code' => 'RESOURCE_NOT_FOUND',
+                        'message' => 'Recurso não encontrado.'
+                    ];
+                    continue;
+                }
+
+                if (!$this->authorizationService->canAccessResource($user, $organization, $resource)) {
+                    $results[] = [
+                        'resource_uuid' => $uuid,
+                        'success' => false,
+                        'code' => 'ACCESS_DENIED',
+                        'message' => 'Você não possui permissão para acessar este recurso.'
+                    ];
+                    continue;
+                }
+
+                $contentData = $this->getContent($organization, $uuid, $user->id, $accessContext->getResolvedIdentity());
+                
+                // Mapeia os dados do conteúdo individual para a resposta da Tool de múltiplos
+                $results[] = [
+                    'resource_uuid' => $uuid,
+                    'success' => true,
+                    'name' => $contentData['name'] ?? null,
+                    'mime_type' => $contentData['mime_type'] ?? null,
+                    'content_type' => $contentData['content_type'] ?? null,
+                    'content' => $contentData['content'] ?? null,
+                    'truncated' => $contentData['truncated'] ?? false,
+                ];
+                
+            } catch (\Exception $e) {
+                // Same logic as AIResourcesController::handleException
+                $code = $e->getCode();
+                
+                if (is_string($code) && !empty($code)) {
+                    $errorCode = $code;
+                } elseif (is_numeric($code) && $code > 0) {
+                    $errorCode = (string)$code;
+                } elseif ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                    $errorCode = 'ACCESS_DENIED';
+                } else {
+                    $errorCode = 'INTERNAL_ERROR';
+                }
+
+                $results[] = [
+                    'resource_uuid' => $uuid,
+                    'success' => false,
+                    'code' => $errorCode,
+                    'message' => $e->getMessage()
+                ];
+            }
+        }
+
+        return $results;
     }
 }

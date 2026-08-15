@@ -4,6 +4,7 @@ namespace App\Domain\AI\Api\Controllers;
 
 use App\Domain\AI\Api\Resources\AIResourceResource;
 use App\Domain\AI\Api\Services\AIResourcesService;
+use App\Http\Requests\AI\ReadMultipleResourcesRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -158,6 +159,39 @@ class AIResourcesController
             ]);
         } catch (\Exception $e) {
             return $this->handleException($e, 'Error fetching resource content');
+        }
+    }
+
+    public function readMultiple(ReadMultipleResourcesRequest $request): JsonResponse
+    {
+        try {
+            $organization = $request->get('_active_organization');
+            $user = $request->get('_active_user');
+
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace')
+                ->first();
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'resources.read',
+                $integration,
+                $integration ? $integration->provider : 'google_workspace'
+            );
+
+            $resourceUuids = $request->input('resource_uuids', []);
+
+            $results = $this->service->readMultipleResources($resourceUuids, $organization, $user, $accessContext);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'resources' => $results
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return $this->handleException($e, 'Error fetching multiple resources content');
         }
     }
 

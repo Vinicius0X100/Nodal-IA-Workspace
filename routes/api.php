@@ -42,6 +42,7 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/groups/with-members', [\App\Domain\AI\Api\Controllers\AIGroupsController::class, 'withMembers']);
     Route::get('/groups/{uuid}/members', [\App\Domain\AI\Api\Controllers\AIGroupsController::class, 'members']);
     Route::get('/resources/search', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'search']);
+    Route::post('/resources/read-multiple', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'readMultiple']);
     Route::get('/resources/{uuid}', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'show']);
     Route::get('/resources/{uuid}/content', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'content']);
     Route::get('/resources/{uuid}/file', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'file']);

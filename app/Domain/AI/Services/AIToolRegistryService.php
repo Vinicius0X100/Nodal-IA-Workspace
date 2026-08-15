@@ -233,6 +233,17 @@ class AIToolRegistryService
                 'required_permissions' => ['resources.read'],
                 'requires_external_identity' => true,
             ],
+            [
+                'slug' => 'google_read_multiple_resources',
+                'name' => 'Ler Múltiplos Recursos do Google Drive',
+                'description' => 'Lê o conteúdo real de vários recursos já identificados pelo Nodal. Use quando a solicitação depender da comparação, análise ou consulta do conteúdo de dois ou mais recursos.',
+                'endpoint' => '/api/ai/resources/read-multiple',
+                'http_method' => 'POST',
+                'tool_type' => 'read',
+                'requires_confirmation' => false,
+                'required_permissions' => ['resources.read'],
+                'requires_external_identity' => true,
+            ],
         ];
 
         return $this->upsertTools($organization, $integration, 'google', $tools);
