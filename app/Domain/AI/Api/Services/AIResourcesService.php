@@ -278,4 +278,44 @@ class AIResourcesService
 
         return $results;
     }
+
+    /**
+     * Generate a temporary download URL for multimodal processing.
+     */
+    public function readResourceFile(string $resourceUuid, Organization $organization, \App\Domain\Identity\Models\User $user): array
+    {
+        $resource = $this->findByUuid($organization, $resourceUuid);
+
+        if (!$resource) {
+            return [
+                'success' => false,
+                'code' => 'RESOURCE_NOT_FOUND',
+            ];
+        }
+
+        if (!$this->authorizationService->canAccessResource($user, $organization, $resource)) {
+            return [
+                'success' => false,
+                'code' => 'ACCESS_DENIED',
+            ];
+        }
+
+        $temporaryDownload = \App\Domain\Resources\Models\TemporaryResourceDownload::create([
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+            'integration_resource_id' => $resource->id,
+            'expires_at' => now()->addHour(),
+        ]);
+
+        return [
+            'success' => true,
+            'data' => [
+                'resource_uuid' => $resource->uuid,
+                'filename' => $resource->name,
+                'mime_type' => $resource->mime_type ?? 'application/octet-stream',
+                'size' => $resource->size,
+                'file_url' => url('/api/ai/resources/file/download/' . $temporaryDownload->uuid),
+            ]
+        ];
+    }
 }

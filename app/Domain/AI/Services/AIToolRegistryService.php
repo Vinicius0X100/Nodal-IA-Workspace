@@ -244,6 +244,17 @@ class AIToolRegistryService
                 'required_permissions' => ['resources.read'],
                 'requires_external_identity' => true,
             ],
+            [
+                'slug' => 'google_read_resource_file',
+                'name' => 'Obter Link de Download Temporário de Arquivo do Google Drive',
+                'description' => 'Obtém uma URL temporária segura de um recurso autorizado para processamento multimodal, como PDFs, imagens e documentos que não possuem extração textual disponível.',
+                'endpoint' => '/api/ai/resources/file',
+                'http_method' => 'POST',
+                'tool_type' => 'read',
+                'requires_confirmation' => false,
+                'required_permissions' => ['resources.read'],
+                'requires_external_identity' => true,
+            ],
         ];
 
         return $this->upsertTools($organization, $integration, 'google', $tools);

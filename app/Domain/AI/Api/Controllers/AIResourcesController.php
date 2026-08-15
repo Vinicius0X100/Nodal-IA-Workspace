@@ -4,7 +4,9 @@ namespace App\Domain\AI\Api\Controllers;
 
 use App\Domain\AI\Api\Resources\AIResourceResource;
 use App\Domain\AI\Api\Services\AIResourcesService;
+use App\Domain\Resources\Models\TemporaryResourceDownload;
 use App\Http\Requests\AI\ReadMultipleResourcesRequest;
+use App\Http\Requests\AI\ReadResourceFileRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -159,6 +161,78 @@ class AIResourcesController
             ]);
         } catch (\Exception $e) {
             return $this->handleException($e, 'Error fetching resource content');
+        }
+    }
+
+    public function generateFileUrl(ReadResourceFileRequest $request): JsonResponse
+    {
+        try {
+            $organization = $request->get('_active_organization');
+            $user = $request->get('_active_user');
+
+            $resourceUuid = $request->input('resource_uuid');
+
+            $result = $this->service->readResourceFile($resourceUuid, $organization, $user);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'code' => $result['code'],
+                    'message' => 'Não foi possível gerar a URL.'
+                ], 403);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $result['data'],
+            ]);
+        } catch (\Exception $e) {
+            return $this->handleException($e, 'Error generating file url');
+        }
+    }
+
+    public function downloadTemporaryFile(Request $request, string $temporaryUuid)
+    {
+        try {
+            $temporaryDownload = TemporaryResourceDownload::where('uuid', $temporaryUuid)->first();
+
+            if (!$temporaryDownload) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Link de download inválido ou expirado.'
+                ], 404);
+            }
+
+            if (now()->greaterThan($temporaryDownload->expires_at)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Link de download expirado.'
+                ], 403);
+            }
+
+            $organization = $temporaryDownload->organization;
+            $user = $temporaryDownload->user;
+            $resource = $temporaryDownload->integrationResource;
+            $uuid = $resource->uuid;
+
+            // O dono do link pode não ser o usuário ativo se n8n chamar direto sem Auth
+            // Mas usamos o Identity e as credenciais do usuário que GEROU o link.
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace')
+                ->first();
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'resources.read',
+                $integration,
+                $integration ? $integration->provider : 'google_workspace'
+            );
+            
+            return $this->service->getFileStream($organization, $uuid, $user->id, $accessContext->getResolvedIdentity());
+            
+        } catch (\Exception $e) {
+            return $this->handleException($e, 'Error fetching temporary resource file');
         }
     }
 
