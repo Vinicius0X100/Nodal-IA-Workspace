@@ -187,7 +187,34 @@ const suggestions = [
     { icon: PresentationIcon, label: 'Criar relatório', text: 'Crie um relatório sobre' },
 ];
 
-function EmptyState({ onSuggestion }: { onSuggestion: (text: string) => void }) {
+function EmptyState({ 
+    groups, 
+    onSuggestion 
+}: { 
+    groups: Group[]; 
+    onSuggestion: (text: string) => void;
+}) {
+    const [search, setSearch] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    
+    // Simulate API search/shimmer
+    useEffect(() => {
+        if (!search) {
+            setIsSearching(false);
+            return;
+        }
+        setIsSearching(true);
+        const timer = setTimeout(() => {
+            setIsSearching(false);
+        }, 400); // 400ms shimmer effect
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    const filteredItems = React.useMemo(() => {
+        if (!search) return [];
+        return groups.flatMap(g => g.items).filter(i => i.title.toLowerCase().includes(search.toLowerCase()));
+    }, [search, groups]);
+
     return (
         <motion.div 
             variants={containerVariants}
@@ -199,32 +226,82 @@ function EmptyState({ onSuggestion }: { onSuggestion: (text: string) => void }) 
                 <img src="/images/Nodal-Logo.png" alt="Nodal" className="w-full h-auto object-contain drop-shadow-sm" />
             </motion.div>
 
-            <motion.h1 variants={itemVariants} className="text-3xl font-semibold text-neutral-900 mb-3 text-center tracking-tight">
+            <motion.h1 variants={itemVariants} className="text-3xl font-semibold text-neutral-900 mb-6 text-center tracking-tight">
                 Como podemos ajudar hoje?
             </motion.h1>
 
-            <motion.div variants={containerVariants} className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-4xl mt-6">
-                {suggestions.map((s, i) => {
-                    const Icon = s.icon;
-                    return (
-                        <motion.button
-                            variants={itemVariants}
-                            key={s.label}
-                            onClick={() => onSuggestion(s.text + ' ')}
-                            className="group relative overflow-hidden flex flex-col gap-3 p-5 bg-white hover:bg-neutral-50 border border-neutral-200 hover:border-blue-200 rounded-3xl text-left transition-all duration-300 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-50/50 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-in-out z-10" />
-                            
-                            <div className="w-10 h-10 rounded-2xl bg-neutral-50 border border-neutral-100 flex items-center justify-center group-hover:bg-blue-50 group-hover:border-blue-100 transition-colors">
-                                <Icon className="w-5 h-5 text-neutral-400 group-hover:text-blue-600 transition-colors" />
-                            </div>
-                            <span className="text-sm text-neutral-600 group-hover:text-neutral-900 font-medium transition-colors">
-                                {s.label}
-                            </span>
-                        </motion.button>
-                    );
-                })}
+            <motion.div variants={itemVariants} className="w-full max-w-2xl mb-8">
+                <div className="relative group">
+                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                        <SearchIcon className="w-5 h-5 text-neutral-400 group-focus-within:text-blue-500 transition-colors" />
+                    </div>
+                    <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Pesquisar nas conversas passadas..."
+                        className="w-full pl-12 pr-4 py-4 bg-white border border-neutral-200 rounded-2xl text-[15px] text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-sm font-medium"
+                    />
+                </div>
             </motion.div>
+
+            {search ? (
+                <motion.div variants={containerVariants} className="w-full max-w-2xl space-y-3">
+                    {isSearching ? (
+                        <>
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="flex items-center gap-4 p-4 bg-white border border-neutral-100 rounded-2xl shadow-sm">
+                                    <div className="w-10 h-10 rounded-full bg-neutral-100 animate-pulse flex-shrink-0" />
+                                    <div className="flex flex-col gap-2 flex-1">
+                                        <div className="h-4 bg-neutral-100 animate-pulse rounded w-1/3" />
+                                        <div className="h-3 bg-neutral-100 animate-pulse rounded w-1/4" />
+                                    </div>
+                                </div>
+                            ))}
+                        </>
+                    ) : filteredItems.length > 0 ? (
+                        filteredItems.map(item => (
+                            <Link href={route('assistant.show', item.uuid)} key={item.uuid} className="flex items-center gap-4 p-4 bg-white border border-neutral-200 rounded-2xl hover:border-blue-300 hover:shadow-md transition-all group focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                                <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors flex-shrink-0">
+                                    <MessageSquare className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <div className="flex flex-col flex-1 overflow-hidden">
+                                    <span className="font-semibold text-neutral-900 truncate">{item.title || 'Nova Conversa'}</span>
+                                    <span className="text-xs text-neutral-500">{new Date(item.updated_at).toLocaleDateString()}</span>
+                                </div>
+                            </Link>
+                        ))
+                    ) : (
+                        <div className="text-center py-12 px-4 border border-dashed border-neutral-200 rounded-3xl bg-neutral-50/50">
+                            <SearchIcon className="w-8 h-8 text-neutral-300 mx-auto mb-3" />
+                            <p className="text-[15px] font-medium text-neutral-600">Nenhuma conversa encontrada para "{search}"</p>
+                            <p className="text-sm text-neutral-400 mt-1">Tente usar termos diferentes</p>
+                        </div>
+                    )}
+                </motion.div>
+            ) : (
+                <motion.div variants={containerVariants} className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-4xl">
+                    {suggestions.map((s, i) => {
+                        const Icon = s.icon;
+                        return (
+                            <motion.button
+                                variants={itemVariants}
+                                key={s.label}
+                                onClick={() => onSuggestion(s.text + ' ')}
+                                className="group relative overflow-hidden flex flex-col gap-3 p-5 bg-white hover:bg-neutral-50 border border-neutral-200 hover:border-blue-200 rounded-3xl text-left transition-all duration-300 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-50/50 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-in-out z-10" />
+                                
+                                <div className="w-10 h-10 rounded-2xl bg-neutral-50 border border-neutral-100 flex items-center justify-center group-hover:bg-blue-50 group-hover:border-blue-100 transition-colors">
+                                    <Icon className="w-5 h-5 text-neutral-400 group-hover:text-blue-600 transition-colors" />
+                                </div>
+                                <span className="text-sm text-neutral-600 group-hover:text-neutral-900 font-medium transition-colors">
+                                    {s.label}
+                                </span>
+                            </motion.button>
+                        );
+                    })}
+                </motion.div>
+            )}
         </motion.div>
     );
 }
@@ -324,29 +401,34 @@ function ChatHeader({
                 <div className="flex items-center gap-2 flex-1 justify-end">
                     {conversation && (
                         <>
-                            <button
+                            <Button
+                                variant="outline"
                                 title="Compartilhar"
                                 disabled
-                                className="p-2 rounded-xl text-neutral-300 cursor-not-allowed hover:bg-neutral-50 transition-colors hidden sm:block"
+                                className="hidden sm:flex items-center gap-2 rounded-xl text-neutral-400 border-transparent bg-transparent hover:bg-neutral-50 hover:text-neutral-600 h-9 px-3"
                             >
                                 <Share2 className="w-4 h-4" />
-                            </button>
-                            <button
+                                <span className="text-[13px] font-medium">Compartilhar</span>
+                            </Button>
+                            <Button
+                                variant="outline"
                                 onClick={() => setDeleteModalOpen(true)}
                                 title="Excluir conversa"
-                                className="p-2 rounded-xl text-neutral-400 hover:bg-red-50 hover:text-red-500 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                                className="flex items-center gap-2 rounded-xl text-neutral-400 border-transparent bg-transparent hover:bg-red-50 hover:text-red-600 h-9 px-3"
                             >
                                 <Trash2 className="w-4 h-4" />
-                            </button>
+                                <span className="text-[13px] font-medium hidden sm:inline">Excluir</span>
+                            </Button>
                         </>
                     )}
-                    <button
+                    <Button
                         onClick={() => router.visit(route('assistant.index'))}
                         title="Nova Conversa"
-                        className="p-2 rounded-xl text-neutral-600 hover:bg-neutral-100 transition-colors ml-1"
+                        className="flex items-center gap-2 rounded-xl bg-neutral-900 text-white hover:bg-neutral-800 shadow-sm h-9 px-4 ml-2"
                     >
-                        <Plus className="w-5 h-5" />
-                    </button>
+                        <Plus className="w-4 h-4" />
+                        <span className="text-[13px] font-medium hidden sm:inline">Novo Chat</span>
+                    </Button>
                 </div>
             </header>
 
@@ -451,25 +533,16 @@ function ConversationSidebar({
         <AnimatePresence>
             {isOpen && (
                 <>
-                    {/* Backdrop */}
                     <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={onClose}
-                        className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm z-30"
-                    />
-                    
-                    {/* Sidebar */}
-                    <motion.div
-                        initial={{ x: '-100%' }}
-                        animate={{ x: 0 }}
-                        exit={{ x: '-100%' }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="fixed inset-y-0 left-0 w-[300px] bg-white border-r border-neutral-100 z-40 flex flex-col shadow-2xl"
-                    >
-                        <div className="p-4 flex items-center justify-between border-b border-neutral-100">
-                            <h3 className="font-semibold text-neutral-900 text-lg">Histórico de Chats</h3>
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 320, opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className="flex flex-col bg-neutral-50/50 border-r border-neutral-100 z-10 overflow-hidden h-full flex-shrink-0"
+                >
+                    <div className="w-[320px] h-full flex flex-col">
+                        <div className="p-4 flex items-center justify-between border-b border-neutral-100 bg-white">
+                            <h3 className="font-semibold text-neutral-900 text-[17px]">Histórico de Chats</h3>
                             <button onClick={onClose} className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-500 transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
@@ -570,6 +643,7 @@ function ConversationSidebar({
                                 ))
                             )}
                         </div>
+                    </div>
                     </motion.div>
 
                     {/* Sidebar Delete Confirmation Dialog */}
@@ -720,7 +794,7 @@ function MessageInput({
 export default function AssistantIndex({ conversation, messages, groups }: Props) {
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(true);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -742,10 +816,13 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
 
     useEffect(() => {
         setOptimisticMessages([]);
+    }, [messages]);
+
+    useEffect(() => {
         if (!isLoading) {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [messages, isLoading, isProcessing]);
+    }, [messages, optimisticMessages, isLoading, isProcessing]);
 
     const handleOptimisticSubmit = (val: string) => {
         setOptimisticMessages(prev => [...prev, {
@@ -779,7 +856,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
             <Toaster position="top-center" theme="light" richColors />
 
             {/* Container fullscreen clean and white */}
-            <div className="flex flex-col h-screen w-screen bg-white text-neutral-900 overflow-hidden font-sans">
+            <div className="flex h-screen w-screen bg-white text-neutral-900 overflow-hidden font-sans">
                 
                 <ConversationSidebar
                     groups={groups}
@@ -788,15 +865,15 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                     onClose={() => setIsSidebarOpen(false)}
                 />
 
-                <ChatHeader
-                    conversation={conversation}
-                    onRename={handleRename}
-                    onDelete={handleDelete}
-                    onToggleSidebar={() => setIsSidebarOpen(true)}
-                />
-
-                {/* Main Area */}
                 <div className="flex-1 flex flex-col overflow-hidden relative">
+                    <ChatHeader
+                        conversation={conversation}
+                        onRename={handleRename}
+                        onDelete={handleDelete}
+                        onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+                    />
+
+                    {/* Main Area */}
                     <div className="flex-1 overflow-y-auto w-full scroll-smooth" style={{ scrollbarWidth: 'none' }}>
                         
                         <AnimatePresence mode="wait">
@@ -805,13 +882,16 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                                     <ShimmerSkeleton />
                                 </motion.div>
                             ) : !conversation || messages.length === 0 ? (
-                                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                                    <EmptyState onSuggestion={(text) => {
-                                        setInputValue(text);
-                                        if (!conversation) {
-                                            router.post(route('assistant.store'), {}, { preserveScroll: false });
-                                        }
-                                    }} />
+                                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="h-full">
+                                    <EmptyState 
+                                        groups={groups}
+                                        onSuggestion={(text) => {
+                                            setInputValue(text);
+                                            if (!conversation) {
+                                                router.post(route('assistant.store'), {}, { preserveScroll: false });
+                                            }
+                                        }} 
+                                    />
                                 </motion.div>
                             ) : (
                                 <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="py-8 space-y-6">
