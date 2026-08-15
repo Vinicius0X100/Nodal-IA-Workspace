@@ -554,13 +554,26 @@ function ConversationSidebar({
                             </button>
                         </div>
 
-                        <div className="p-4 bg-neutral-50/50 border-b border-neutral-100">
+                        <div className="px-3 py-3 bg-neutral-50/50 border-b border-neutral-100 flex flex-col gap-1">
                             <button
-                                onClick={onSearchClick}
-                                className="w-full flex items-center gap-2 pl-4 pr-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm text-neutral-500 hover:text-neutral-900 hover:border-neutral-300 transition-all shadow-sm font-medium"
+                                onClick={() => {
+                                    router.visit(route('assistant.index'));
+                                    if (window.innerWidth < 1024) onClose();
+                                }}
+                                className="w-full text-left px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 flex items-center gap-3 text-neutral-700 hover:text-neutral-900 hover:bg-white border border-transparent hover:border-neutral-200 hover:shadow-sm"
                             >
-                                <Search className="w-4 h-4 text-neutral-400" />
-                                <span>Buscar nas conversas...</span>
+                                <Plus className="w-4 h-4 text-neutral-500" />
+                                <span className="flex-1">Nova Conversa</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    onSearchClick();
+                                    if (window.innerWidth < 1024) onClose();
+                                }}
+                                className="w-full text-left px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 flex items-center gap-3 text-neutral-700 hover:text-neutral-900 hover:bg-white border border-transparent hover:border-neutral-200 hover:shadow-sm"
+                            >
+                                <Search className="w-4 h-4 text-neutral-500" />
+                                <span className="flex-1">Pesquisar Histórico</span>
                             </button>
                         </div>
 
