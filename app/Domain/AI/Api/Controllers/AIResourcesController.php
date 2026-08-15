@@ -156,17 +156,8 @@ class AIResourcesController
                 'success' => true,
                 'data' => $contentData,
             ]);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return response()->json([
-                'success' => false,
-                'code' => 'ACCESS_DENIED',
-                'message' => $e->getMessage()
-            ], 403);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error fetching resource content: ' . $e->getMessage()
-            ], $e->getCode() >= 400 ? $e->getCode() : 500);
+            return $this->handleException($e, 'Error fetching resource content');
         }
     }
 
@@ -202,17 +193,68 @@ class AIResourcesController
             
             return $this->service->getFileStream($organization, $uuid, $user->id, $accessContext->getResolvedIdentity());
             
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        } catch (\Exception $e) {
+            return $this->handleException($e, 'Error fetching resource file');
+        }
+    }
+
+    private function handleException(\Exception $e, string $defaultMessage): JsonResponse
+    {
+        if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
             return response()->json([
                 'success' => false,
                 'code' => 'ACCESS_DENIED',
                 'message' => $e->getMessage()
             ], 403);
-        } catch (\Exception $e) {
+        }
+
+        if ($e instanceof \App\Domain\Identities\Exceptions\ExternalIdentityRequiredException) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error fetching resource file: ' . $e->getMessage()
-            ], $e->getCode() >= 400 ? $e->getCode() : 500);
+                'code' => 'EXTERNAL_IDENTITY_REQUIRED',
+                'message' => $e->getMessage()
+            ], 403);
         }
+
+        if ($e instanceof \App\Domain\Identities\Exceptions\ProviderDelegationRequiredException) {
+            return response()->json([
+                'success' => false,
+                'code' => 'PROVIDER_DELEGATION_REQUIRED',
+                'message' => $e->getMessage()
+            ], 403);
+        }
+
+        $errorCode = $e->getCode();
+        $status = 500;
+        $appCode = 'INTERNAL_ERROR';
+
+        if (is_numeric($errorCode)) {
+            $statusInt = (int)$errorCode;
+            if ($statusInt >= 400 && $statusInt < 600) {
+                $status = $statusInt;
+            }
+            if ($status === 404) {
+                $appCode = 'RESOURCE_NOT_FOUND';
+            } elseif ($status === 403) {
+                $appCode = 'ACCESS_DENIED';
+            } elseif ($status === 400) {
+                $appCode = 'BAD_REQUEST';
+            }
+        } elseif (is_string($errorCode) && !empty($errorCode)) {
+            $appCode = $errorCode;
+            $status = 400; // default for unknown custom string codes
+
+            if (in_array($appCode, ['EXTERNAL_IDENTITY_REQUIRED', 'ACCESS_DENIED', 'PROVIDER_DELEGATION_REQUIRED'])) {
+                $status = 403;
+            } elseif (str_ends_with($appCode, 'NOT_FOUND')) {
+                $status = 404;
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'code' => $appCode,
+            'message' => $defaultMessage . ': ' . $e->getMessage()
+        ], $status);
     }
 }
