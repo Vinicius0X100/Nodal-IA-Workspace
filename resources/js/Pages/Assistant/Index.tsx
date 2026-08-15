@@ -116,7 +116,7 @@ function MessageBubble({ message }: { message: Message }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className="flex justify-end px-4 py-3 w-full max-w-3xl mx-auto"
             >
-                <div className="max-w-[75%] bg-[#0048AA] text-white px-5 py-3.5 rounded-3xl rounded-br-sm text-[15px] leading-relaxed shadow-sm font-medium">
+                <div className="max-w-[75%] bg-gradient-to-tr from-[#0048AA] to-blue-500 text-white px-6 py-4 rounded-3xl rounded-br-md text-[15px] leading-relaxed shadow-md font-medium">
                     {message.content}
                 </div>
             </motion.div>
@@ -130,10 +130,10 @@ function MessageBubble({ message }: { message: Message }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="flex gap-4 px-4 py-3 w-full max-w-3xl mx-auto group"
         >
-            <div className="w-8 h-8 rounded-full border border-neutral-200/60 flex items-center justify-center flex-shrink-0 mt-1">
-                <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-5 h-5 object-contain" />
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-50 to-white border border-blue-100 shadow-sm flex items-center justify-center flex-shrink-0 mt-1">
+                <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-6 h-6 object-contain" />
             </div>
-            <div className="max-w-[85%] text-neutral-800 text-[15px] leading-relaxed prose prose-neutral prose-p:leading-relaxed max-w-none">
+            <div className="max-w-[85%] text-neutral-800 text-[15px] leading-relaxed prose prose-neutral prose-p:leading-relaxed max-w-none pt-1">
                 <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -615,34 +615,38 @@ function MessageInput({
     conversationUuid,
     value,
     onChange,
-    isProcessing
+    isProcessing,
+    onOptimisticSubmit
 }: {
     conversationUuid?: string;
     value: string;
     onChange: (v: string) => void;
     isProcessing: boolean;
+    onOptimisticSubmit: (val: string) => void;
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const handleSubmit = () => {
         if (!value.trim() || isProcessing) return;
 
+        const submitValue = value;
+        onChange('');
+        onOptimisticSubmit(submitValue);
+
         if (!conversationUuid) {
             router.post(
                 route('assistant.store'),
-                { message: value },
+                { message: submitValue },
                 {
                     preserveScroll: false,
-                    onSuccess: () => onChange(''),
                 }
             );
         } else {
             router.post(
                 route('assistant.messages.store', conversationUuid),
-                { content: value },
+                { content: submitValue },
                 {
                     preserveScroll: true,
-                    onSuccess: () => onChange(''),
                 }
             );
         }
@@ -718,6 +722,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
     const [isLoading, setIsLoading] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Watch Inertia events to show the AI typing indicator
@@ -736,10 +741,24 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
     }, [conversation?.uuid]);
 
     useEffect(() => {
+        setOptimisticMessages([]);
         if (!isLoading) {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
     }, [messages, isLoading, isProcessing]);
+
+    const handleOptimisticSubmit = (val: string) => {
+        setOptimisticMessages(prev => [...prev, {
+            id: Date.now(),
+            uuid: 'opt-' + Date.now(),
+            role: 'user',
+            content: val,
+            created_at: new Date().toISOString()
+        }]);
+        setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 50);
+    };
 
     const handleRename = (title: string) => {
         if (!conversation) return;
@@ -796,20 +815,20 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                                 </motion.div>
                             ) : (
                                 <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="py-8 space-y-6">
-                                    {messages.map((msg) => (
+                                    {[...messages, ...optimisticMessages].map((msg) => (
                                         <MessageBubble key={msg.uuid} message={msg} />
                                     ))}
                                     
                                     {/* AI Typing Indicator */}
                                     {isProcessing && (
                                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4 px-4 py-3 w-full max-w-3xl mx-auto">
-                                            <div className="w-8 h-8 rounded-full border border-neutral-200/60 flex items-center justify-center flex-shrink-0 mt-1">
-                                                <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-5 h-5 object-contain opacity-70" />
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-50 to-white border border-blue-100 shadow-sm flex items-center justify-center flex-shrink-0 mt-1">
+                                                <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-6 h-6 object-contain opacity-70" />
                                             </div>
-                                            <div className="bg-neutral-50 border border-neutral-100 rounded-3xl rounded-bl-sm px-5 py-4 flex items-center gap-1.5 h-12 shadow-sm">
-                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0 }} className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
-                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.15 }} className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
-                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.3 }} className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
+                                            <div className="bg-neutral-50 border border-neutral-100 rounded-3xl rounded-bl-sm px-5 py-4 flex items-center gap-2 h-[52px] shadow-sm mt-1">
+                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0 }} className="w-2 h-2 bg-neutral-400 rounded-full" />
+                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.15 }} className="w-2 h-2 bg-neutral-400 rounded-full" />
+                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.3 }} className="w-2 h-2 bg-neutral-400 rounded-full" />
                                             </div>
                                         </motion.div>
                                     )}
@@ -826,6 +845,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                         value={inputValue}
                         onChange={setInputValue}
                         isProcessing={isProcessing}
+                        onOptimisticSubmit={handleOptimisticSubmit}
                     />
                 </div>
             </div>
