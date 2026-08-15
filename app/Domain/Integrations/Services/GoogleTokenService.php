@@ -109,7 +109,7 @@ class GoogleTokenService
 
             $errorData = $response->json();
             $errorCode = $errorData['error'] ?? 'unknown_error';
-            $this->logSecureError($integration, 'delegation_token', 'Falha ao solicitar token delegado: ' . json_encode($errorData));
+            $this->logSecureError($integration, 'delegation_token', 'Falha ao solicitar token delegado: ' . json_encode($errorData) . ' | Scopes solicitados: ' . implode(',', $scopes));
             
             if ($errorCode === 'invalid_grant' || $response->status() === 400 || $response->status() === 401) {
                 $integration->update(['status' => 'needs_reconnect']);
