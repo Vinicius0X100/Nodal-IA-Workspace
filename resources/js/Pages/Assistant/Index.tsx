@@ -187,34 +187,7 @@ const suggestions = [
     { icon: PresentationIcon, label: 'Criar relatório', text: 'Crie um relatório sobre' },
 ];
 
-function EmptyState({ 
-    groups, 
-    onSuggestion 
-}: { 
-    groups: Group[]; 
-    onSuggestion: (text: string) => void;
-}) {
-    const [search, setSearch] = useState('');
-    const [isSearching, setIsSearching] = useState(false);
-    
-    // Simulate API search/shimmer
-    useEffect(() => {
-        if (!search) {
-            setIsSearching(false);
-            return;
-        }
-        setIsSearching(true);
-        const timer = setTimeout(() => {
-            setIsSearching(false);
-        }, 400); // 400ms shimmer effect
-        return () => clearTimeout(timer);
-    }, [search]);
-
-    const filteredItems = React.useMemo(() => {
-        if (!search) return [];
-        return groups.flatMap(g => g.items).filter(i => i.title.toLowerCase().includes(search.toLowerCase()));
-    }, [search, groups]);
-
+function EmptyState({ onSuggestion }: { onSuggestion: (text: string) => void }) {
     return (
         <motion.div 
             variants={containerVariants}
@@ -230,12 +203,73 @@ function EmptyState({
                 Como podemos ajudar hoje?
             </motion.h1>
 
-            <motion.div variants={itemVariants} className="w-full max-w-2xl mb-8">
+            <motion.div variants={containerVariants} className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-4xl mt-6">
+                {suggestions.map((s, i) => {
+                    const Icon = s.icon;
+                    return (
+                        <motion.button
+                            variants={itemVariants}
+                            key={s.label}
+                            onClick={() => onSuggestion(s.text + ' ')}
+                            className="group relative overflow-hidden flex flex-col gap-3 p-5 bg-white hover:bg-neutral-50 border border-neutral-200 hover:border-blue-200 rounded-3xl text-left transition-all duration-300 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-50/50 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-in-out z-10" />
+                            
+                            <div className="w-10 h-10 rounded-2xl bg-neutral-50 border border-neutral-100 flex items-center justify-center group-hover:bg-blue-50 group-hover:border-blue-100 transition-colors">
+                                <Icon className="w-5 h-5 text-neutral-400 group-hover:text-blue-600 transition-colors" />
+                            </div>
+                            <span className="text-sm text-neutral-600 group-hover:text-neutral-900 font-medium transition-colors">
+                                {s.label}
+                            </span>
+                        </motion.button>
+                    );
+                })}
+            </motion.div>
+        </motion.div>
+    );
+}
+
+// ─── Search Screen ────────────────────────────────────────────────────────────
+
+function SearchScreen({ groups }: { groups: Group[] }) {
+    const [search, setSearch] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    
+    useEffect(() => {
+        if (!search) {
+            setIsSearching(false);
+            return;
+        }
+        setIsSearching(true);
+        const timer = setTimeout(() => {
+            setIsSearching(false);
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    const filteredItems = React.useMemo(() => {
+        if (!search) return [];
+        return groups.flatMap(g => g.items).filter(i => i.title.toLowerCase().includes(search.toLowerCase()));
+    }, [search, groups]);
+
+    return (
+        <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="flex flex-col items-center h-full px-6 w-full max-w-3xl mx-auto py-10"
+        >
+            <motion.h1 className="text-3xl font-semibold text-neutral-900 mb-6 text-center tracking-tight">
+                Pesquisar Histórico
+            </motion.h1>
+
+            <motion.div className="w-full max-w-2xl mb-8">
                 <div className="relative group">
                     <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
                         <SearchIcon className="w-5 h-5 text-neutral-400 group-focus-within:text-blue-500 transition-colors" />
                     </div>
                     <input
+                        autoFocus
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Pesquisar nas conversas passadas..."
@@ -244,8 +278,8 @@ function EmptyState({
                 </div>
             </motion.div>
 
-            {search ? (
-                <motion.div variants={containerVariants} className="w-full max-w-2xl space-y-3">
+            {search && (
+                <div className="w-full max-w-2xl space-y-3">
                     {isSearching ? (
                         <>
                             {[1, 2, 3].map(i => (
@@ -277,30 +311,7 @@ function EmptyState({
                             <p className="text-sm text-neutral-400 mt-1">Tente usar termos diferentes</p>
                         </div>
                     )}
-                </motion.div>
-            ) : (
-                <motion.div variants={containerVariants} className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-4xl">
-                    {suggestions.map((s, i) => {
-                        const Icon = s.icon;
-                        return (
-                            <motion.button
-                                variants={itemVariants}
-                                key={s.label}
-                                onClick={() => onSuggestion(s.text + ' ')}
-                                className="group relative overflow-hidden flex flex-col gap-3 p-5 bg-white hover:bg-neutral-50 border border-neutral-200 hover:border-blue-200 rounded-3xl text-left transition-all duration-300 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                            >
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-50/50 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-in-out z-10" />
-                                
-                                <div className="w-10 h-10 rounded-2xl bg-neutral-50 border border-neutral-100 flex items-center justify-center group-hover:bg-blue-50 group-hover:border-blue-100 transition-colors">
-                                    <Icon className="w-5 h-5 text-neutral-400 group-hover:text-blue-600 transition-colors" />
-                                </div>
-                                <span className="text-sm text-neutral-600 group-hover:text-neutral-900 font-medium transition-colors">
-                                    {s.label}
-                                </span>
-                            </motion.button>
-                        );
-                    })}
-                </motion.div>
+                </div>
             )}
         </motion.div>
     );
@@ -475,12 +486,14 @@ function ConversationSidebar({
     groups,
     activeUuid,
     isOpen,
-    onClose
+    onClose,
+    onSearchClick
 }: {
     groups: Group[];
     activeUuid?: string;
     isOpen: boolean;
     onClose: () => void;
+    onSearchClick: () => void;
 }) {
     const [search, setSearch] = useState('');
     const [editingUuid, setEditingUuid] = useState<string | null>(null);
@@ -520,14 +533,7 @@ function ConversationSidebar({
         });
     };
 
-    const filteredGroups = search
-        ? groups.map((g) => ({
-            ...g,
-            items: g.items.filter((i) =>
-                i.title.toLowerCase().includes(search.toLowerCase())
-            ),
-        })).filter((g) => g.items.length > 0)
-        : groups;
+    const filteredGroups = groups;
 
     return (
         <AnimatePresence>
@@ -549,21 +555,19 @@ function ConversationSidebar({
                         </div>
 
                         <div className="p-4 bg-neutral-50/50 border-b border-neutral-100">
-                            <div className="relative">
-                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                                <input
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Buscar nas conversas..."
-                                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm font-medium"
-                                />
-                            </div>
+                            <button
+                                onClick={onSearchClick}
+                                className="w-full flex items-center gap-2 pl-4 pr-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm text-neutral-500 hover:text-neutral-900 hover:border-neutral-300 transition-all shadow-sm font-medium"
+                            >
+                                <Search className="w-4 h-4 text-neutral-400" />
+                                <span>Buscar nas conversas...</span>
+                            </button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
                             {filteredGroups.length === 0 ? (
                                 <p className="text-sm text-neutral-400 text-center pt-8 px-4 font-medium">
-                                    {search ? 'Nada encontrado.' : 'Comece uma nova conversa para salvar o histórico.'}
+                                    Comece uma nova conversa para salvar o histórico.
                                 </p>
                             ) : (
                                 filteredGroups.map((group) => (
@@ -796,6 +800,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
     const [isLoading, setIsLoading] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isSearchActive, setIsSearchActive] = useState(false);
     const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -810,6 +815,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
     }, []);
 
     useEffect(() => {
+        setIsSearchActive(false);
         const timer = setTimeout(() => setIsLoading(false), 500);
         return () => clearTimeout(timer);
     }, [conversation?.uuid]);
@@ -863,6 +869,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                     activeUuid={conversation?.uuid}
                     isOpen={isSidebarOpen}
                     onClose={() => setIsSidebarOpen(false)}
+                    onSearchClick={() => setIsSearchActive(true)}
                 />
 
                 <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -877,14 +884,15 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                     <div className="flex-1 overflow-y-auto w-full scroll-smooth" style={{ scrollbarWidth: 'none' }}>
                         
                         <AnimatePresence mode="wait">
-                            {isLoading && conversation ? (
+                            {isSearchActive ? (
+                                <SearchScreen key="search" groups={groups} />
+                            ) : isLoading && conversation ? (
                                 <motion.div key="skeleton" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
                                     <ShimmerSkeleton />
                                 </motion.div>
                             ) : !conversation || messages.length === 0 ? (
                                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="h-full">
                                     <EmptyState 
-                                        groups={groups}
                                         onSuggestion={(text) => {
                                             setInputValue(text);
                                             if (!conversation) {
@@ -920,13 +928,15 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
 
                     </div>
 
-                    <MessageInput
-                        conversationUuid={conversation?.uuid}
-                        value={inputValue}
-                        onChange={setInputValue}
-                        isProcessing={isProcessing}
-                        onOptimisticSubmit={handleOptimisticSubmit}
-                    />
+                    {!isSearchActive && (
+                        <MessageInput
+                            conversationUuid={conversation?.uuid}
+                            value={inputValue}
+                            onChange={setInputValue}
+                            isProcessing={isProcessing}
+                            onOptimisticSubmit={handleOptimisticSubmit}
+                        />
+                    )}
                 </div>
             </div>
         </>
