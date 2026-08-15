@@ -549,7 +549,7 @@ function ConversationSidebar({
                     <div className="w-[320px] h-full flex flex-col">
                         <div className="p-4 flex items-center justify-between border-b border-neutral-100 bg-white">
                             <h3 className="font-semibold text-neutral-900 text-[17px]">Histórico de Chats</h3>
-                            <button onClick={onClose} className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-500 transition-colors">
+                            <button onClick={onClose} className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-500 transition-colors cursor-pointer">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -560,7 +560,7 @@ function ConversationSidebar({
                                     router.visit(route('assistant.index'));
                                     if (window.innerWidth < 1024) onClose();
                                 }}
-                                className="w-full text-left px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 flex items-center gap-3 text-neutral-700 hover:text-neutral-900 hover:bg-white border border-transparent hover:border-neutral-200 hover:shadow-sm"
+                                className="w-full text-left px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 flex items-center gap-3 text-neutral-700 hover:text-neutral-900 hover:bg-white border border-transparent hover:border-neutral-200 hover:shadow-sm cursor-pointer"
                             >
                                 <Plus className="w-4 h-4 text-neutral-500" />
                                 <span className="flex-1">Nova Conversa</span>
@@ -570,7 +570,7 @@ function ConversationSidebar({
                                     onSearchClick();
                                     if (window.innerWidth < 1024) onClose();
                                 }}
-                                className="w-full text-left px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 flex items-center gap-3 text-neutral-700 hover:text-neutral-900 hover:bg-white border border-transparent hover:border-neutral-200 hover:shadow-sm"
+                                className="w-full text-left px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 flex items-center gap-3 text-neutral-700 hover:text-neutral-900 hover:bg-white border border-transparent hover:border-neutral-200 hover:shadow-sm cursor-pointer"
                             >
                                 <Search className="w-4 h-4 text-neutral-500" />
                                 <span className="flex-1">Pesquisar Histórico</span>
@@ -612,7 +612,7 @@ function ConversationSidebar({
                                                                     router.visit(route('assistant.show', item.uuid));
                                                                     onClose();
                                                                 }}
-                                                                className={`w-full text-left pl-4 pr-10 py-3 rounded-2xl text-[14px] font-medium transition-all duration-200 flex items-center gap-3 focus:outline-none ${
+                                                                className={`w-full text-left pl-4 pr-10 py-3 rounded-2xl text-[14px] font-medium transition-all duration-200 flex items-center gap-3 focus:outline-none cursor-pointer ${
                                                                     item.uuid === activeUuid
                                                                         ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100'
                                                                         : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 border border-transparent'
@@ -625,7 +625,7 @@ function ConversationSidebar({
 
                                                             <DropdownMenu>
                                                                 <DropdownMenuTrigger asChild>
-                                                                    <button className="absolute right-3 opacity-0 group-hover/item:opacity-100 p-2 rounded-xl hover:bg-white border border-transparent hover:border-neutral-200 hover:shadow-sm text-neutral-500 transition-all focus:opacity-100">
+                                                                    <button className="absolute right-3 opacity-0 group-hover/item:opacity-100 p-2 rounded-xl hover:bg-white border border-transparent hover:border-neutral-200 hover:shadow-sm text-neutral-500 transition-all focus:opacity-100 cursor-pointer">
                                                                         <MoreHorizontal className="w-4 h-4" />
                                                                     </button>
                                                                 </DropdownMenuTrigger>
