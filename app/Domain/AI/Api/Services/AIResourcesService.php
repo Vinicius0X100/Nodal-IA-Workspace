@@ -10,6 +10,7 @@ use App\Domain\Integrations\Services\IntegrationManager;
 use App\Domain\Audit\Actions\LogAuditAction;
 use App\Domain\Integrations\Services\GoogleTokenService;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Exception;
 
 class AIResourcesService
@@ -34,7 +35,7 @@ class AIResourcesService
             })
             ->pluck('id');
 
-        return IntegrationResource::whereIn('integration_id', $integrationIds)
+        $results = IntegrationResource::whereIn('integration_id', $integrationIds)
             ->when($type, function ($q) use ($type) {
                 $q->where('resource_type', $type);
             })
@@ -48,6 +49,122 @@ class AIResourcesService
             ->orderBy('updated_by_provider_at', 'desc')
             ->limit($limit)
             ->get();
+
+        if ($results->isEmpty() && !empty($query)) {
+            return $this->performFuzzySearch($integrationIds->toArray(), $query, $type, $limit);
+        }
+
+        return $results;
+    }
+
+    /**
+     * Fallback to fuzzy searching when exact/LIKE matches fail.
+     */
+    private function performFuzzySearch(array $integrationIds, string $query, ?string $type, int $limit): Collection
+    {
+        // Limit candidates to avoid heavy PHP-side processing
+        $candidates = IntegrationResource::whereIn('integration_id', $integrationIds)
+            ->when($type, function ($q) use ($type) {
+                $q->where('resource_type', $type);
+            })
+            ->orderBy('updated_by_provider_at', 'desc')
+            ->limit(300)
+            ->get();
+
+        $queryTokens = $this->tokenize($query);
+        if (empty($queryTokens)) {
+            return new Collection();
+        }
+
+        $scoredCandidates = [];
+
+        foreach ($candidates as $candidate) {
+            $score = $this->calculateFuzzyScore($queryTokens, $candidate->name, $candidate->description);
+            if ($score >= 60) {
+                $candidate->fuzzy_score = $score;
+                $scoredCandidates[] = $candidate;
+            }
+        }
+
+        usort($scoredCandidates, function($a, $b) {
+            return $b->fuzzy_score <=> $a->fuzzy_score;
+        });
+
+        return (new Collection($scoredCandidates))->take($limit);
+    }
+
+    private function normalizeText(?string $text): string
+    {
+        if (empty($text)) {
+            return '';
+        }
+        $text = Str::ascii($text);
+        $text = strtolower($text);
+        $text = preg_replace('/[^a-z0-9\s]/', ' ', $text);
+        $text = preg_replace('/\s+/', ' ', $text);
+        return trim($text);
+    }
+
+    private function tokenize(?string $text): array
+    {
+        $normalized = $this->normalizeText($text);
+        $words = explode(' ', $normalized);
+        $stopWords = ['de', 'da', 'do', 'em', 'para', 'com', 'o', 'a', 'os', 'as', 'um', 'uma', 'uns', 'umas', 'que', 'e', 'ou', 'por'];
+        
+        $tokens = [];
+        foreach ($words as $word) {
+            if (strlen($word) >= 2 && !in_array($word, $stopWords)) {
+                $tokens[] = $word;
+            }
+        }
+        return $tokens;
+    }
+
+    private function calculateFuzzyScore(array $queryTokens, ?string $name, ?string $description): int
+    {
+        $nameTokens = $this->tokenize($name);
+        $descTokens = $this->tokenize($description);
+        
+        if (empty($nameTokens) && empty($descTokens)) {
+            return 0;
+        }
+
+        $totalScore = 0;
+
+        foreach ($queryTokens as $qToken) {
+            $bestMatch = 0;
+            
+            foreach ($nameTokens as $tToken) {
+                similar_text($qToken, $tToken, $percent);
+                if (str_contains($tToken, $qToken) || str_contains($qToken, $tToken)) {
+                    $percent = max($percent, 90.0);
+                }
+                if ($percent > $bestMatch) {
+                    $bestMatch = $percent;
+                }
+            }
+            
+            $bestNameMatch = $bestMatch;
+            
+            if ($bestNameMatch < 80) {
+                $bestDescMatch = 0;
+                foreach ($descTokens as $tToken) {
+                    similar_text($qToken, $tToken, $percent);
+                    if (str_contains($tToken, $qToken) || str_contains($qToken, $tToken)) {
+                        $percent = max($percent, 85.0);
+                    }
+                    if ($percent > $bestDescMatch) {
+                        $bestDescMatch = $percent;
+                    }
+                }
+                $bestMatch = max($bestNameMatch, $bestDescMatch * 0.8);
+            }
+
+            $totalScore += $bestMatch;
+        }
+
+        $averageScore = $totalScore / count($queryTokens);
+        return (int) round($averageScore);
     }
 
     /**
