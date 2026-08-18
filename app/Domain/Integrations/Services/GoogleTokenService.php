@@ -4,15 +4,54 @@ namespace App\Domain\Integrations\Services;
 
 use App\Domain\Integrations\Models\Integration;
 use App\Domain\Integrations\Models\IntegrationLog;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Exception;
 use Firebase\JWT\JWT;
 use App\Domain\Identities\Models\ExternalIdentity;
 use App\Domain\Identities\Exceptions\ProviderDelegationRequiredException;
+use App\Domain\Identities\Exceptions\IntegrationInactiveException;
 
 class GoogleTokenService
 {
+    /** Status que indicam que a integração não está operacional. */
+    private const INACTIVE_STATUSES = ['not_connected', 'disconnected', 'needs_reconnect', 'revoked', 'disabled', 'error'];
+
+    /**
+     * Lança IntegrationInactiveException se a integração estiver inativa ou desabilitada.
+     *
+     * @throws IntegrationInactiveException
+     */
+    private function assertIntegrationActive(Integration $integration): void
+    {
+        if (!$integration->is_enabled || in_array($integration->status, self::INACTIVE_STATUSES, true)) {
+            throw new IntegrationInactiveException(
+                "A integração Google Workspace está desconectada ou desabilitada. Reconecte a conta para continuar."
+            );
+        }
+    }
+
+    /**
+     * Invalida todos os tokens delegados em cache para uma integração.
+     * Deve ser chamado no fluxo de desconexão.
+     */
+    public function invalidateDelegatedTokenCache(Integration $integration): void
+    {
+        // Remove a chave genérica sem scopes para retrocompatibilidade
+        Cache::forget("google_delegated_token:{$integration->id}");
+
+        // Invalida via tag se o driver de cache suportar tags
+        try {
+            Cache::tags(["integration:{$integration->id}"])->flush();
+        } catch (\BadMethodCallException) {
+            // Driver sem suporte a tags (ex: file, database) — log e segue
+            Log::info("[GoogleTokenService] Driver de cache sem suporte a tags. Tokens delegados podem persistir até expiração natural.", [
+                'integration_id' => $integration->id,
+            ]);
+        }
+    }
+
     /**
      * Retorna um access_token válido.
      * Renova o token automaticamente caso esteja vencido ou próximo do vencimento (buffer).
@@ -20,10 +59,13 @@ class GoogleTokenService
      * @param Integration $integration
      * @param bool $forceRefresh
      * @return string
+     * @throws IntegrationInactiveException
      * @throws Exception
      */
     public function getValidAccessToken(Integration $integration, bool $forceRefresh = false): string
     {
+        $this->assertIntegrationActive($integration);
+
         if (!$integration->access_token && !$integration->refresh_token) {
             throw new Exception("A integração não possui tokens de acesso nem de renovação.");
         }
@@ -51,11 +93,15 @@ class GoogleTokenService
      * @param ExternalIdentity $externalIdentity
      * @param array $scopes
      * @return string
+     * @throws IntegrationInactiveException
      * @throws ProviderDelegationRequiredException
      * @throws Exception
      */
     public function getDelegatedAccessToken(Integration $integration, ExternalIdentity $externalIdentity, array $scopes = []): string
     {
+        // Bloqueia DWD se a integração estiver inativa ou desabilitada
+        $this->assertIntegrationActive($integration);
+
         $config = $integration->config;
 
         if (!$config || empty($config->delegation_credentials_json)) {
@@ -75,7 +121,7 @@ class GoogleTokenService
 
         // Cache o token delegado por e-mail, integração e scopes para não ficar pedindo todo o tempo (dura 1 hr)
         $cacheKey = "google_delegated_token:{$integration->id}:{$externalIdentity->primary_email}:{$scopesHash}";
-        if ($cachedToken = \Illuminate\Support\Facades\Cache::get($cacheKey)) {
+        if ($cachedToken = Cache::get($cacheKey)) {
             return $cachedToken;
         }
 
@@ -102,7 +148,7 @@ class GoogleTokenService
                 $data = $response->json();
                 
                 // Salvar em cache com 55 minutos para renovar antes de expirar
-                \Illuminate\Support\Facades\Cache::put($cacheKey, $data['access_token'], now()->addMinutes(55));
+                Cache::put($cacheKey, $data['access_token'], now()->addMinutes(55));
 
                 return $data['access_token'];
             }
@@ -192,10 +238,14 @@ class GoogleTokenService
      * @param callable $requestClosure O closure deve aceitar a string $accessToken e retornar \Illuminate\Http\Client\Response
      * @param array $scopes Escopos a delegar caso $externalIdentity seja preenchido
      * @return \Illuminate\Http\Client\Response
+     * @throws IntegrationInactiveException
      * @throws Exception
      */
     public function executeWithRetry(Integration $integration, callable $requestClosure, ?ExternalIdentity $externalIdentity = null, array $scopes = []): \Illuminate\Http\Client\Response
     {
+        // Ponto central de guarda: rejeita qualquer operação se a integração não estiver ativa
+        $this->assertIntegrationActive($integration);
+
         $accessToken = $externalIdentity 
             ? $this->getDelegatedAccessToken($integration, $externalIdentity, $scopes)
             : $this->getValidAccessToken($integration);
@@ -205,7 +255,7 @@ class GoogleTokenService
         if ($response->status() === 401) {
             if ($externalIdentity) {
                 // Para DWD o cache é invalidado e gera um novo JWT
-                \Illuminate\Support\Facades\Cache::forget("google_delegated_token:{$integration->id}:{$externalIdentity->primary_email}");
+                Cache::forget("google_delegated_token:{$integration->id}:{$externalIdentity->primary_email}");
                 $newAccessToken = $this->getDelegatedAccessToken($integration, $externalIdentity, $scopes);
             } else {
                 Log::info("[GoogleTokenService] Recebeu 401. Tentando forçar refresh token.", ['integration_id' => $integration->id]);

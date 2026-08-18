@@ -110,12 +110,15 @@ class GoogleWorkspaceConnector implements ConnectorInterface
 
             // Remove os tokens da base
             $integration->update([
-                'access_token' => null,
-                'refresh_token' => null,
-                'token_expires_at' => null,
-                'scope' => null,
-                'status' => 'not_connected'
+                'access_token'      => null,
+                'refresh_token'     => null,
+                'token_expires_at'  => null,
+                'scope'             => null,
+                'status'            => 'not_connected',
             ]);
+
+            // Invalida tokens delegados (DWD) que possam estar em cache
+            $this->googleTokenService->invalidateDelegatedTokenCache($integration);
         }
     }
 

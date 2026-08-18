@@ -25,7 +25,9 @@ class AIResourcesController
 
             // ── Resolve Contexto de Acesso & Identidade ──────────────────
             $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
-                ->where('provider', $request->query('provider', 'google_workspace')) // Ajuste provisório
+                ->where('provider', $request->query('provider', 'google_workspace'))
+                ->where('status', 'connected')
+                ->where('is_enabled', true)
                 ->first();
                 
             $accessContext = $this->authorizationService->resolveAccessContext(
@@ -73,7 +75,9 @@ class AIResourcesController
             $user = $request->get('_active_user');
 
             $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
-                ->where('provider', 'google_workspace') // Por enquanto apenas Google
+                ->where('provider', 'google_workspace')
+                ->where('status', 'connected')
+                ->where('is_enabled', true)
                 ->first();
 
             $accessContext = $this->authorizationService->resolveAccessContext(
@@ -129,6 +133,8 @@ class AIResourcesController
 
             $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
                 ->where('provider', 'google_workspace')
+                ->where('status', 'connected')
+                ->where('is_enabled', true)
                 ->first();
 
             $accessContext = $this->authorizationService->resolveAccessContext(
@@ -324,6 +330,14 @@ class AIResourcesController
             ], 403);
         }
 
+        if ($e instanceof \App\Domain\Identities\Exceptions\IntegrationInactiveException) {
+            return response()->json([
+                'success' => false,
+                'code' => 'PROVIDER_REAUTH_REQUIRED',
+                'message' => $e->getMessage()
+            ], 403);
+        }
+
         if ($e instanceof \App\Domain\Identities\Exceptions\ProviderDelegationRequiredException) {
             return response()->json([
                 'success' => false,
@@ -352,7 +366,7 @@ class AIResourcesController
             $appCode = $errorCode;
             $status = 400; // default for unknown custom string codes
 
-            if (in_array($appCode, ['EXTERNAL_IDENTITY_REQUIRED', 'ACCESS_DENIED', 'PROVIDER_DELEGATION_REQUIRED'])) {
+            if (in_array($appCode, ['EXTERNAL_IDENTITY_REQUIRED', 'ACCESS_DENIED', 'PROVIDER_DELEGATION_REQUIRED', 'PROVIDER_REAUTH_REQUIRED'])) {
                 $status = 403;
             } elseif (str_ends_with($appCode, 'NOT_FOUND')) {
                 $status = 404;
