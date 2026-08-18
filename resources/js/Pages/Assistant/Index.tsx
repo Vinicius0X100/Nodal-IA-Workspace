@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Head, router, useForm, Link, usePage } from '@inertiajs/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -130,8 +130,8 @@ function MessageBubble({ message }: { message: Message }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="flex gap-4 px-4 py-3 w-full max-w-3xl mx-auto group"
         >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-50 to-white border border-blue-100 shadow-sm flex items-center justify-center flex-shrink-0 mt-1">
-                <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-6 h-6 object-contain" />
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-50 to-white border border-blue-100 shadow-sm flex items-center justify-center flex-shrink-0 mt-1">
+                <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-7 h-7 object-contain" />
             </div>
             <div className="max-w-[85%] text-neutral-800 text-[15px] leading-relaxed prose prose-neutral prose-p:leading-relaxed max-w-none pt-1">
                 <ReactMarkdown
@@ -707,13 +707,15 @@ function MessageInput({
     value,
     onChange,
     isProcessing,
-    onOptimisticSubmit
+    onOptimisticSubmit,
+    onBeforeSend,
 }: {
     conversationUuid?: string;
     value: string;
     onChange: (v: string) => void;
     isProcessing: boolean;
     onOptimisticSubmit: (val: string) => void;
+    onBeforeSend: () => void;
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -722,23 +724,20 @@ function MessageInput({
 
         const submitValue = value;
         onChange('');
+        onBeforeSend();
         onOptimisticSubmit(submitValue);
 
         if (!conversationUuid) {
             router.post(
                 route('assistant.store'),
                 { message: submitValue },
-                {
-                    preserveScroll: false,
-                }
+                { preserveScroll: false }
             );
         } else {
             router.post(
                 route('assistant.messages.store', conversationUuid),
                 { content: submitValue },
-                {
-                    preserveScroll: true,
-                }
+                { preserveScroll: true }
             );
         }
     };
@@ -810,27 +809,84 @@ function MessageInput({
 
 export default function AssistantIndex({ conversation, messages, groups }: Props) {
     const [inputValue, setInputValue] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
     const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
+    const [toolHint, setToolHint] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    // Flag: tracks if the current navigation was triggered by a message send (not a page visit)
+    const isSendingRef = useRef(false);
+    const toolHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Watch Inertia events to show the AI typing indicator
+    // Contextual labels for each AI tool slug
+    const TOOL_HINTS: Record<string, string> = {
+        google_search_resources: 'Buscando documentos no Drive…',
+        google_read_resource: 'Lendo documento…',
+        google_read_multiple_resources: 'Lendo documentos…',
+        google_read_resource_file: 'Obtendo arquivo…',
+        google_calendar_events_list: 'Consultando calendário…',
+        google_calendar_freebusy: 'Verificando disponibilidade…',
+        google_calendar_event_create: 'Criando evento…',
+        google_calendar_event_update: 'Atualizando evento…',
+        google_calendar_event_delete: 'Excluindo evento…',
+        google_gmail_messages_search: 'Pesquisando e-mails…',
+        google_gmail_message_read: 'Lendo e-mail…',
+        google_gmail_attachment_read: 'Lendo anexo…',
+        google_gmail_attachment_download_link: 'Gerando link de download…',
+        current_user: 'Identificando usuário…',
+    };
+
+    // Rotate through hints while processing
+    const startToolHints = useCallback(() => {
+        const hints = [
+            'Analisando sua pergunta…',
+            'Processando com IA…',
+            'Elaborando resposta…',
+        ];
+        let idx = 0;
+        const cycle = () => {
+            setToolHint(hints[idx % hints.length]);
+            idx++;
+            toolHintTimerRef.current = setTimeout(cycle, 3000);
+        };
+        cycle();
+    }, []);
+
+    const stopToolHints = useCallback(() => {
+        if (toolHintTimerRef.current) clearTimeout(toolHintTimerRef.current);
+        setToolHint(null);
+    }, []);
+
+    // Watch Inertia events — only activate isProcessing during message sends, not page navigations
     useEffect(() => {
-        const removeStart = router.on('start', () => setIsProcessing(true));
-        const removeFinish = router.on('finish', () => setIsProcessing(false));
+        // Suppress the Inertia progress bar when the navigation is a message send
+        const removeBefore = router.on('before', (e) => {
+            if (isSendingRef.current) {
+                // Mark this visit so Inertia doesn't show the top loader
+                (e.detail.visit as any).showProgress = false;
+            }
+        });
+        const removeStart = router.on('start', () => {
+            if (isSendingRef.current) {
+                setIsProcessing(true);
+                startToolHints();
+            }
+        });
+        const removeFinish = router.on('finish', () => {
+            isSendingRef.current = false;
+            setIsProcessing(false);
+            stopToolHints();
+        });
         return () => {
+            removeBefore();
             removeStart();
             removeFinish();
         };
-    }, []);
+    }, [startToolHints, stopToolHints]);
 
     useEffect(() => {
         setIsSearchActive(false);
-        const timer = setTimeout(() => setIsLoading(false), 500);
-        return () => clearTimeout(timer);
     }, [conversation?.uuid]);
 
     useEffect(() => {
@@ -838,10 +894,8 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
     }, [messages]);
 
     useEffect(() => {
-        if (!isLoading) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
-    }, [messages, optimisticMessages, isLoading, isProcessing]);
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages, optimisticMessages, isProcessing]);
 
     const handleOptimisticSubmit = (val: string) => {
         setOptimisticMessages(prev => [...prev, {
@@ -899,18 +953,11 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                         <AnimatePresence mode="wait">
                             {isSearchActive ? (
                                 <SearchScreen key="search" groups={groups} />
-                            ) : isLoading && conversation ? (
-                                <motion.div key="skeleton" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                                    <ShimmerSkeleton />
-                                </motion.div>
-                            ) : !conversation || messages.length === 0 ? (
+                            ) : !conversation && optimisticMessages.length === 0 ? (
                                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="h-full">
                                     <EmptyState 
                                         onSuggestion={(text) => {
                                             setInputValue(text);
-                                            if (!conversation) {
-                                                router.post(route('assistant.store'), {}, { preserveScroll: false });
-                                            }
                                         }} 
                                     />
                                 </motion.div>
@@ -922,14 +969,32 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                                     
                                     {/* AI Typing Indicator */}
                                     {isProcessing && (
-                                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4 px-4 py-3 w-full max-w-3xl mx-auto">
-                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-50 to-white border border-blue-100 shadow-sm flex items-center justify-center flex-shrink-0 mt-1">
-                                                <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-6 h-6 object-contain opacity-70" />
+                                        <motion.div 
+                                            initial={{ opacity: 0, y: 10 }} 
+                                            animate={{ opacity: 1, y: 0 }} 
+                                            exit={{ opacity: 0, y: 5 }}
+                                            className="flex gap-4 px-4 py-3 w-full max-w-3xl mx-auto"
+                                        >
+                                            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-50 to-white border border-blue-100 shadow-sm flex items-center justify-center flex-shrink-0 mt-1">
+                                                <img src="/images/Nodal-Icon.png" alt="Nodal AI" className="w-7 h-7 object-contain opacity-80" />
                                             </div>
-                                            <div className="bg-neutral-50 border border-neutral-100 rounded-3xl rounded-bl-sm px-5 py-4 flex items-center gap-2 h-[52px] shadow-sm mt-1">
-                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0 }} className="w-2 h-2 bg-neutral-400 rounded-full" />
-                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.15 }} className="w-2 h-2 bg-neutral-400 rounded-full" />
-                                                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.3 }} className="w-2 h-2 bg-neutral-400 rounded-full" />
+                                            <div className="flex flex-col gap-1 mt-1">
+                                                {toolHint && (
+                                                    <motion.span
+                                                        key={toolHint}
+                                                        initial={{ opacity: 0, y: 4 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0 }}
+                                                        className="text-[11px] font-medium text-blue-500 tracking-wide px-1"
+                                                    >
+                                                        {toolHint}
+                                                    </motion.span>
+                                                )}
+                                                <div className="bg-neutral-50 border border-neutral-100 rounded-3xl rounded-bl-sm px-5 py-4 flex items-center gap-2 h-[52px] shadow-sm">
+                                                    <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0 }} className="w-2 h-2 bg-neutral-400 rounded-full" />
+                                                    <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.15 }} className="w-2 h-2 bg-neutral-400 rounded-full" />
+                                                    <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.3 }} className="w-2 h-2 bg-neutral-400 rounded-full" />
+                                                </div>
                                             </div>
                                         </motion.div>
                                     )}
@@ -948,6 +1013,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                             onChange={setInputValue}
                             isProcessing={isProcessing}
                             onOptimisticSubmit={handleOptimisticSubmit}
+                            onBeforeSend={() => { isSendingRef.current = true; }}
                         />
                     )}
                 </div>
