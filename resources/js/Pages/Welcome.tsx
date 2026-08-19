@@ -31,11 +31,9 @@ function MicrosoftLogo({ size = 28 }: { size?: number }) {
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
         <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            background: 'rgba(0,72,170,0.07)', border: '1px solid rgba(0,72,170,0.14)',
-            borderRadius: 980, padding: '5px 14px', fontSize: 12, fontWeight: 600,
+            display: 'block', fontSize: 13, fontWeight: 700,
             color: '#0048AA', letterSpacing: '0.04em', textTransform: 'uppercase',
-            marginBottom: 20,
+            marginBottom: 16,
         }}>
             {children}
         </span>
@@ -497,8 +495,8 @@ export default function Welcome() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 64, alignItems: 'center' }}>
                         {/* Text */}
                         <div>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: 980, padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#a78bfa', letterSpacing: '0.04em', textTransform: 'uppercase' as const, marginBottom: 20 }}>
-                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 12, height: 12 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa', letterSpacing: '0.04em', textTransform: 'uppercase' as const, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 14, height: 14 }}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                                 </svg>
                                 IA Assistant — O coração do Nodal
@@ -610,7 +608,7 @@ export default function Welcome() {
                 <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 64, alignItems: 'center' }}>
                     {/* Text */}
                     <div>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f0ebff', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 980, padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#7c3aed', letterSpacing: '0.04em', textTransform: 'uppercase' as const, marginBottom: 20 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#7c3aed', letterSpacing: '0.04em', textTransform: 'uppercase' as const, marginBottom: 16 }}>
                             API & Integrações customizadas
                         </div>
                         <h3 style={{ fontSize: 'clamp(26px, 3.5vw, 38px)', fontWeight: 800, letterSpacing: '-0.035em', lineHeight: 1.1, marginBottom: 16, color: '#1d1d1f' }}>
@@ -672,8 +670,8 @@ export default function Welcome() {
             <section id="security" className="section-dark" style={{ padding: '100px 24px' }}>
                 <div style={{ maxWidth: 1100, margin: '0 auto' }}>
                     <div style={{ textAlign: 'center', marginBottom: 64 }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 980, padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#60A5FA', letterSpacing: '0.04em', textTransform: 'uppercase' as const, marginBottom: 20 }}>
-                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 12, height: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#60A5FA', letterSpacing: '0.04em', textTransform: 'uppercase' as const, marginBottom: 16 }}>
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 14, height: 14 }}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
                             </svg>
                             Segurança Enterprise

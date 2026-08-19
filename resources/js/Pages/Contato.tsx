@@ -133,28 +133,7 @@ export default function Contato({ plano }: Props) {
                 .d3 { animation-delay: 0.18s; }
             `}</style>
 
-            {/* Navbar */}
-            <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, borderBottom: scrolled ? '1px solid rgba(0,0,0,0.07)' : '1px solid transparent', transition: 'all 0.3s ease' }} className={scrolled ? 'nav-blur' : ''}>
-                <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px', height: 54, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <a href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-                        <img src="/images/Nodal-Logo.png" alt="Nodal" style={{ height: 26, width: 'auto' }} />
-                    </a>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        {([['Produto', '/produto'], ['Serviços', '/servicos'], ['Segurança', '/#security']] as [string, string][]).map(([item, href]) => (
-                            <a key={item} href={href} className="btn-ghost-sm" style={{ color: '#1d1d1f', fontSize: 13 }}>{item}</a>
-                        ))}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <a href="/contato" className="btn-ghost-sm" style={{ color: '#0048AA', fontWeight: 600, fontSize: 13 }}>Contato</a>
-                        <Link href="/login" className="btn-primary-sm" style={{ fontSize: 13 }}>
-                            Área do Cliente
-                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 13, height: 13 }}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                            </svg>
-                        </Link>
-                    </div>
-                </div>
-            </nav>
+            {/* Navbar removida para layout split sem colisão de contraste */}
 
             {/* Layout de duas colunas */}
             <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', background: 'white' }}>
@@ -173,7 +152,7 @@ export default function Contato({ plano }: Props) {
 
                     <div style={{ position: 'relative', zIndex: 1 }}>
                         {/* Label */}
-                        <div className="anim-up d1" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 980, padding: '5px 14px', fontSize: 11, fontWeight: 600, color: '#60A5FA', letterSpacing: '0.05em', textTransform: 'uppercase' as const, marginBottom: 28 }}>
+                        <div className="anim-up d1" style={{ fontSize: 13, fontWeight: 700, color: '#60A5FA', letterSpacing: '0.05em', textTransform: 'uppercase' as const, marginBottom: 16 }}>
                             Fale conosco
                         </div>
 
