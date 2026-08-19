@@ -29,6 +29,11 @@ Route::get('/', function () {
 Route::inertia('/termos-de-uso', 'Legal/Terms')->name('terms');
 Route::inertia('/politica-de-privacidade', 'Legal/Privacy')->name('privacy');
 
+// Páginas institucionais (Público)
+Route::inertia('/produto', 'Produto')->name('produto');
+Route::inertia('/servicos', 'Servicos')->name('servicos');
+
+
 // Public
 Route::middleware('guest')->group(function () {
 
