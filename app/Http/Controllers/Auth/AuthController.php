@@ -34,7 +34,7 @@ class AuthController extends Controller
                 session(['active_organization_id' => $org->id]);
             }
 
-            return redirect()->intended('dashboard');
+            return redirect()->intended(route('dashboard'));
         }
 
         return back()->withErrors([

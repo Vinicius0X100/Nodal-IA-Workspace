@@ -31,5 +31,31 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
+
+        // Renderiza erros HTTP como página Inertia (elimina comportamento de "modal")
+        $exceptions->respond(function (\Symfony\Component\HttpFoundation\Response $response, \Throwable $exception, Request $request) {
+            $status = $response->getStatusCode();
+
+            if (
+                ! $request->is('api/*')
+                && in_array($status, [404, 403, 500, 503])
+                && $request->header('X-Inertia')
+            ) {
+                return \Inertia\Inertia::render('Error', ['status' => $status])
+                    ->toResponse($request)
+                    ->setStatusCode($status);
+            }
+
+            if (
+                ! $request->is('api/*')
+                && in_array($status, [404, 403, 500, 503])
+                && ! $request->header('X-Inertia')
+                && ! $request->expectsJson()
+            ) {
+                return response()->view("errors.{$status}", ['status' => $status], $status);
+            }
+
+            return $response;
+        });
     })->create();
 
