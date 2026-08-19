@@ -80,7 +80,7 @@ export default function Produto() {
                         ))}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <a href="mailto:contato@nodal.com.br" className="btn-ghost-sm" style={{ color: '#0048AA' }}>Contato</a>
+                        <a href="/contato" className="btn-ghost-sm" style={{ color: '#0048AA' }}>Contato</a>
                         <Link href="/login" className="btn-primary-sm">
                             Área do Cliente
                             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 13, height: 13 }}>
@@ -105,7 +105,7 @@ export default function Produto() {
                 <p style={{ fontSize: 18, color: '#6e6e73', lineHeight: 1.65, maxWidth: 560, margin: '0 auto 40px' }}>
                     O Nodal é uma plataforma modular. Use o que você precisa, integre com o que você já tem.
                 </p>
-                <a href="mailto:contato@nodal.com.br" style={{ background: '#0048AA', color: 'white', borderRadius: 980, padding: '14px 30px', fontSize: 16, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 32px rgba(0,72,170,0.28)', transition: 'all 0.2s' }}>
+                <a href="/contato" style={{ background: '#0048AA', color: 'white', borderRadius: 980, padding: '14px 30px', fontSize: 16, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 32px rgba(0,72,170,0.28)', transition: 'all 0.2s' }}>
                     Solicitar demonstração
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 16, height: 16 }}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
@@ -209,7 +209,7 @@ export default function Produto() {
                         Agende uma demonstração guiada com a nossa equipe e descubra como o Nodal se encaixa na sua operação.
                     </p>
                     <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <a href="mailto:contato@nodal.com.br" style={{ background: '#0048AA', color: 'white', borderRadius: 980, padding: '13px 28px', fontSize: 15, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 24px rgba(0,72,170,0.25)', transition: 'all 0.2s' }}>
+                        <a href="/contato" style={{ background: '#0048AA', color: 'white', borderRadius: 980, padding: '13px 28px', fontSize: 15, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 24px rgba(0,72,170,0.25)', transition: 'all 0.2s' }}>
                             Agendar demonstração
                         </a>
                         <a href="/servicos" style={{ background: 'transparent', color: '#1d1d1f', border: '1.5px solid rgba(0,0,0,0.14)', borderRadius: 980, padding: '12px 26px', fontSize: 15, fontWeight: 500, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', transition: 'all 0.2s' }}>
@@ -224,7 +224,7 @@ export default function Produto() {
                 <img src="/images/Nodal-Logo.png" alt="Nodal" style={{ height: 20, opacity: 0.6 }} />
                 <p style={{ fontSize: 12, color: '#8e8e93' }}>© {new Date().getFullYear()} Sacratech Softwares. Todos os direitos reservados.</p>
                 <div style={{ display: 'flex', gap: 16 }}>
-                    {[['Home', '/'], ['Serviços', '/servicos'], ['Contato', 'mailto:contato@nodal.com.br']].map(([l, h]) => (
+                    {[['Home', '/'], ['Serviços', '/servicos'], ['Contato', '/contato']].map(([l, h]) => (
                         <a key={l} href={h} style={{ fontSize: 13, color: '#8e8e93', textDecoration: 'none' }}>{l}</a>
                     ))}
                 </div>

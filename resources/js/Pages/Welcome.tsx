@@ -230,7 +230,7 @@ export default function Welcome() {
                         ))}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <a href="mailto:contato@nodal.com.br" className="btn-ghost-sm" style={{ color: '#0048AA', fontSize: 13 }}>Contato</a>
+                        <a href="/contato" className="btn-ghost-sm" style={{ color: '#0048AA', fontSize: 13 }}>Contato</a>
                         <Link href="/login" className="btn-primary-sm">
                             Área do Cliente
                             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 13, height: 13 }}>
@@ -255,7 +255,7 @@ export default function Welcome() {
                         </p>
 
                         <div className="anim-up d4" style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', marginBottom: 80 }}>
-                            <a href="mailto:contato@nodal.com.br" className="btn-hero-blue">
+                            <a href="/contato" className="btn-hero-blue">
                                 Falar com especialista
                                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 16, height: 16 }}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
@@ -486,8 +486,127 @@ export default function Welcome() {
                 </div>
             </section>
 
+            {/* ═══════════════════ IA ASSISTANT ═══════════════════════════════════════ */}
+            <section style={{ padding: '100px 24px', background: 'linear-gradient(160deg, #060f24 0%, #0d1c3d 55%, #071630 100%)', position: 'relative', overflow: 'hidden' }}>
+                {/* Glow effects */}
+                <div style={{ position: 'absolute', top: '10%', left: '15%', width: 500, height: 500, background: 'radial-gradient(circle, rgba(124,58,237,0.12), transparent)', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', bottom: '10%', right: '10%', width: 400, height: 400, background: 'radial-gradient(circle, rgba(0,72,170,0.15), transparent)', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)', backgroundSize: '60px 60px', pointerEvents: 'none' }} />
+
+                <div style={{ maxWidth: 1100, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 64, alignItems: 'center' }}>
+                        {/* Text */}
+                        <div>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: 980, padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#a78bfa', letterSpacing: '0.04em', textTransform: 'uppercase' as const, marginBottom: 20 }}>
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 12, height: 12 }}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                                </svg>
+                                IA Assistant — O coração do Nodal
+                            </div>
+                            <h3 style={{ fontSize: 'clamp(28px, 3.5vw, 42px)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.08, color: 'white', marginBottom: 18 }}>
+                                Inteligência artificial<br />
+                                <span style={{ background: 'linear-gradient(135deg, #a78bfa, #818CF8, #60A5FA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                                    integrada à sua empresa.
+                                </span>
+                            </h3>
+                            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: 1.75, marginBottom: 32 }}>
+                                O Nodal não é apenas um hub de integrações. A IA é o ponto central da experiência — com acesso seguro e granular ao contexto da sua organização: colaboradores, documentos, integrações e permissões. Tudo o que você precisava perguntar para três pessoas diferentes, agora responde em segundos.
+                            </p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 36 }}>
+                                {[
+                                    { icon: '🔍', text: 'Busca semântica em documentos do Google Drive e SharePoint' },
+                                    { icon: '📊', text: 'Relatórios automáticos sobre equipe, acessos e atividade' },
+                                    { icon: '🔐', text: 'Acesso controlado por permissão — a IA vê apenas o que o usuário pode ver' },
+                                    { icon: '💬', text: 'Responde perguntas sobre a organização em linguagem natural' },
+                                    { icon: '⚡', text: 'Baseada nos modelos de linguagem mais avançados disponíveis' },
+                                ].map(item => (
+                                    <div key={item.text} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                                        <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
+                                        <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.55 }}>{item.text}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <a href="/contato" style={{ background: 'linear-gradient(135deg, #7c3aed, #9b5cf6)', color: 'white', borderRadius: 980, padding: '13px 28px', fontSize: 14, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 24px rgba(124,58,237,0.4)', transition: 'all 0.2s' }}>
+                                    Quero acesso antecipado
+                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 14, height: 14 }}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                    </svg>
+                                </a>
+                                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Disponível em todos os planos</span>
+                            </div>
+                        </div>
+
+                        {/* Visual — chat mockup */}
+                        <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', backdropFilter: 'blur(12px)' }}>
+                            {/* Header */}
+                            <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #7c3aed, #9b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'white' }}>Nodal IA</div>
+                                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Assistente da sua organização</div>
+                                </div>
+                                <div style={{ marginLeft: 'auto', fontSize: 10, color: '#6ee7b7', background: 'rgba(110,231,183,0.1)', padding: '2px 9px', borderRadius: 6, fontWeight: 600 }}>● Online</div>
+                            </div>
+                            {/* Messages */}
+                            <div style={{ padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: 340 }}>
+                                {/* User message */}
+                                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                    <div style={{ background: '#7c3aed', color: 'white', borderRadius: '14px 14px 4px 14px', padding: '10px 14px', maxWidth: '80%', fontSize: 13, lineHeight: 1.5 }}>
+                                        Quais colaboradores do time de engenharia têm acesso ao repositório principal?
+                                    </div>
+                                </div>
+                                {/* AI response */}
+                                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                    <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #7c3aed, #9b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                                    </div>
+                                    <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px 14px 14px 14px', padding: '12px 14px', maxWidth: '85%' }}>
+                                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6, marginBottom: 12 }}>
+                                            Encontrei <strong style={{ color: 'white' }}>7 colaboradores</strong> com acesso ao repositório principal:
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                            {[
+                                                { name: 'Carlos Lima', role: 'Tech Lead', src: '#7c3aed' },
+                                                { name: 'Ana Souza', role: 'Senior Dev', src: '#0048AA' },
+                                                { name: 'Marcos Reis', role: 'DevOps', src: '#059669' },
+                                            ].map(u => (
+                                                <div key={u.name} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '6px 10px' }}>
+                                                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: u.src, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'white', fontWeight: 700 }}>{u.name[0]}</div>
+                                                    <div>
+                                                        <div style={{ fontSize: 11, fontWeight: 600, color: 'white' }}>{u.name}</div>
+                                                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{u.role}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', paddingLeft: 4 }}>+ 4 outros. Deseja ver a lista completa?</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {/* Typing indicator */}
+                                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                    <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #7c3aed, #9b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                                    </div>
+                                    <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px 14px 14px 14px', padding: '12px 16px', display: 'flex', gap: 4, alignItems: 'center' }}>
+                                        {[0, 150, 300].map(d => (
+                                            <div key={d} style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', animation: 'pulse2 1.2s ease-in-out infinite', animationDelay: `${d}ms` }} />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* ═══════════════════ API / CRM INTEGRATION ══════════════════════════════ */}
             <section style={{ padding: '100px 24px', background: 'white' }}>
+
                 <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 64, alignItems: 'center' }}>
                     {/* Text */}
                     <div>
@@ -498,16 +617,16 @@ export default function Welcome() {
                             Conecte o CRM ou sistema<br />que sua empresa já usa
                         </h3>
                         <p style={{ fontSize: 15, color: '#6e6e73', lineHeight: 1.7, marginBottom: 28 }}>
-                            Não importa qual ferramenta a sua empresa usa — Salesforce, HubSpot, SAP, ou um sistema legado próprio. A API REST do Nodal permite integrar qualquer plataforma com autenticação OAuth2, webhooks em tempo real e documentação OpenAPI completa.
+                            Não importa qual ferramenta a sua empresa usa — Salesforce, SAP ou um sistema legado próprio. A API REST do Nodal permite integrar qualquer plataforma com autenticação OAuth2, webhooks em tempo real e documentação OpenAPI completa.
                         </p>
                         <CheckItem>API REST documentada com Swagger/OpenAPI</CheckItem>
                         <CheckItem>Webhooks para eventos em tempo real (usuário criado, acesso revogado, etc.)</CheckItem>
                         <CheckItem>Autenticação OAuth2 com escopos granulares por recurso</CheckItem>
-                        <CheckItem>Suporte a integrações com Salesforce, HubSpot, Pipedrive, SAP e ERPs</CheckItem>
+                        <CheckItem>Suporte a integrações com Salesforce, SAP e sistemas legados via REST</CheckItem>
                         <CheckItem>SDK disponível para Node.js e Python (em breve)</CheckItem>
                         <CheckItem>Rate limiting, throttling e logs de requisições incluídos</CheckItem>
                         <div style={{ marginTop: 32, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                            <a href="mailto:contato@nodal.com.br" className="btn-hero-blue" style={{ padding: '12px 26px', fontSize: 14, background: 'linear-gradient(135deg, #7c3aed, #9b59f5)', boxShadow: '0 8px 24px rgba(124,58,237,0.3)' }}>
+                            <a href="/contato" className="btn-hero-blue" style={{ padding: '12px 26px', fontSize: 14, background: 'linear-gradient(135deg, #7c3aed, #9b59f5)', boxShadow: '0 8px 24px rgba(124,58,237,0.3)' }}>
                                 Falar com a equipe técnica
                             </a>
                             <a href="/servicos" className="btn-hero-outline" style={{ padding: '11px 24px', fontSize: 14 }}>Ver serviços</a>
@@ -591,12 +710,12 @@ export default function Welcome() {
                         <SecurityBadge
                             icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ width: 28, height: 28 }}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>}
                             label="OAuth2 & SSO"
-                            desc="Login via Google, Microsoft e provedores de identidade corporativos. Suporte a SAML 2.0 e OpenID Connect disponível no plano Enterprise."
+                            desc="Login via Google e Microsoft com OAuth2. Suporte a provedores de identidade corporativos (SSO) está no roadmap e será anunciado em breve."
                         />
                         <SecurityBadge
-                            icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ width: 28, height: 28 }}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>}
-                            label="Infraestrutura BR"
-                            desc="Dados armazenados em data centers brasileiros, em conformidade com a LGPD. Processo documentado de DPA disponível sob demanda."
+                            icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ width: 28, height: 28 }}><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>}
+                            label="Alta Disponibilidade"
+                            desc="Infraestrutura em nuvem com SLA de 99,9%. Monitoramento 24/7, failover automático e backups diários com teste de restauração."
                         />
                     </div>
                 </div>
@@ -656,7 +775,7 @@ export default function Welcome() {
                             Fale com a nossa equipe e coloque sua empresa no Nodal em menos de 24 horas.
                         </p>
                         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                            <a href="mailto:contato@nodal.com.br" style={{ background: 'white', color: '#0048AA', borderRadius: 980, padding: '14px 30px', fontSize: 15, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.18)', letterSpacing: '-0.01em', transition: 'all 0.2s' }}>
+                            <a href="/contato" style={{ background: 'white', color: '#0048AA', borderRadius: 980, padding: '14px 30px', fontSize: 15, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.18)', letterSpacing: '-0.01em', transition: 'all 0.2s' }}>
                                 Entrar em contato
                             </a>
                             <Link href="/login" style={{ background: 'rgba(255,255,255,0.12)', color: 'white', border: '1.5px solid rgba(255,255,255,0.28)', borderRadius: 980, padding: '13px 28px', fontSize: 15, fontWeight: 500, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', letterSpacing: '-0.01em' }}>
@@ -699,7 +818,7 @@ export default function Welcome() {
                             </div>
                             <div>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: '#1d1d1f', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>Contato</div>
-                                <a href="mailto:contato@nodal.com.br" style={{ display: 'block', fontSize: 13, color: '#8e8e93', textDecoration: 'none', marginBottom: 8 }}>contato@nodal.com.br</a>
+                                <a href="/contato" style={{ display: 'block', fontSize: 13, color: '#8e8e93', textDecoration: 'none', marginBottom: 8 }}>contato@sacratech.com</a>
                             </div>
                         </div>
                         <div />

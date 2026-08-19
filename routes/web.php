@@ -32,6 +32,9 @@ Route::inertia('/politica-de-privacidade', 'Legal/Privacy')->name('privacy');
 // Páginas institucionais (Público)
 Route::inertia('/produto', 'Produto')->name('produto');
 Route::inertia('/servicos', 'Servicos')->name('servicos');
+Route::get('/contato', [\App\Http\Controllers\Contact\ContactController::class, 'show'])->name('contato');
+Route::post('/contato', [\App\Http\Controllers\Contact\ContactController::class, 'send'])->name('contato.send');
+
 
 
 // Public

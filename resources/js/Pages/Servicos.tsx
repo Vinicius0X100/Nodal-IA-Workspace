@@ -43,7 +43,7 @@ export default function Servicos() {
                         ))}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <a href="mailto:contato@nodal.com.br" className="btn-ghost-sm" style={{ color: '#0048AA' }}>Contato</a>
+                        <a href="/contato" className="btn-ghost-sm" style={{ color: '#0048AA' }}>Contato</a>
                         <Link href="/login" className="btn-primary-sm">
                             Área do Cliente
                             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 13, height: 13 }}>
@@ -70,7 +70,7 @@ export default function Servicos() {
                 <p style={{ fontSize: 18, color: '#6e6e73', lineHeight: 1.65, maxWidth: 540, margin: '0 auto 40px' }}>
                     Nossa equipe cuida de toda a implementação, integração e treinamento para que você foque no que importa: o seu negócio.
                 </p>
-                <a href="mailto:contato@nodal.com.br" style={{ background: '#0048AA', color: 'white', borderRadius: 980, padding: '14px 30px', fontSize: 16, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 32px rgba(0,72,170,0.28)' }}>
+                <a href="/contato" style={{ background: '#0048AA', color: 'white', borderRadius: 980, padding: '14px 30px', fontSize: 16, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 32px rgba(0,72,170,0.28)' }}>
                     Falar com um especialista
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 16, height: 16 }}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
@@ -159,7 +159,7 @@ export default function Servicos() {
                             </div>
                             <p style={{ fontSize: 13, color: '#8e8e93', marginBottom: 28, lineHeight: 1.5 }}>Ideal para empresas de até 50 colaboradores.</p>
                             <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', paddingTop: 24, marginBottom: 28 }}>
-                                {['Até 50 usuários', 'Google Workspace ou Microsoft 365', '1 integração via API', 'Diretório de equipe', 'Auditoria básica', 'Suporte via e-mail', 'SLA 99,9%'].map(f => (
+                                {['Até 50 usuários', 'Google Workspace ou Microsoft 365', '1 integração via API', 'IA Assistant incluída', 'Diretório de equipe', 'Auditoria básica', 'Suporte via e-mail', 'SLA 99,9%'].map(f => (
                                     <div key={f} className="check-item">
                                         <div className="check-dot">
                                             <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -168,7 +168,7 @@ export default function Servicos() {
                                     </div>
                                 ))}
                             </div>
-                            <a href="mailto:contato@nodal.com.br?subject=Plano Starter" style={{ display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 12, border: '1.5px solid rgba(0,72,170,0.25)', color: '#0048AA', fontSize: 14, fontWeight: 600, textDecoration: 'none', transition: 'all 0.2s' }}>
+                            <a href="/contato?plano=starter" style={{ display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 12, border: '1.5px solid rgba(0,72,170,0.25)', color: '#0048AA', fontSize: 14, fontWeight: 600, textDecoration: 'none', transition: 'all 0.2s' }}>
                                 Solicitar proposta
                             </a>
                         </div>
@@ -193,7 +193,7 @@ export default function Servicos() {
                                     </div>
                                 ))}
                             </div>
-                            <a href="mailto:contato@nodal.com.br?subject=Plano Business" style={{ display: 'block', textAlign: 'center', padding: '13px 0', borderRadius: 12, background: 'linear-gradient(135deg, #0048AA, #0066FF)', color: 'white', fontSize: 14, fontWeight: 700, textDecoration: 'none', boxShadow: '0 4px 16px rgba(0,72,170,0.3)', transition: 'all 0.2s' }}>
+                            <a href="/contato?plano=business" style={{ display: 'block', textAlign: 'center', padding: '13px 0', borderRadius: 12, background: 'linear-gradient(135deg, #0048AA, #0066FF)', color: 'white', fontSize: 14, fontWeight: 700, textDecoration: 'none', boxShadow: '0 4px 16px rgba(0,72,170,0.3)', transition: 'all 0.2s' }}>
                                 Solicitar proposta
                             </a>
                         </div>
@@ -206,7 +206,7 @@ export default function Servicos() {
                             </div>
                             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 28, lineHeight: 1.5 }}>Para grandes organizações com necessidades específicas.</p>
                             <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 24, marginBottom: 28 }}>
-                                {['Usuários ilimitados', 'Todas as integrações + desenvolvimentos custom', 'SSO com SAML 2.0 e OIDC', 'Data residency no Brasil', 'DPA e LGPD documentados', 'Gerente de conta dedicado', 'SLA customizado com penalidade', 'Ambiente privado (on-premise disponível)'].map(f => (
+                                {['Usuários ilimitados', 'Todas as integrações + desenvolvimentos custom', 'Auditoria completa em tempo real', 'Gerente de conta dedicado', 'SLA customizado com penalidade', 'Ambiente privado (on-premise disponível)'].map(f => (
                                     <div key={f} className="check-item" style={{ color: 'rgba(255,255,255,0.8)' }}>
                                         <div style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', background: 'rgba(96,165,250,0.2)', border: '1px solid rgba(96,165,250,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
                                             <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#60A5FA" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -215,13 +215,13 @@ export default function Servicos() {
                                     </div>
                                 ))}
                             </div>
-                            <a href="mailto:contato@nodal.com.br?subject=Plano Enterprise" style={{ display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 12, border: '1.5px solid rgba(96,165,250,0.4)', color: '#60A5FA', fontSize: 14, fontWeight: 600, textDecoration: 'none', transition: 'all 0.2s' }}>
+                            <a href="/contato?plano=enterprise" style={{ display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 12, border: '1.5px solid rgba(96,165,250,0.4)', color: '#60A5FA', fontSize: 14, fontWeight: 600, textDecoration: 'none', transition: 'all 0.2s' }}>
                                 Falar com a equipe
                             </a>
                         </div>
                     </div>
                     <p style={{ textAlign: 'center', fontSize: 13, color: '#8e8e93', marginTop: 32 }}>
-                        Todos os preços são sob consulta pois cada contrato é personalizado para a realidade da sua empresa. <a href="mailto:contato@nodal.com.br" style={{ color: '#0048AA' }}>Entre em contato</a> para receber uma proposta.
+                        Todos os preços são sob consulta pois cada contrato é personalizado para a realidade da sua empresa. <a href="/contato" style={{ color: '#0048AA' }}>Entre em contato</a> para receber uma proposta.
                     </p>
                 </div>
             </section>
@@ -261,7 +261,7 @@ export default function Servicos() {
                     <p style={{ fontSize: 16, color: '#6e6e73', lineHeight: 1.65, marginBottom: 36 }}>
                         Nossa equipe está pronta para entender a realidade da sua empresa e montar uma proposta personalizada.
                     </p>
-                    <a href="mailto:contato@nodal.com.br" style={{ background: '#0048AA', color: 'white', borderRadius: 980, padding: '14px 32px', fontSize: 16, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 32px rgba(0,72,170,0.28)', transition: 'all 0.2s' }}>
+                    <a href="/contato" style={{ background: '#0048AA', color: 'white', borderRadius: 980, padding: '14px 32px', fontSize: 16, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 32px rgba(0,72,170,0.28)', transition: 'all 0.2s' }}>
                         Entrar em contato
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ width: 16, height: 16 }}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
@@ -275,7 +275,7 @@ export default function Servicos() {
                 <img src="/images/Nodal-Logo.png" alt="Nodal" style={{ height: 20, opacity: 0.6 }} />
                 <p style={{ fontSize: 12, color: '#8e8e93' }}>© {new Date().getFullYear()} Sacratech Softwares. Todos os direitos reservados.</p>
                 <div style={{ display: 'flex', gap: 16 }}>
-                    {[['Home', '/'], ['Produto', '/produto'], ['Contato', 'mailto:contato@nodal.com.br']].map(([l, h]) => (
+                    {[['Home', '/'], ['Produto', '/produto'], ['Contato', '/contato']].map(([l, h]) => (
                         <a key={l} href={h} style={{ fontSize: 13, color: '#8e8e93', textDecoration: 'none' }}>{l}</a>
                     ))}
                 </div>
