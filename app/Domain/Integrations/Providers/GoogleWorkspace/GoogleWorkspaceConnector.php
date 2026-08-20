@@ -5,7 +5,9 @@ namespace App\Domain\Integrations\Providers\GoogleWorkspace;
 use App\Domain\Integrations\Contracts\ConnectorInterface;
 use App\Domain\Integrations\Services\GoogleOAuthService;
 use App\Domain\Integrations\Services\GoogleTokenService;
-use App\Domain\Organizations\Models\Organization;
+use App\Domain\Integrations\Models\Integration;
+use App\Domain\Integrations\Models\IntegrationWebhook;
+use Illuminate\Support\Str;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
@@ -85,6 +87,16 @@ class GoogleWorkspaceConnector implements ConnectorInterface
             ]
         );
         
+        // Register Webhook channel for real-time drive updates
+        try {
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', $this->getProviderName())
+                ->first();
+            $this->registerWebhookChannel($integration);
+        } catch (\Exception $e) {
+            Log::error("Failed to register webhook channel during callback: " . $e->getMessage());
+        }
+        
         // Log ou atualização na tabela `integrations` para 'connected' pode ser feito fora daqui
         // ou emitindo um evento.
     }
@@ -96,6 +108,14 @@ class GoogleWorkspaceConnector implements ConnectorInterface
             ->first();
 
         if ($integration && $integration->access_token) {
+            // Stop active webhooks
+            $activeWebhooks = IntegrationWebhook::where('integration_id', $integration->id)
+                ->where('state', 'active')
+                ->get();
+            foreach ($activeWebhooks as $webhook) {
+                $this->stopWebhookChannel($integration, $webhook);
+            }
+
             // Revogar na API do Google
             $response = \Illuminate\Support\Facades\Http::post('https://oauth2.googleapis.com/revoke', [
                 'token' => $integration->access_token,
@@ -295,6 +315,77 @@ class GoogleWorkspaceConnector implements ConnectorInterface
                 'message' => $e->getMessage(),
             ]);
             throw $e;
+        }
+    }
+
+    public function registerWebhookChannel(Integration $integration): void
+    {
+        $token = $this->tokenService->getValidAccessToken($integration);
+        $channelId = (string) Str::uuid();
+        
+        // Using url() so it resolves to the application's base URL (e.g., HTTPS domain)
+        $webhookAddress = url('/api/webhooks/google-workspace');
+        
+        $webhook = IntegrationWebhook::create([
+            'integration_id' => $integration->id,
+            'channel_id' => $channelId,
+            'resource_uri' => $webhookAddress,
+            'state' => 'pending',
+            'expires_at' => now()->addDays(7), // Google Drive webhooks typically expire in a week or so, requiring renewal
+        ]);
+
+        $response = \Illuminate\Support\Facades\Http::withToken($token)
+            ->post('https://www.googleapis.com/drive/v3/changes/watch?supportsAllDrives=true&includeItemsFromAllDrives=true', [
+                'id' => $channelId,
+                'type' => 'web_hook',
+                'address' => $webhookAddress,
+            ]);
+
+        if (!$response->successful()) {
+            $webhook->update(['state' => 'error']);
+            throw new Exception("Falha ao registrar Webhook no Google Drive: " . $response->body());
+        }
+
+        // The initial 'sync' request might already hit the controller before this line executes,
+        // but we assume it'll be updated via the controller.
+        // Google returns `resourceId` in the response as well.
+        $data = $response->json();
+        $webhook->update([
+            'resource_id' => $data['resourceId'] ?? null,
+            'state' => 'active',
+            'expires_at' => isset($data['expiration']) ? \Carbon\Carbon::createFromTimestampMs($data['expiration']) : now()->addDays(7),
+        ]);
+        
+        \App\Domain\Integrations\Models\IntegrationLog::create([
+            'integration_id' => $integration->id,
+            'event' => 'webhook_registered',
+            'status' => 'success',
+            'message' => "Webhook de Push Notifications registrado com sucesso.",
+        ]);
+    }
+
+    public function stopWebhookChannel(Integration $integration, IntegrationWebhook $webhook): void
+    {
+        if (!$webhook->resource_id) {
+            $webhook->update(['state' => 'stopped']);
+            return;
+        }
+
+        try {
+            $token = $this->tokenService->getValidAccessToken($integration);
+            $response = \Illuminate\Support\Facades\Http::withToken($token)
+                ->post('https://www.googleapis.com/drive/v3/channels/stop', [
+                    'id' => $webhook->channel_id,
+                    'resourceId' => $webhook->resource_id,
+                ]);
+
+            if ($response->successful() || $response->status() === 404) {
+                $webhook->update(['state' => 'stopped']);
+            } else {
+                Log::warning("Failed to stop Google Drive webhook channel {$webhook->channel_id}: " . $response->body());
+            }
+        } catch (\Exception $e) {
+            Log::error("Error stopping webhook channel {$webhook->channel_id}: " . $e->getMessage());
         }
     }
 }

@@ -66,3 +66,8 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/gmail/messages/{messageId}/attachments/{attachmentId}', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'readAttachment']);
     Route::post('/gmail/messages/{messageId}/attachments/download-link', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'downloadLink']);
 });
+
+// Webhooks
+Route::prefix('webhooks')->group(function () {
+    Route::post('/google-workspace', [\App\Http\Controllers\Webhooks\GoogleWorkspaceWebhookController::class, 'handle'])->name('webhooks.google_workspace');
+});
