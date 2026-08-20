@@ -22,6 +22,68 @@ class AIResourcesService
         private \App\Domain\Permissions\Services\AuthorizationService $authorizationService
     ) {}
 
+    public function rename(Organization $organization, \App\Domain\Identity\Models\User $user, \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext, string $uuid, string $name): array
+    {
+        $resource = $this->findByUuid($organization, $uuid);
+        if (!$resource) {
+            throw new Exception("Resource not found.", 404);
+        }
+
+        $integration = $resource->integration;
+        if (!$integration || $integration->provider !== 'google_workspace') {
+            throw new Exception("Apenas recursos do Google Workspace podem ser renomeados atualmente.", 400);
+        }
+
+        if ($integration->status !== 'connected' || !$integration->is_enabled) {
+            throw new Exception("Integração do Google Workspace não está ativa ou configurada.", 403);
+        }
+
+        if (!$this->authorizationService->canAccessResource($user, $organization, $resource)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException("Você não possui permissão para acessar este recurso.");
+        }
+
+        $fileId = $resource->external_id;
+        if (empty($fileId)) {
+            throw new Exception("Resource lacks an external identifier.", 400);
+        }
+
+        $url = "https://www.googleapis.com/drive/v3/files/{$fileId}";
+        $payload = [
+            'name' => $name,
+        ];
+
+        $identity = $accessContext->getResolvedIdentity();
+
+        $response = $this->googleTokenService->executeWithRetry($integration, function ($token) use ($url, $payload) {
+            return Http::withToken($token)->patch($url, $payload);
+        }, $identity, ['https://www.googleapis.com/auth/drive']);
+
+        if (!$response->successful()) {
+            throw new Exception("Provider API Error: " . $response->body(), $response->status());
+        }
+
+        $resource->update([
+            'name' => $name,
+            'updated_by_provider_at' => now(),
+            'last_synced_at' => now(),
+        ]);
+
+        $this->logAuditAction->execute('ai_rename_resource', 'IntegrationResource', (string) $resource->id, [
+            'provider' => 'google_workspace',
+            'uuid' => $resource->uuid,
+            'user_id' => $user->id,
+            'old_name' => $resource->getOriginal('name'),
+            'new_name' => $name
+        ]);
+
+        return [
+            'resource_uuid' => $resource->uuid,
+            'name' => $resource->name,
+            'type' => $resource->is_folder ? 'folder' : ($resource->resource_type ?? 'document'),
+            'provider' => 'google_workspace',
+        ];
+    }
+
     public function createFolder(Organization $organization, \App\Domain\Identity\Models\User $user, \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext, string $name, ?string $parentResourceUuid = null): array
     {
         $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)

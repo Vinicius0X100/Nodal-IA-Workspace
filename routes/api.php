@@ -42,13 +42,14 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/groups/with-members', [\App\Domain\AI\Api\Controllers\AIGroupsController::class, 'withMembers']);
     Route::get('/groups/{uuid}/members', [\App\Domain\AI\Api\Controllers\AIGroupsController::class, 'members']);
     Route::post('/resources/folders', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'createFolder']);
+    Route::patch('/resources/{uuid}/rename', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'rename'])->whereUuid('uuid');
     Route::get('/resources/search', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'search']);
     Route::post('/resources/read-multiple', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'readMultiple']);
     Route::post('/resources/file', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'generateFileUrl']);
     Route::get('/resources/file/download/{temporary_uuid}', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'downloadTemporaryFile'])->withoutMiddleware('ai.gateway');
-    Route::get('/resources/{uuid}', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'show']);
-    Route::get('/resources/{uuid}/content', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'content']);
-    Route::get('/resources/{uuid}/file', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'file']);
+    Route::get('/resources/{uuid}', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'show'])->whereUuid('uuid');
+    Route::get('/resources/{uuid}/content', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'content'])->whereUuid('uuid');
+    Route::get('/resources/{uuid}/file', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'file'])->whereUuid('uuid');
     Route::get('/tools', [\App\Domain\AI\Api\Controllers\AIToolsController::class, 'index']);
 
     // Calendar (read-only v1 + write v1)
