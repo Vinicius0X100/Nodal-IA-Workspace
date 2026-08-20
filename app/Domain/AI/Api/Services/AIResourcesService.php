@@ -84,6 +84,125 @@ class AIResourcesService
         ];
     }
 
+    public function move(Organization $organization, \App\Domain\Identity\Models\User $user, \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext, string $uuid, string $destinationFolderUuid): array
+    {
+        $resource = $this->findByUuid($organization, $uuid);
+        if (!$resource) {
+            throw new Exception("Resource not found.", 404);
+        }
+
+        $destinationFolder = $this->findByUuid($organization, $destinationFolderUuid);
+        if (!$destinationFolder) {
+            throw new Exception("Destination folder not found.", 404);
+        }
+
+        if (!$destinationFolder->is_folder && $destinationFolder->mime_type !== 'application/vnd.google-apps.folder') {
+            throw new Exception("Destination is not a folder.", 422);
+        }
+
+        $integration = $resource->integration;
+        if (!$integration || $integration->provider !== 'google_workspace') {
+            throw new Exception("Apenas recursos do Google Workspace podem ser movidos atualmente.", 400);
+        }
+
+        if ($integration->status !== 'connected' || !$integration->is_enabled) {
+            throw new Exception("Integração do Google Workspace não está ativa ou configurada.", 403);
+        }
+
+        if (!$this->authorizationService->canAccessResource($user, $organization, $resource)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException("Você não possui permissão para acessar este recurso.");
+        }
+        
+        if (!$this->authorizationService->canAccessResource($user, $organization, $destinationFolder)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException("Você não possui permissão para acessar a pasta de destino.");
+        }
+
+        $fileId = $resource->external_id;
+        if (empty($fileId)) {
+            throw new Exception("Resource lacks an external identifier.", 400);
+        }
+
+        $destId = $destinationFolder->external_id;
+        if (empty($destId)) {
+            throw new Exception("Destination folder lacks an external identifier.", 400);
+        }
+
+        // Prevent moving folder into itself
+        if ($fileId === $destId) {
+            throw new Exception("Cannot move a folder into itself.", 422);
+        }
+
+        $identity = $accessContext->getResolvedIdentity();
+
+        // 1. Fetch current parents
+        $getUrl = "https://www.googleapis.com/drive/v3/files/{$fileId}?fields=parents";
+        $getResponse = $this->googleTokenService->executeWithRetry($integration, function ($token) use ($getUrl) {
+            return Http::withToken($token)->get($getUrl);
+        }, $identity, ['https://www.googleapis.com/auth/drive']);
+
+        if (!$getResponse->successful()) {
+            throw new Exception("Provider API Error when fetching parents: " . $getResponse->body(), $getResponse->status());
+        }
+
+        $currentParents = $getResponse->json('parents', []);
+        
+        $parentsToRemove = array_filter($currentParents, fn($p) => $p !== $destId);
+        
+        $queryParams = [];
+        if (!in_array($destId, $currentParents)) {
+            $queryParams['addParents'] = $destId;
+        }
+        if (!empty($parentsToRemove)) {
+            $queryParams['removeParents'] = implode(',', $parentsToRemove);
+        }
+
+        if (empty($queryParams)) {
+            // Already in destination and has no other parents
+            return [
+                'resource_uuid' => $resource->uuid,
+                'name' => $resource->name,
+                'type' => $resource->is_folder ? 'folder' : ($resource->resource_type ?? 'document'),
+                'provider' => 'google_workspace',
+                'destination_folder_resource_uuid' => $destinationFolder->uuid,
+            ];
+        }
+
+        $patchUrl = "https://www.googleapis.com/drive/v3/files/{$fileId}?" . http_build_query($queryParams);
+        
+        $patchResponse = $this->googleTokenService->executeWithRetry($integration, function ($token) use ($patchUrl) {
+            return Http::withToken($token)->patch($patchUrl, []);
+        }, $identity, ['https://www.googleapis.com/auth/drive']);
+
+        if (!$patchResponse->successful()) {
+            throw new Exception("Provider API Error: " . $patchResponse->body(), $patchResponse->status());
+        }
+
+        $oldParentExternalId = $resource->parent_external_id ?? (count($currentParents) > 0 ? $currentParents[0] : null);
+
+        $resource->update([
+            'parent_external_id' => $destId,
+            'updated_by_provider_at' => now(),
+            'last_synced_at' => now(),
+        ]);
+
+        $this->logAuditAction->execute('ai_move_resource', 'IntegrationResource', (string) $resource->id, [
+            'provider' => 'google_workspace',
+            'uuid' => $resource->uuid,
+            'user_id' => $user->id,
+            'destination_folder_resource_uuid' => $destinationFolder->uuid,
+            'old_parent_external_id' => $oldParentExternalId,
+            'new_parent_external_id' => $destId
+        ]);
+
+        return [
+            'resource_uuid' => $resource->uuid,
+            'name' => $resource->name,
+            'type' => $resource->is_folder ? 'folder' : ($resource->resource_type ?? 'document'),
+            'provider' => 'google_workspace',
+            'destination_folder_resource_uuid' => $destinationFolder->uuid,
+        ];
+    }
+
     public function createFolder(Organization $organization, \App\Domain\Identity\Models\User $user, \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext, string $name, ?string $parentResourceUuid = null): array
     {
         $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)

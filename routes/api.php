@@ -43,6 +43,7 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/groups/{uuid}/members', [\App\Domain\AI\Api\Controllers\AIGroupsController::class, 'members']);
     Route::post('/resources/folders', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'createFolder']);
     Route::patch('/resources/{uuid}/rename', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'rename'])->whereUuid('uuid');
+    Route::patch('/resources/{uuid}/move', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'move'])->whereUuid('uuid');
     Route::get('/resources/search', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'search']);
     Route::post('/resources/read-multiple', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'readMultiple']);
     Route::post('/resources/file', [\App\Domain\AI\Api\Controllers\AIResourcesController::class, 'generateFileUrl']);

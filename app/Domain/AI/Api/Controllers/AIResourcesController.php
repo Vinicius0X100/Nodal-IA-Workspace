@@ -8,6 +8,7 @@ use App\Domain\Resources\Models\TemporaryResourceDownload;
 use App\Http\Requests\AI\ReadMultipleResourcesRequest;
 use App\Http\Requests\AI\ReadResourceFileRequest;
 use App\Http\Requests\AI\CreateFolderRequest;
+use App\Http\Requests\AI\MoveResourceRequest;
 use App\Http\Requests\AI\RenameResourceRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -49,6 +50,39 @@ class AIResourcesController
             ]);
         } catch (\Exception $e) {
             return $this->handleException($e, 'Error renaming resource');
+        }
+    }
+
+    public function move(MoveResourceRequest $request, string $uuid): JsonResponse
+    {
+        try {
+            $organization = $request->get('_active_organization');
+            $user = $request->get('_active_user');
+
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace')
+                ->where('status', 'connected')
+                ->where('is_enabled', true)
+                ->first();
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'resources.write',
+                $integration,
+                $integration ? $integration->provider : 'google_workspace'
+            );
+
+            $destinationFolderUuid = $request->input('destination_folder_resource_uuid');
+
+            $data = $this->service->move($organization, $user, $accessContext, $uuid, $destinationFolderUuid);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            return $this->handleException($e, 'Error moving resource');
         }
     }
 
