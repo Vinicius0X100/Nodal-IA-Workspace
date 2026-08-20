@@ -21,6 +21,94 @@ class AIResourcesService
         private GoogleTokenService $googleTokenService,
         private \App\Domain\Permissions\Services\AuthorizationService $authorizationService
     ) {}
+
+    public function createFolder(Organization $organization, \App\Domain\Identity\Models\User $user, \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext, string $name, ?string $parentResourceUuid = null): array
+    {
+        $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+            ->where('provider', 'google_workspace')
+            ->where('status', 'connected')
+            ->where('is_enabled', true)
+            ->first();
+
+        if (!$integration) {
+            throw new Exception("Integração do Google Workspace não está ativa ou configurada.", 403);
+        }
+
+        $parentResource = null;
+        if ($parentResourceUuid) {
+            $parentResource = $this->findByUuid($organization, $parentResourceUuid);
+            
+            if (!$parentResource) {
+                throw new Exception("Pasta pai não encontrada.", 404);
+            }
+
+            if (!$this->authorizationService->canAccessResource($user, $organization, $parentResource)) {
+                throw new \Illuminate\Auth\Access\AuthorizationException("Você não possui permissão para acessar a pasta pai.");
+            }
+
+            if ($parentResource->mime_type !== 'application/vnd.google-apps.folder') {
+                throw new Exception("O recurso pai especificado não é uma pasta.", 422);
+            }
+        }
+
+        $url = "https://www.googleapis.com/drive/v3/files";
+        $payload = [
+            'name' => $name,
+            'mimeType' => 'application/vnd.google-apps.folder',
+        ];
+
+        if ($parentResource && $parentResource->external_id) {
+            $payload['parents'] = [$parentResource->external_id];
+        }
+
+        $identity = $accessContext->getResolvedIdentity();
+
+        $response = $this->googleTokenService->executeWithRetry($integration, function ($token) use ($url, $payload) {
+            return Http::withToken($token)->post($url, $payload);
+        }, $identity, ['https://www.googleapis.com/auth/drive']);
+
+        if (!$response->successful()) {
+            throw new Exception("Provider API Error: " . $response->body(), $response->status());
+        }
+
+        $googleData = $response->json();
+        $googleFileId = $googleData['id'] ?? null;
+
+        if (!$googleFileId) {
+            throw new Exception("A API do Google não retornou o ID do arquivo.", 500);
+        }
+
+        $resource = IntegrationResource::create([
+            'integration_id' => $integration->id,
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'provider' => 'google_workspace',
+            'resource_type' => 'folder',
+            'external_id' => $googleFileId,
+            'parent_external_id' => $parentResource ? $parentResource->external_id : null,
+            'name' => $name,
+            'mime_type' => 'application/vnd.google-apps.folder',
+            'is_folder' => true,
+            'created_by_provider_at' => now(),
+            'updated_by_provider_at' => now(),
+            'last_synced_at' => now(),
+        ]);
+
+        $this->logAuditAction->execute('ai_create_resource_folder', 'IntegrationResource', (string) $resource->id, [
+            'provider' => 'google_workspace',
+            'uuid' => $resource->uuid,
+            'user_id' => $user->id,
+            'parent_uuid' => $parentResourceUuid
+        ]);
+
+        return [
+            'resource_uuid' => $resource->uuid,
+            'name' => $resource->name,
+            'type' => 'folder',
+            'provider' => 'google_workspace',
+            'parent_resource_uuid' => $parentResourceUuid,
+        ];
+    }
+
     /**
      * Search resources for the given organization.
      */

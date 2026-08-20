@@ -7,6 +7,7 @@ use App\Domain\AI\Api\Services\AIResourcesService;
 use App\Domain\Resources\Models\TemporaryResourceDownload;
 use App\Http\Requests\AI\ReadMultipleResourcesRequest;
 use App\Http\Requests\AI\ReadResourceFileRequest;
+use App\Http\Requests\AI\CreateFolderRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -16,6 +17,40 @@ class AIResourcesController
         private AIResourcesService $service,
         private \App\Domain\Permissions\Services\AuthorizationService $authorizationService
     ) {}
+
+    public function createFolder(CreateFolderRequest $request): JsonResponse
+    {
+        try {
+            $organization = $request->get('_active_organization');
+            $user = $request->get('_active_user');
+
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace')
+                ->where('status', 'connected')
+                ->where('is_enabled', true)
+                ->first();
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'resources.write',
+                $integration,
+                $integration ? $integration->provider : 'google_workspace'
+            );
+
+            $name = $request->input('name');
+            $parentResourceUuid = $request->input('parent_resource_uuid');
+
+            $data = $this->service->createFolder($organization, $user, $accessContext, $name, $parentResourceUuid);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ], 201);
+        } catch (\Exception $e) {
+            return $this->handleException($e, 'Error creating folder');
+        }
+    }
 
     public function search(Request $request): JsonResponse
     {
