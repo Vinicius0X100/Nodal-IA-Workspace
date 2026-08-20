@@ -337,15 +337,45 @@ export default function Welcome() {
             </section>
 
             {/* ════════════════════════ FINALIDADE DO APLICATIVO ════════════════════════════ */}
-            <section style={{ padding: '80px 24px', background: 'white', textAlign: 'center' }}>
-                <div style={{ maxWidth: 840, margin: '0 auto', background: 'linear-gradient(180deg, #f9f9fb 0%, #f0f0f5 100%)', borderRadius: 24, padding: '48px 32px', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 12px 40px rgba(0,0,0,0.03)' }}>
-                    <SectionLabel>Sobre o Aplicativo</SectionLabel>
-                    <h2 style={{ fontSize: 'clamp(24px, 4vw, 32px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.2, marginBottom: 20, color: '#1d1d1f' }}>
-                        Qual é a finalidade do Nodal?
+            <section style={{ padding: '120px 24px', background: '#fafafa', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: '-150px', left: '50%', transform: 'translateX(-50%)', width: 800, height: 400, background: 'radial-gradient(ellipse at bottom, rgba(0,102,255,0.08), transparent 70%)', pointerEvents: 'none' }} />
+                
+                <div style={{ maxWidth: 960, margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 1 }}>
+                    <SectionLabel>O Propósito do Nodal</SectionLabel>
+                    
+                    <h2 style={{ fontSize: 'clamp(36px, 5vw, 56px)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.08, marginBottom: 28, color: '#1d1d1f' }}>
+                        A IA que gerencia a sua empresa<br />
+                        <span className="text-gradient">para você focar no que importa.</span>
                     </h2>
-                    <p style={{ fontSize: 16, color: '#6e6e73', lineHeight: 1.7, maxWidth: 700, margin: '0 auto' }}>
-                        A principal finalidade do <strong>Nodal</strong> é atuar como uma plataforma centralizada de governança, integrações e Inteligência Artificial para o ambiente corporativo. O Nodal permite que as organizações conectem ferramentas como o <strong>Google Workspace</strong> para sincronizar com segurança seus usuários, grupos, arquivos e permissões. O aplicativo auxilia as empresas na auditoria de acessos, facilita a gestão do conhecimento através de uma busca inteligente em nuvem e agiliza os processos internos sem substituir as ferramentas originais.
+                    
+                    <p style={{ fontSize: 19, color: '#6e6e73', lineHeight: 1.6, maxWidth: 840, margin: '0 auto 60px', fontWeight: 400, letterSpacing: '-0.01em' }}>
+                        A finalidade do <strong>Nodal</strong> é ser o seu cérebro corporativo central. Ele se conecta e gerencia todos os recursos da sua organização — como arquivos, dados e acessos — fazendo com que a Inteligência Artificial trabalhe ativamente por você no dia a dia.
                     </p>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 40, textAlign: 'left' }}>
+                        <div>
+                            <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #0048AA, #0066FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                                <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </div>
+                            <h4 style={{ fontSize: 20, fontWeight: 700, color: '#1d1d1f', marginBottom: 14, letterSpacing: '-0.02em' }}>Gestão Inteligente</h4>
+                            <p style={{ fontSize: 15, color: '#6e6e73', lineHeight: 1.65 }}>
+                                O aplicativo automatiza o fluxo de informações e organiza recursos digitais (como do Google Workspace). A IA encontra documentos, responde dúvidas e ajuda a gerenciar a operação no lugar da sua equipe.
+                            </p>
+                        </div>
+                        <div>
+                            <div style={{ width: 44, height: 44, borderRadius: 14, background: '#1d1d1f', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                                <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                            </div>
+                            <h4 style={{ fontSize: 20, fontWeight: 700, color: '#1d1d1f', marginBottom: 14, letterSpacing: '-0.02em' }}>Protocolos e Nivelamento Seguro</h4>
+                            <p style={{ fontSize: 15, color: '#6e6e73', lineHeight: 1.65 }}>
+                                Seguindo protocolos de segurança rigorosos, o Nodal garante um nivelamento de acesso perfeito. A IA respeita as permissões para que <strong>cada usuário na corporação acesse apenas aquilo que lhe diz respeito.</strong>
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
