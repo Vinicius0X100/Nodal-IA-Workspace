@@ -8,20 +8,31 @@ use App\Domain\Resources\Services\ResourceSyncService;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class SyncProviderResourcesJob implements ShouldQueue
+class SyncProviderResourcesJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 3600; // 1 hour max
+    public $uniqueFor = 3600; // Tempo máximo que o job fica bloqueado caso falhe e não libere a trava
 
     public function __construct(
         public Integration $integration,
         public ?string $userId = null // Who triggered the sync
     ) {
+    }
+
+    /**
+     * O ID único do Job é o ID da integração.
+     * Isso garante que apenas um sync rode por vez por cliente.
+     */
+    public function uniqueId(): string
+    {
+        return (string) $this->integration->id;
     }
 
     public function handle(

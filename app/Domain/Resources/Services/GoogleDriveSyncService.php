@@ -32,7 +32,7 @@ class GoogleDriveSyncService
         do {
             $response = \Illuminate\Support\Facades\Http::withToken($integration->access_token)
                 ->get('https://www.googleapis.com/drive/v3/files', [
-                    'pageSize' => 100,
+                    'pageSize' => 1000, // Otimizado de 100 para 1000 (limite do Google) para evitar milhares de requests
                     'fields' => $fields,
                     'pageToken' => $pageToken,
                     'supportsAllDrives' => 'true', // Importante para Shared Drives
@@ -52,7 +52,7 @@ class GoogleDriveSyncService
                         // Tenta de novo a mesma requisição
                         $response = \Illuminate\Support\Facades\Http::withToken($integration->access_token)
                             ->get('https://www.googleapis.com/drive/v3/files', [
-                                'pageSize' => 100,
+                                'pageSize' => 1000,
                                 'fields' => $fields,
                                 'pageToken' => $pageToken,
                                 'supportsAllDrives' => 'true',
@@ -111,6 +111,10 @@ class GoogleDriveSyncService
             if (!empty($resourcesToUpsert)) {
                 $this->resourceRepository->upsertResources($resourcesToUpsert);
             }
+
+            // Liberar memória no loop para não derrubar o servidor em contas grandes
+            unset($resourcesToUpsert, $files, $data);
+            gc_collect_cycles();
 
         } while ($pageToken);
         
