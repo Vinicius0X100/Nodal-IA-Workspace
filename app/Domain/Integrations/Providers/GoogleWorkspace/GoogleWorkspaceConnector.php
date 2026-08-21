@@ -7,6 +7,7 @@ use App\Domain\Integrations\Services\GoogleOAuthService;
 use App\Domain\Integrations\Services\GoogleTokenService;
 use App\Domain\Integrations\Models\Integration;
 use App\Domain\Integrations\Models\IntegrationWebhook;
+use App\Domain\Organizations\Models\Organization;
 use Illuminate\Support\Str;
 use Exception;
 use Illuminate\Support\Facades\Log;
