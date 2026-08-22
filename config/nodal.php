@@ -16,6 +16,13 @@ return [
     |
     | Para alterar, mude aqui. Nunca coloque número mágico no Service/Request.
     */
-    'max_upload_size_mb' => env('NODAL_MAX_UPLOAD_SIZE_MB', 50),
+    /*
+    |--------------------------------------------------------------------------
+    | Chat Settings
+    |--------------------------------------------------------------------------
+    | Quantidade máxima de anexos suportados em uma única mensagem de chat.
+    |
+    */
+    'max_chat_attachments' => env('NODAL_MAX_CHAT_ATTACHMENTS', 5),
 
 ];

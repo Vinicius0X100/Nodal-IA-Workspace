@@ -722,29 +722,41 @@ function MessageInput({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
     const [attachPopupOpen, setAttachPopupOpen] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
-    const [uploadedFile, setUploadedFile] = useState<{ name: string } | null>(null);
+    const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
     const handleSubmit = () => {
-        if (!value.trim() || isProcessing) return;
+        if (!value.trim() && !uploadedFile || isProcessing) return;
 
         const submitValue = value;
         onChange('');
+        
+        // Mantemos o optimistic view apenas para texto por enquanto (simples)
+        if (submitValue.trim()) {
+            onOptimisticSubmit(submitValue);
+        }
+        
         onBeforeSend();
-        onOptimisticSubmit(submitValue);
+        
+        // Criamos os dados
+        const routeData = {
+            content: submitValue, // Para conversas existentes
+            message: submitValue, // Para novas conversas
+            ...(uploadedFile ? { attachments: [uploadedFile] } : {})
+        };
+
+        const postOptions = {
+            preserveScroll: !!conversationUuid,
+            onSuccess: () => {
+                setUploadedFile(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            },
+            forceFormData: !!uploadedFile, // Forçar multipart se houver arquivo
+        };
 
         if (!conversationUuid) {
-            router.post(
-                route('assistant.store'),
-                { message: submitValue },
-                { preserveScroll: false }
-            );
+            router.post(route('assistant.store'), routeData, postOptions);
         } else {
-            router.post(
-                route('assistant.messages.store', conversationUuid),
-                { content: submitValue },
-                { preserveScroll: true }
-            );
+            router.post(route('assistant.messages.store', conversationUuid), routeData, postOptions);
         }
     };
 
@@ -779,41 +791,10 @@ function MessageInput({
         const file = e.target.files?.[0];
         if (!file) return;
         setAttachPopupOpen(false);
-        setIsUploading(true);
-        setUploadedFile(null);
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        fetch('/api/ai/resources/upload', {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
-            },
-            body: formData,
-        })
-            .then(async (res) => {
-                if (!res.ok) {
-                    const data = await res.json().catch(() => ({}));
-                    throw new Error(data.message ?? 'Falha ao enviar o arquivo.');
-                }
-                return res.json();
-            })
-            .then((data) => {
-                setUploadedFile({ name: file.name });
-                // Adiciona menção ao arquivo na mensagem
-                onChange((value ? value + '\n' : '') + `📎 Arquivo anexado: ${file.name}`);
-            })
-            .catch((err) => {
-                alert('Erro ao anexar arquivo: ' + err.message);
-            })
-            .finally(() => {
-                setIsUploading(false);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-            });
+        setUploadedFile(file);
     };
 
-    const hasValue = value.trim().length > 0;
+    const hasValue = value.trim().length > 0 || !!uploadedFile;
 
     return (
         <div className="px-4 pb-8 pt-4 w-full max-w-3xl mx-auto flex-shrink-0 relative bg-white">
@@ -833,32 +814,38 @@ function MessageInput({
 
                 <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between">
                     <div className="flex items-center gap-2" ref={popupRef}>
-                        {/* Popup de ações de anexar */}
+                        {/* Popup de ações de anexar — abre para cima com animação */}
                         {attachPopupOpen && (
                             <div
-                                className="absolute bottom-12 left-0 z-50"
+                                className="absolute bottom-14 left-0 z-50"
                                 style={{
-                                    filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.13))',
+                                    animation: 'popupSlideUp 0.18s cubic-bezier(0.22, 1, 0.36, 1) both',
                                 }}
                             >
-                                <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden min-w-[220px]">
+                                <style>{`
+                                    @keyframes popupSlideUp {
+                                        from { opacity: 0; transform: translateY(10px) scale(0.96); }
+                                        to   { opacity: 1; transform: translateY(0) scale(1); }
+                                    }
+                                `}</style>
+                                <div className="bg-white border border-neutral-200/80 rounded-2xl overflow-hidden min-w-[230px] shadow-xl shadow-neutral-900/10">
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-neutral-50 transition-colors text-left"
+                                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-blue-50/60 active:bg-blue-100/60 transition-colors text-left cursor-pointer group"
                                     >
-                                        <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-                                            <Paperclip className="w-4 h-4 text-[#0048AA]" />
+                                        <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0 shadow-sm shadow-blue-500/30 group-hover:shadow-blue-500/50 group-hover:scale-105 transition-all">
+                                            <Paperclip className="w-4 h-4 text-white" />
                                         </span>
                                         <div>
-                                            <div className="text-sm font-semibold text-neutral-800">Adicionar foto/arquivo</div>
-                                            <div className="text-xs text-neutral-400">PDF, imagem, doc, planilha...</div>
+                                            <div className="text-sm font-semibold text-neutral-800 group-hover:text-[#0048AA] transition-colors">Adicionar foto/arquivo</div>
+                                            <div className="text-xs text-neutral-400 mt-0.5">PDF, imagem, doc, planilha...</div>
                                         </div>
                                     </button>
                                 </div>
-                                {/* Seta indicando origem */}
-                                <div className="flex justify-start pl-4">
-                                    <div className="w-3 h-3 bg-white border-r border-b border-neutral-200 rotate-45 -mt-1.5 ml-2" />
+                                {/* Seta apontando para o botão abaixo */}
+                                <div className="flex justify-start pl-5">
+                                    <div className="w-3 h-3 bg-white border-r border-b border-neutral-200/80 rotate-45 -mt-[7px]" />
                                 </div>
                             </div>
                         )}
@@ -872,25 +859,20 @@ function MessageInput({
                             accept="application/pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv,application/zip,application/x-zip-compressed"
                         />
 
-                        {/* Botão de + para abrir popup */}
+                        {/* Botão de + — visual bonito, activo quando popup aberto */}
                         <button
                             type="button"
                             onClick={() => setAttachPopupOpen((prev) => !prev)}
-                            disabled={isProcessing || isUploading}
-                            className={`p-2 rounded-xl transition-colors ${
-                                attachPopupOpen
-                                    ? 'bg-blue-50 text-[#0048AA]'
-                                    : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600'
-                            } ${
-                                isUploading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-                            }`}
+                            disabled={isProcessing}
                             title="Anexar arquivo"
+                            className={`relative flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200 cursor-pointer
+                                ${attachPopupOpen
+                                    ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-md shadow-blue-500/30 scale-105'
+                                    : 'bg-neutral-100 text-neutral-500 hover:bg-gradient-to-br hover:from-blue-500 hover:to-blue-700 hover:text-white hover:shadow-md hover:shadow-blue-500/25 hover:scale-105'
+                                }
+                            `}
                         >
-                            {isUploading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                                <Plus className="w-5 h-5" />
-                            )}
+                            <Plus className={`w-4 h-4 transition-transform duration-200 ${attachPopupOpen ? 'rotate-45' : ''}`} />
                         </button>
 
                         {/* Badge do arquivo anexado */}
@@ -900,8 +882,11 @@ function MessageInput({
                                 <span className="max-w-[120px] truncate">{uploadedFile.name}</span>
                                 <button
                                     type="button"
-                                    onClick={() => setUploadedFile(null)}
-                                    className="text-blue-400 hover:text-blue-700 ml-0.5"
+                                    onClick={() => {
+                                        setUploadedFile(null);
+                                        if (fileInputRef.current) fileInputRef.current.value = '';
+                                    }}
+                                    className="text-blue-400 hover:text-blue-700 ml-0.5 cursor-pointer"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>

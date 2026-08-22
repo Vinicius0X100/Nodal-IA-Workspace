@@ -21,18 +21,27 @@ class MessageController extends Controller
      */
     public function store(Request $request, string $uuid): RedirectResponse
     {
+        $maxFiles = config('nodal.max_chat_attachments', 5);
+        $maxSizeKilobytes = (int) config('nodal.max_upload_size_mb', 50) * 1024;
+
         $request->validate([
-            'content' => 'required|string|max:32000',
+            'content' => 'nullable|string|max:32000',
+            'attachments' => ['nullable', 'array', 'max:' . $maxFiles],
+            'attachments.*' => ['file', 'max:' . $maxSizeKilobytes],
         ]);
 
         $organizationId = session('active_organization_id');
 
         $conversation = $this->conversationService->findOrFail($organizationId, $uuid);
 
-        // Salva a mensagem do usuário
+        // Salva a mensagem do usuário com possíveis anexos
+        $attachments = $request->file('attachments', []);
+        $content = $request->input('content', '');
+        
         $userMessage = $this->messageService->addUserMessage(
             $conversation,
-            $request->input('content')
+            $content,
+            $attachments
         );
 
         // Disparar AI Gateway

@@ -46,6 +46,14 @@ return [
             'report' => false,
         ],
 
+        'chat-attachments' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/chat-attachments'),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

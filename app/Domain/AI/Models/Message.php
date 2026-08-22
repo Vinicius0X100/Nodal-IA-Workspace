@@ -23,6 +23,11 @@ class Message extends Model
         return $this->belongsTo(Conversation::class);
     }
 
+    public function attachments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(MessageAttachment::class);
+    }
+
     public function isFromUser(): bool
     {
         return $this->role === MessageRole::USER;

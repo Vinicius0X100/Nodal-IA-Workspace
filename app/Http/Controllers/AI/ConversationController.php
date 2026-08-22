@@ -42,14 +42,24 @@ class ConversationController extends Controller
         $organizationId = session('active_organization_id');
         $userId = $request->user()->id;
 
+        $maxFiles = config('nodal.max_chat_attachments', 5);
+        $maxSizeKilobytes = (int) config('nodal.max_upload_size_mb', 50) * 1024;
+
+        $request->validate([
+            'message' => 'nullable|string|max:32000',
+            'attachments' => ['nullable', 'array', 'max:' . $maxFiles],
+            'attachments.*' => ['file', 'max:' . $maxSizeKilobytes],
+        ]);
+
         // Generate title if initial message is provided
         $initialMessage = $request->input('message');
         $title = $initialMessage ? (mb_strlen($initialMessage) > 30 ? mb_substr($initialMessage, 0, 30) . '...' : $initialMessage) : 'Nova Conversa';
 
         $conversation = $this->conversationService->create($organizationId, $userId, $title);
 
-        if ($initialMessage) {
-            $userMessage = $this->messageService->addUserMessage($conversation, $initialMessage);
+        if ($initialMessage || $request->hasFile('attachments')) {
+            $attachments = $request->file('attachments', []);
+            $userMessage = $this->messageService->addUserMessage($conversation, $initialMessage ?? '', $attachments);
             
             // Disparar AI Gateway
             if ($this->aiProvider->isAvailable()) {

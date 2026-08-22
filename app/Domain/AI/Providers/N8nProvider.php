@@ -33,10 +33,16 @@ class N8nProvider implements AIProviderInterface
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($msg) {
-                return [
+                $item = [
                     'role' => $msg->role->value,
                     'content' => $msg->content,
                 ];
+
+                if (!empty($msg->metadata_json['attachments'])) {
+                    $item['attachments'] = $msg->metadata_json['attachments'];
+                }
+
+                return $item;
             })
             ->toArray();
 
