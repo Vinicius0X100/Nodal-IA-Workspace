@@ -49,7 +49,6 @@ class MessageService
                         $savedPaths[] = $storagePath;
 
                         $attachmentModel = $message->attachments()->create([
-                            'uuid' => (string) Str::uuid(),
                             'organization_id' => $conversation->organization_id,
                             'conversation_id' => $conversation->id,
                             'user_id' => $conversation->user_id,
@@ -60,6 +59,9 @@ class MessageService
                             'status' => 'staged',
                             'expires_at' => now()->addDays(7),
                         ]);
+                        
+                        // Garante que capturamos o estado exato gerado no banco (por ex. via HasSecondaryUuid)
+                        $attachmentModel->refresh();
 
                         $metadataAttachments[] = [
                             'attachment_uuid' => $attachmentModel->uuid,

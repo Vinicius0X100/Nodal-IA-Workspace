@@ -38,7 +38,19 @@ class N8nProvider implements AIProviderInterface
                     'content' => $msg->content,
                 ];
 
-                if (!empty($msg->metadata_json['attachments'])) {
+                // Recarrega a relação de attachments para garantir dados frescos do banco
+                $msg->load('attachments');
+
+                if ($msg->attachments && $msg->attachments->isNotEmpty()) {
+                    $item['attachments'] = $msg->attachments->map(function ($att) {
+                        return [
+                            'attachment_uuid' => $att->uuid,
+                            'name' => $att->original_name,
+                            'mime_type' => $att->mime_type,
+                            'size' => $att->size,
+                        ];
+                    })->toArray();
+                } elseif (!empty($msg->metadata_json['attachments'])) {
                     $item['attachments'] = $msg->metadata_json['attachments'];
                 }
 
