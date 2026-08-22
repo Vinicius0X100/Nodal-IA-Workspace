@@ -36,6 +36,7 @@ interface Message {
     uuid: string;
     role: 'user' | 'assistant' | 'system' | 'tool';
     content: string;
+    attachments?: { name: string; mime_type?: string; size?: number }[];
     created_at: string;
 }
 
@@ -117,8 +118,27 @@ function MessageBubble({ message }: { message: Message }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className="flex justify-end px-4 py-3 w-full max-w-3xl mx-auto"
             >
-                <div className="max-w-[75%] bg-gradient-to-tr from-[#0048AA] to-blue-500 text-white px-6 py-4 rounded-3xl rounded-br-md text-[15px] leading-relaxed shadow-md font-medium">
-                    {message.content}
+                <div className="max-w-[75%] flex flex-col items-end gap-2">
+                    {message.attachments && message.attachments.length > 0 && (
+                        <div className="flex flex-col gap-2 w-full items-end">
+                            {message.attachments.map((file, i) => (
+                                <div key={i} className="flex items-center gap-3 px-4 py-3 bg-neutral-50/10 border border-neutral-200/50 rounded-2xl max-w-[280px] shadow-sm">
+                                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-blue-600 shrink-0 shadow-sm border border-neutral-100">
+                                        <Paperclip className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex flex-col overflow-hidden min-w-0">
+                                        <span className="text-[14px] font-semibold text-neutral-800 truncate">{file.name}</span>
+                                        <span className="text-xs text-neutral-500 truncate uppercase">{file.name.split('.').pop()}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {message.content && (
+                        <div className="bg-gradient-to-tr from-[#0048AA] to-blue-500 text-white px-6 py-4 rounded-3xl rounded-br-md text-[15px] leading-relaxed shadow-md font-medium inline-block">
+                            {message.content}
+                        </div>
+                    )}
                 </div>
             </motion.div>
         );
@@ -715,7 +735,7 @@ function MessageInput({
     value: string;
     onChange: (v: string) => void;
     isProcessing: boolean;
-    onOptimisticSubmit: (val: string) => void;
+    onOptimisticSubmit: (val: string, file?: File | null) => void;
     onBeforeSend: () => void;
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -730,9 +750,9 @@ function MessageInput({
         const submitValue = value;
         onChange('');
         
-        // Mantemos o optimistic view apenas para texto por enquanto (simples)
-        if (submitValue.trim()) {
-            onOptimisticSubmit(submitValue);
+        // Mantemos o optimistic view
+        if (submitValue.trim() || uploadedFile) {
+            onOptimisticSubmit(submitValue, uploadedFile);
         }
         
         onBeforeSend();
@@ -798,6 +818,28 @@ function MessageInput({
 
     return (
         <div className="px-4 pb-8 pt-4 w-full max-w-3xl mx-auto flex-shrink-0 relative bg-white">
+            {/* Badge do arquivo anexado - Movido para cima do chat */}
+            {uploadedFile && (
+                <div className="mb-3 px-2 flex items-center">
+                    <div className="flex items-center gap-2.5 px-4 py-2 bg-neutral-50 border border-neutral-200/80 rounded-2xl shadow-sm text-sm text-neutral-700 font-medium animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                            <Paperclip className="w-4 h-4" />
+                        </div>
+                        <span className="max-w-[200px] truncate">{uploadedFile.name}</span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setUploadedFile(null);
+                                if (fileInputRef.current) fileInputRef.current.value = '';
+                            }}
+                            className="w-6 h-6 rounded-full hover:bg-neutral-200 flex items-center justify-center text-neutral-400 hover:text-neutral-700 transition-colors ml-1 cursor-pointer"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className={`relative bg-neutral-50/50 border rounded-3xl transition-all duration-300 shadow-sm overflow-visible ${
                 !hasValue && !conversationUuid ? 'border-neutral-200 opacity-90' : 'border-neutral-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:bg-white'
             }`}>
@@ -875,23 +917,6 @@ function MessageInput({
                             <Plus className={`w-4 h-4 transition-transform duration-200 ${attachPopupOpen ? 'rotate-45' : ''}`} />
                         </button>
 
-                        {/* Badge do arquivo anexado */}
-                        {uploadedFile && (
-                            <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100">
-                                <Paperclip className="w-3 h-3" />
-                                <span className="max-w-[120px] truncate">{uploadedFile.name}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setUploadedFile(null);
-                                        if (fileInputRef.current) fileInputRef.current.value = '';
-                                    }}
-                                    className="text-blue-400 hover:text-blue-700 ml-0.5 cursor-pointer"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </span>
-                        )}
                     </div>
 
                     <button
@@ -1007,12 +1032,13 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, optimisticMessages, isProcessing]);
 
-    const handleOptimisticSubmit = (val: string) => {
+    const handleOptimisticSubmit = (val: string, file?: File | null) => {
         setOptimisticMessages(prev => [...prev, {
             id: Date.now(),
             uuid: 'opt-' + Date.now(),
             role: 'user',
             content: val,
+            attachments: file ? [{ name: file.name, mime_type: file.type, size: file.size }] : undefined,
             created_at: new Date().toISOString()
         }]);
         setTimeout(() => {
@@ -1122,7 +1148,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                             value={inputValue}
                             onChange={setInputValue}
                             isProcessing={isProcessing}
-                            onOptimisticSubmit={handleOptimisticSubmit}
+                            onOptimisticSubmit={(val, file) => handleOptimisticSubmit(val, file)}
                             onBeforeSend={() => { isSendingRef.current = true; }}
                         />
                     )}

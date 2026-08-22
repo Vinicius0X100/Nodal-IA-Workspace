@@ -92,6 +92,7 @@ class ConversationController extends Controller
                 'uuid' => $m->uuid,
                 'role' => $m->role->value,
                 'content' => $m->content,
+                'attachments' => $m->metadata_json['attachments'] ?? [],
                 'created_at' => $m->created_at->toIso8601String(),
             ]);
 
