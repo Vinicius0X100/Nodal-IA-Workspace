@@ -8,7 +8,8 @@ import {
     Send, Paperclip, Mic, MessageSquare, ArrowLeft,
     FileText, FileSpreadsheet, BarChart3, Search as SearchIcon,
     FileSearch, PresentationIcon, X, Check, Loader2,
-    Sparkles, Menu, Edit, MoreHorizontal, Pin, PinOff, Edit2, Trash, AlertTriangle
+    Sparkles, Menu, Edit, MoreHorizontal, Pin, PinOff, Edit2, Trash, AlertTriangle,
+    ImagePlus
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import {
@@ -718,6 +719,11 @@ function MessageInput({
     onBeforeSend: () => void;
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
+    const [attachPopupOpen, setAttachPopupOpen] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadedFile, setUploadedFile] = useState<{ name: string } | null>(null);
 
     const handleSubmit = () => {
         if (!value.trim() || isProcessing) return;
@@ -749,6 +755,19 @@ function MessageInput({
         }
     };
 
+    // Fechar popup ao clicar fora
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+                setAttachPopupOpen(false);
+            }
+        };
+        if (attachPopupOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [attachPopupOpen]);
+
     useEffect(() => {
         const ta = textareaRef.current;
         if (!ta) return;
@@ -756,11 +775,49 @@ function MessageInput({
         ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
     }, [value]);
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setAttachPopupOpen(false);
+        setIsUploading(true);
+        setUploadedFile(null);
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch('/api/ai/resources/upload', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+            },
+            body: formData,
+        })
+            .then(async (res) => {
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.message ?? 'Falha ao enviar o arquivo.');
+                }
+                return res.json();
+            })
+            .then((data) => {
+                setUploadedFile({ name: file.name });
+                // Adiciona menção ao arquivo na mensagem
+                onChange((value ? value + '\n' : '') + `📎 Arquivo anexado: ${file.name}`);
+            })
+            .catch((err) => {
+                alert('Erro ao anexar arquivo: ' + err.message);
+            })
+            .finally(() => {
+                setIsUploading(false);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            });
+    };
+
     const hasValue = value.trim().length > 0;
 
     return (
         <div className="px-4 pb-8 pt-4 w-full max-w-3xl mx-auto flex-shrink-0 relative bg-white">
-            <div className={`relative bg-neutral-50/50 border rounded-3xl transition-all duration-300 shadow-sm overflow-hidden ${
+            <div className={`relative bg-neutral-50/50 border rounded-3xl transition-all duration-300 shadow-sm overflow-visible ${
                 !hasValue && !conversationUuid ? 'border-neutral-200 opacity-90' : 'border-neutral-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:bg-white'
             }`}>
                 <textarea
@@ -775,13 +832,81 @@ function MessageInput({
                 />
 
                 <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <button disabled className="p-2 rounded-xl text-neutral-400 cursor-not-allowed hover:bg-neutral-100 transition-colors">
-                            <Paperclip className="w-5 h-5" />
+                    <div className="flex items-center gap-2" ref={popupRef}>
+                        {/* Popup de ações de anexar */}
+                        {attachPopupOpen && (
+                            <div
+                                className="absolute bottom-12 left-0 z-50"
+                                style={{
+                                    filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.13))',
+                                }}
+                            >
+                                <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden min-w-[220px]">
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-neutral-50 transition-colors text-left"
+                                    >
+                                        <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                                            <Paperclip className="w-4 h-4 text-[#0048AA]" />
+                                        </span>
+                                        <div>
+                                            <div className="text-sm font-semibold text-neutral-800">Adicionar foto/arquivo</div>
+                                            <div className="text-xs text-neutral-400">PDF, imagem, doc, planilha...</div>
+                                        </div>
+                                    </button>
+                                </div>
+                                {/* Seta indicando origem */}
+                                <div className="flex justify-start pl-4">
+                                    <div className="w-3 h-3 bg-white border-r border-b border-neutral-200 rotate-45 -mt-1.5 ml-2" />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Input de arquivo oculto */}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            className="hidden"
+                            onChange={handleFileChange}
+                            accept="application/pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv,application/zip,application/x-zip-compressed"
+                        />
+
+                        {/* Botão de + para abrir popup */}
+                        <button
+                            type="button"
+                            onClick={() => setAttachPopupOpen((prev) => !prev)}
+                            disabled={isProcessing || isUploading}
+                            className={`p-2 rounded-xl transition-colors ${
+                                attachPopupOpen
+                                    ? 'bg-blue-50 text-[#0048AA]'
+                                    : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600'
+                            } ${
+                                isUploading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                            }`}
+                            title="Anexar arquivo"
+                        >
+                            {isUploading ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <Plus className="w-5 h-5" />
+                            )}
                         </button>
-                        <button disabled className="p-2 rounded-xl text-neutral-400 cursor-not-allowed hover:bg-neutral-100 transition-colors">
-                            <Mic className="w-5 h-5" />
-                        </button>
+
+                        {/* Badge do arquivo anexado */}
+                        {uploadedFile && (
+                            <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100">
+                                <Paperclip className="w-3 h-3" />
+                                <span className="max-w-[120px] truncate">{uploadedFile.name}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setUploadedFile(null)}
+                                    className="text-blue-400 hover:text-blue-700 ml-0.5"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </span>
+                        )}
                     </div>
 
                     <button
