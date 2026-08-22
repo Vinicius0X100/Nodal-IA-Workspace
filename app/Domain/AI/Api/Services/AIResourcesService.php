@@ -704,4 +704,246 @@ class AIResourcesService
             ]
         ];
     }
+
+    /**
+     * Faz upload de um arquivo para o Google Drive e cria o IntegrationResource local.
+     *
+     * Fluxo:
+     * validar integração → resolver parent opcional → enviar para o Google (multipart upload)
+     * → confirmar resposta → criar IntegrationResource → auditoria → retornar
+     *
+     * IMPORTANTE: IntegrationResource só é criado APÓS o Google confirmar o upload.
+     * Se o banco falhar após o Google aceitar, o erro é logado para reconciliação manual.
+     */
+    public function upload(
+        Organization $organization,
+        \App\Domain\Identity\Models\User $user,
+        \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext,
+        \Illuminate\Http\UploadedFile $file,
+        ?string $parentResourceUuid = null
+    ): array {
+        // ── 1. Resolver integração ────────────────────────────────────────────
+        $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+            ->where('provider', 'google_workspace')
+            ->where('status', 'connected')
+            ->where('is_enabled', true)
+            ->first();
+
+        if (!$integration) {
+            throw new Exception("Integração do Google Workspace não está ativa ou configurada.", 403);
+        }
+
+        // ── 2. Resolver pasta de destino (opcional) ───────────────────────────
+        $parentResource = null;
+        if ($parentResourceUuid) {
+            $parentResource = $this->findByUuid($organization, $parentResourceUuid);
+
+            if (!$parentResource) {
+                throw new Exception("Pasta de destino não encontrada.", 404);
+            }
+
+            if (!$this->authorizationService->canAccessResource($user, $organization, $parentResource)) {
+                throw new \Illuminate\Auth\Access\AuthorizationException("Você não possui permissão para acessar a pasta de destino.");
+            }
+
+            // Validar que o destino é de fato uma pasta
+            if (!$parentResource->is_folder && $parentResource->mime_type !== 'application/vnd.google-apps.folder') {
+                throw new Exception("O recurso de destino especificado não é uma pasta.", 422);
+            }
+        }
+
+        // ── 3. Obter informações seguras do arquivo (via Laravel/Symfony) ─────
+        // Nunca confiar apenas no MIME enviado pelo cliente.
+        // O Laravel usa Symfony\Component\HttpFoundation\File\UploadedFile que detecta o MIME real.
+        $originalName  = $file->getClientOriginalName();
+        $detectedMime  = $file->getMimeType(); // MIME detectado pelo servidor
+        $extension     = $file->getClientOriginalExtension();
+        $sizeBytes     = $file->getSize();
+
+        // Sanitização segura do nome: remove barras e caracteres de traversal,
+        // mas preserva o nome original e a extensão.
+        $safeName = preg_replace('/[\/\\\0]/', '_', $originalName);
+        if (empty(trim($safeName))) {
+            $safeName = 'arquivo_' . now()->timestamp . ($extension ? ".{$extension}" : '');
+        }
+
+        // ── 4. Montar metadata e fazer upload multipart para o Google Drive ───
+        // Multipart Upload (até 5MB) ou para arquivos maiores o Google aceita até 5MB
+        // no corpo. Para 50 MB usamos multipart com o Content-Length correto.
+        // A API de multipart do Google aceita arquivos até seu limite de upload da conta.
+        // Ref: https://developers.google.com/drive/api/guides/manage-uploads#multipart
+        $metadata = ['name' => $safeName];
+        if ($parentResource && $parentResource->external_id) {
+            $metadata['parents'] = [$parentResource->external_id];
+        }
+
+        // Campos que queremos que o Google retorne após a criação
+        $fields = 'id,name,mimeType,parents,size,modifiedTime,createdTime,webViewLink,iconLink,owners,shared';
+
+        $identity = $accessContext->getResolvedIdentity();
+        $fileContent = $file->get(); // Lê o conteúdo do arquivo temporário
+
+        $response = $this->googleTokenService->executeWithRetry(
+            $integration,
+            function ($token) use ($metadata, $fileContent, $detectedMime, $fields) {
+                // Multipart upload usando o endpoint oficial da Google Drive API
+                return Http::withToken($token)
+                    ->withHeaders(['Content-Type' => 'multipart/related; boundary=nodal_boundary'])
+                    ->send('POST', "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields={$fields}", [
+                        'body' => $this->buildMultipartBody($metadata, $fileContent, $detectedMime),
+                    ]);
+            },
+            $identity,
+            ['https://www.googleapis.com/auth/drive']
+        );
+
+        // Descartar o conteúdo da memória imediatamente após o upload
+        unset($fileContent);
+
+        if (!$response->successful()) {
+            throw new Exception("Falha ao enviar arquivo para o Google Drive: " . $response->body(), $response->status());
+        }
+
+        $googleData = $response->json();
+        $googleFileId = $googleData['id'] ?? null;
+
+        if (!$googleFileId) {
+            throw new Exception("A API do Google não retornou o ID do arquivo após o upload.", 500);
+        }
+
+        // ── 5. Mapear tipo do recurso pelo MIME (reutilizando o mapeamento do projeto) ─
+        $resourceType = $this->mapMimeToResourceType($detectedMime);
+
+        // ── 6. Criar IntegrationResource local ───────────────────────────────
+        // IMPORTANTE: Só chegamos aqui se o Google confirmou o upload (response->successful).
+        // Se o banco falhar agora, capturamos o erro, auditamos e retornamos 500 sem fingir sucesso.
+        $googleOwners      = $googleData['owners'] ?? [];
+        $googleModifiedTime = $googleData['modifiedTime'] ?? null;
+        $googleCreatedTime  = $googleData['createdTime'] ?? null;
+        $googleParents     = $googleData['parents'] ?? [];
+
+        try {
+            $resource = IntegrationResource::create([
+                'integration_id'        => $integration->id,
+                'uuid'                  => (string) Str::uuid(),
+                'provider'              => 'google_workspace',
+                'resource_type'         => $resourceType->value,
+                'external_id'           => $googleFileId,
+                'parent_external_id'    => $parentResource ? $parentResource->external_id : ($googleParents[0] ?? null),
+                'name'                  => $safeName,
+                'mime_type'             => $detectedMime,
+                'is_folder'             => false,
+                'is_shared'             => $googleData['shared'] ?? false,
+                'url'                   => $googleData['webViewLink'] ?? null,
+                'icon'                  => $googleData['iconLink'] ?? null,
+                'owner_name'            => $googleOwners[0]['displayName'] ?? null,
+                'owner_email'           => $googleOwners[0]['emailAddress'] ?? null,
+                'size'                  => $sizeBytes,
+                'created_by_provider_at' => $googleCreatedTime ? \Carbon\Carbon::parse($googleCreatedTime) : now(),
+                'updated_by_provider_at' => $googleModifiedTime ? \Carbon\Carbon::parse($googleModifiedTime) : now(),
+                'last_synced_at'        => now(),
+            ]);
+        } catch (\Exception $dbException) {
+            // CASO: Google upload = sucesso, Banco local = falha.
+            // O arquivo JÁ EXISTE no Google Drive. Não deletamos automaticamente
+            // (pode haver implicações de negócio ou o usuário pode precisar recuperar).
+            // Auditamos o evento para reconciliação posterior e retornamos erro.
+            \Illuminate\Support\Facades\Log::error('Upload para o Google Drive concluído, mas falha ao persistir IntegrationResource localmente.', [
+                'google_file_id' => $googleFileId,
+                'organization_id' => $organization->id,
+                'user_id' => $user->id,
+                'filename' => $safeName,
+                'mime_type' => $detectedMime,
+                'db_error' => $dbException->getMessage(),
+            ]);
+
+            $this->logAuditAction->execute('ai_upload_resource_partial_failure', 'Integration', (string) $integration->id, [
+                'provider'              => 'google_workspace',
+                'user_id'               => $user->id,
+                'filename'              => $safeName,
+                'mime_type'             => $detectedMime,
+                'size_bytes'            => $sizeBytes,
+                'parent_resource_uuid'  => $parentResourceUuid,
+                'note'                  => 'Arquivo criado no Google Drive, mas falhou ao salvar localmente. Requer reconciliação manual.',
+            ]);
+
+            throw new Exception(
+                "O arquivo foi enviado ao Google Drive, mas ocorreu uma falha ao registrá-lo no Nodal. Contate o suporte com o nome do arquivo e horário da operação.",
+                500
+            );
+        }
+
+        // ── 7. Auditoria de sucesso ───────────────────────────────────────────
+        $this->logAuditAction->execute('ai_upload_resource', 'IntegrationResource', (string) $resource->id, [
+            'provider'              => 'google_workspace',
+            'resource_uuid'         => $resource->uuid,
+            'user_id'               => $user->id,
+            'filename'              => $safeName,
+            'mime_type'             => $detectedMime,
+            'size_bytes'            => $sizeBytes,
+            'parent_resource_uuid'  => $parentResourceUuid,
+        ]);
+
+        return [
+            'resource_uuid'        => $resource->uuid,
+            'name'                 => $resource->name,
+            'type'                 => $resourceType->value,
+            'mime_type'            => $resource->mime_type,
+            'provider'             => 'google_workspace',
+            'parent_resource_uuid' => $parentResourceUuid,
+        ];
+    }
+
+    /**
+     * Monta o body multipart/related para a Google Drive API.
+     * Segue a especificação oficial:
+     * https://developers.google.com/drive/api/guides/manage-uploads#multipart
+     */
+    private function buildMultipartBody(array $metadata, string $fileContent, string $mimeType): string
+    {
+        $boundary = 'nodal_boundary';
+        $metaJson = json_encode($metadata);
+
+        return "--{$boundary}\r\n"
+            . "Content-Type: application/json; charset=UTF-8\r\n\r\n"
+            . "{$metaJson}\r\n"
+            . "--{$boundary}\r\n"
+            . "Content-Type: {$mimeType}\r\n\r\n"
+            . "{$fileContent}\r\n"
+            . "--{$boundary}--";
+    }
+
+    /**
+     * Mapeia um MIME type para o ResourceType do projeto.
+     * Reutiliza a mesma lógica do GoogleDriveSyncService para consistência.
+     */
+    private function mapMimeToResourceType(string $mimeType): \App\Domain\Resources\Enums\ResourceType
+    {
+        return match (true) {
+            $mimeType === 'application/pdf'                                                         => \App\Domain\Resources\Enums\ResourceType::PDF,
+            $mimeType === 'application/vnd.google-apps.folder'                                      => \App\Domain\Resources\Enums\ResourceType::FOLDER,
+            $mimeType === 'application/vnd.google-apps.document'                                    => \App\Domain\Resources\Enums\ResourceType::DOCUMENT,
+            $mimeType === 'application/vnd.google-apps.spreadsheet'                                 => \App\Domain\Resources\Enums\ResourceType::SPREADSHEET,
+            $mimeType === 'application/vnd.google-apps.presentation'                                => \App\Domain\Resources\Enums\ResourceType::PRESENTATION,
+            $mimeType === 'application/vnd.google-apps.form'                                        => \App\Domain\Resources\Enums\ResourceType::FORM,
+            $mimeType === 'application/vnd.google-apps.drawing'                                     => \App\Domain\Resources\Enums\ResourceType::DRAWING,
+            str_starts_with($mimeType, 'image/')                                                    => \App\Domain\Resources\Enums\ResourceType::IMAGE,
+            str_starts_with($mimeType, 'video/')                                                    => \App\Domain\Resources\Enums\ResourceType::VIDEO,
+            str_starts_with($mimeType, 'audio/')                                                    => \App\Domain\Resources\Enums\ResourceType::AUDIO,
+            // Documentos Office e outros formatos comuns → document (arquivo genérico)
+            in_array($mimeType, [
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-powerpoint',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'text/plain',
+                'text/csv',
+                'application/rtf',
+            ])                                                                                      => \App\Domain\Resources\Enums\ResourceType::DOCUMENT,
+            default                                                                                 => \App\Domain\Resources\Enums\ResourceType::OTHER,
+        };
+    }
 }
+

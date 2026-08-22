@@ -10,6 +10,7 @@ use App\Http\Requests\AI\ReadResourceFileRequest;
 use App\Http\Requests\AI\CreateFolderRequest;
 use App\Http\Requests\AI\MoveResourceRequest;
 use App\Http\Requests\AI\RenameResourceRequest;
+use App\Http\Requests\AI\UploadResourceRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -117,6 +118,40 @@ class AIResourcesController
             ], 201);
         } catch (\Exception $e) {
             return $this->handleException($e, 'Error creating folder');
+        }
+    }
+
+    public function upload(UploadResourceRequest $request): JsonResponse
+    {
+        try {
+            $organization = $request->get('_active_organization');
+            $user = $request->get('_active_user');
+
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace')
+                ->where('status', 'connected')
+                ->where('is_enabled', true)
+                ->first();
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'resources.write',
+                $integration,
+                $integration ? $integration->provider : 'google_workspace'
+            );
+
+            $file = $request->file('file');
+            $parentResourceUuid = $request->input('parent_resource_uuid');
+
+            $data = $this->service->upload($organization, $user, $accessContext, $file, $parentResourceUuid);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ], 201);
+        } catch (\Exception $e) {
+            return $this->handleException($e, 'Error uploading resource');
         }
     }
 
