@@ -120,7 +120,51 @@ class AIResourcesController
             return $this->handleException($e, 'Error creating folder');
         }
     }
+    public function uploadAttachment(\App\Http\Requests\AI\UploadAttachmentRequest $request, \App\Domain\AI\Api\Services\AIAttachmentsService $attachmentsService): JsonResponse
+    {
+        try {
+            $organization = $request->get('_active_organization');
+            $user = $request->get('_active_user');
+            $conversation = $request->get('_active_conversation');
 
+            if (!$conversation) {
+                return response()->json([
+                    'success' => false,
+                    'code' => 'CONVERSATION_REQUIRED',
+                    'message' => 'O contexto de conversa (X-Conversation-UUID) é obrigatório para esta operação.'
+                ], 400);
+            }
+
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace')
+                ->where('status', 'connected')
+                ->where('is_enabled', true)
+                ->first();
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'resources.write',
+                $integration,
+                $integration ? $integration->provider : 'google_workspace'
+            );
+
+            $attachmentUuid = $request->input('attachment_uuid');
+            $parentResourceUuid = $request->input('parent_resource_uuid') ?: null;
+
+            // Resolve o attachment validando isolamento, posse, expiração e existência da conversa (strict mode)
+            $attachment = $attachmentsService->resolveForOperation($organization, $user, $attachmentUuid, $conversation->uuid);
+
+            $data = $this->service->uploadAttachmentToDrive($organization, $user, $accessContext, $attachment, $parentResourceUuid);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            return $this->handleException($e, 'Error uploading attachment to Google Drive');
+        }
+    }
     public function upload(UploadResourceRequest $request): JsonResponse
     {
         try {

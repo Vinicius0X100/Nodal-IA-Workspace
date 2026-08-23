@@ -71,15 +71,37 @@ class AIGatewayMiddleware
             ], 403);
         }
 
+        // Tratar Conversation se informada (opcional para algumas rotas, mas necessário para upload-attachment)
+        $conversationUuid = $request->header('X-Conversation-UUID');
+        $conversation = null;
+
+        if (!empty($conversationUuid)) {
+            $conversation = \App\Domain\AI\Models\Conversation::where('uuid', $conversationUuid)
+                ->where('organization_id', $organization->id)
+                ->first();
+
+            if (!$conversation) {
+                return response()->json([
+                    'success' => false,
+                    'code' => 'CONVERSATION_NOT_FOUND',
+                    'message' => 'Conversation not found or access denied'
+                ], 404);
+            }
+        }
+
         // Bind the organization and user to the container or request so controllers can use it
         $request->merge([
             '_active_organization' => $organization,
             '_active_user' => $user,
+            '_active_conversation' => $conversation,
         ]);
         
         // Alternatively we can use Laravel's container:
         app()->instance(Organization::class, $organization);
         app()->instance(\App\Domain\Identity\Models\User::class, $user);
+        if ($conversation) {
+            app()->instance(\App\Domain\AI\Models\Conversation::class, $conversation);
+        }
 
         return $next($request);
     }

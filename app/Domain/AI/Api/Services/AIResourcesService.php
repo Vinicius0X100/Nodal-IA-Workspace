@@ -715,6 +715,186 @@ class AIResourcesService
      * IMPORTANTE: IntegrationResource só é criado APÓS o Google confirmar o upload.
      * Se o banco falhar após o Google aceitar, o erro é logado para reconciliação manual.
      */
+    public function uploadAttachmentToDrive(
+        Organization $organization,
+        \App\Domain\Identity\Models\User $user,
+        \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext,
+        \App\Domain\AI\Models\MessageAttachment $attachment,
+        ?string $parentResourceUuid = null
+    ): array {
+        // ── 1. Resolver integração ────────────────────────────────────────────
+        $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+            ->where('provider', 'google_workspace')
+            ->where('status', 'connected')
+            ->where('is_enabled', true)
+            ->first();
+
+        if (!$integration) {
+            throw new Exception("Integração do Google Workspace não está ativa ou configurada.", 403);
+        }
+
+        // ── 2. Resolver pasta de destino (opcional) ───────────────────────────
+        $parentResource = null;
+        if ($parentResourceUuid) {
+            $parentResource = $this->findByUuid($organization, $parentResourceUuid);
+
+            if (!$parentResource) {
+                throw new Exception("Pasta de destino não encontrada.", 404);
+            }
+
+            if (!$this->authorizationService->canAccessResource($user, $organization, $parentResource)) {
+                throw new \Illuminate\Auth\Access\AuthorizationException("Você não possui permissão para acessar a pasta de destino.");
+            }
+
+            if (!$parentResource->is_folder && $parentResource->mime_type !== 'application/vnd.google-apps.folder') {
+                throw new Exception("O recurso de destino especificado não é uma pasta.", 422);
+            }
+        }
+
+        $safeName = $attachment->original_name;
+        $detectedMime = $attachment->mime_type ?? 'application/octet-stream';
+        $sizeBytes = $attachment->size;
+
+        // ── 3. Criar Sessão Resumable de Upload ──────────────────────────────
+        $metadata = ['name' => $safeName];
+        if ($parentResource && $parentResource->external_id) {
+            $metadata['parents'] = [$parentResource->external_id];
+        }
+
+        $fields = 'id,name,mimeType,parents,size,modifiedTime,createdTime,webViewLink,iconLink,owners,shared';
+        $identity = $accessContext->getResolvedIdentity();
+
+        $sessionResponse = $this->googleTokenService->executeWithRetry(
+            $integration,
+            function ($token) use ($metadata, $fields, $detectedMime, $sizeBytes) {
+                return Http::withToken($token)
+                    ->withHeaders([
+                        'X-Upload-Content-Type' => $detectedMime,
+                        'X-Upload-Content-Length' => $sizeBytes,
+                        'Content-Type' => 'application/json; charset=UTF-8'
+                    ])
+                    ->post("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields={$fields}", $metadata);
+            },
+            $identity,
+            ['https://www.googleapis.com/auth/drive']
+        );
+
+        $uploadUrl = $sessionResponse->header('Location');
+
+        if (!$sessionResponse->successful() || !$uploadUrl) {
+            throw new Exception("Falha ao iniciar sessão de upload no Google Drive: " . $sessionResponse->body(), $sessionResponse->status() ?: 500);
+        }
+
+        // ── 4. Enviar Arquivo em Chunks de 8MB ────────────────────────────────
+        $disk = \Illuminate\Support\Facades\Storage::disk('chat-attachments');
+        $stream = $disk->readStream($attachment->storage_path);
+        if (!$stream) {
+            throw new Exception("ATTACHMENT_FILE_MISSING", 404);
+        }
+
+        $chunkSize = 8 * 1024 * 1024; // 8MB
+        $bytesSent = 0;
+        $googleData = null;
+
+        try {
+            while (!feof($stream)) {
+                $chunk = fread($stream, $chunkSize);
+                $currentChunkSize = strlen($chunk);
+                
+                if ($currentChunkSize === 0) {
+                    break; // Fim do arquivo inesperado ou exato
+                }
+
+                $start = $bytesSent;
+                $end = $bytesSent + $currentChunkSize - 1;
+
+                // Não usamos executeWithRetry para os chunks porque o uploadUrl já carrega o ID da sessão
+                // E um erro 401 aqui significa que o upload falhou fatalmente.
+                $chunkResponse = Http::withHeaders([
+                    'Content-Length' => (string)$currentChunkSize,
+                    'Content-Range' => "bytes {$start}-{$end}/{$sizeBytes}",
+                ])->withBody($chunk, $detectedMime)->put($uploadUrl);
+
+                if ($chunkResponse->status() === 308) {
+                    // 308 Resume Incomplete = Sucesso parcial
+                    $bytesSent += $currentChunkSize;
+                    continue;
+                }
+
+                if ($chunkResponse->status() === 200 || $chunkResponse->status() === 201) {
+                    // Upload completo
+                    $googleData = $chunkResponse->json();
+                    break;
+                }
+
+                throw new Exception("Falha no upload do chunk para o Google Drive: " . $chunkResponse->body(), $chunkResponse->status());
+            }
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+
+        if (!$googleData || empty($googleData['id'])) {
+            throw new Exception("A API do Google não retornou o ID do arquivo após o upload resumable.", 500);
+        }
+
+        // ── 5. Mapear e Criar IntegrationResource local ───────────────────────
+        $resourceType = $this->mapMimeToResourceType($detectedMime);
+        $googleFileId = $googleData['id'];
+
+        $googleOwners = $googleData['owners'] ?? [];
+        $googleModifiedTime = $googleData['modifiedTime'] ?? null;
+        $googleCreatedTime = $googleData['createdTime'] ?? null;
+        $googleParents = $googleData['parents'] ?? [];
+
+        try {
+            $resource = IntegrationResource::create([
+                'integration_id'        => $integration->id,
+                'uuid'                  => (string) Str::uuid(),
+                'provider'              => 'google_workspace',
+                'resource_type'         => $resourceType->value,
+                'external_id'           => $googleFileId,
+                'parent_external_id'    => $parentResource ? $parentResource->external_id : ($googleParents[0] ?? null),
+                'name'                  => $safeName,
+                'mime_type'             => $detectedMime,
+                'is_folder'             => false,
+                'is_shared'             => $googleData['shared'] ?? false,
+                'url'                   => $googleData['webViewLink'] ?? null,
+                'icon'                  => $googleData['iconLink'] ?? null,
+                'owner_name'            => $googleOwners[0]['displayName'] ?? null,
+                'owner_email'           => $googleOwners[0]['emailAddress'] ?? null,
+                'size'                  => $sizeBytes,
+                'created_by_provider_at' => $googleCreatedTime ? \Carbon\Carbon::parse($googleCreatedTime) : now(),
+                'updated_by_provider_at' => $googleModifiedTime ? \Carbon\Carbon::parse($googleModifiedTime) : now(),
+                'last_synced_at'        => now(),
+            ]);
+        } catch (\Exception $dbException) {
+            $this->logAuditAction->execute('ai_upload_sync_failed', 'IntegrationResource', $googleFileId, [
+                'provider' => 'google_workspace',
+                'user_id' => $user->id,
+                'name' => $safeName,
+                'error' => $dbException->getMessage(),
+            ]);
+            throw new Exception("O arquivo foi enviado para o Google, mas ocorreu um erro interno ao salvá-lo no sistema.", 500);
+        }
+
+        $this->logAuditAction->execute('ai_upload_resource', 'IntegrationResource', (string) $resource->id, [
+            'provider' => 'google_workspace',
+            'uuid' => $resource->uuid,
+            'user_id' => $user->id,
+            'name' => $safeName
+        ]);
+
+        return [
+            'resource_uuid' => $resource->uuid,
+            'name' => $resource->name,
+            'type' => $resource->resource_type ?? 'document',
+            'provider' => 'google_workspace',
+            'url' => $resource->url,
+        ];
+    }
+    
     public function upload(
         Organization $organization,
         \App\Domain\Identity\Models\User $user,
