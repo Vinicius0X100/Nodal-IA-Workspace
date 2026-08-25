@@ -237,7 +237,7 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
             items: connectedIntegrations.map((i: any) => {
                 let name = i.display_name || i.provider;
                 let href = route('integrations.index'); // Default fallback
-                let imgSrc = null;
+                let imgSrc: string | null = null;
                 let subItems = undefined;
 
                 if (i.provider === 'google_workspace') {
@@ -250,10 +250,17 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                     ];
                 }
 
+                if (i.provider === 'meta') {
+                    name = 'Meta';
+                    href = route('integrations.meta');
+                    imgSrc = '/images/meta-logo.svg';
+                }
+
                 return {
                     name,
                     href,
-                    imgSrc,
+                    imgSrc: imgSrc || null,
+                    icon: Blocks, // fallback seguro para não quebrar SidebarItem
                     subItems,
                     active: route().current(`integrations.${i.provider.replace('_', '-')}*`)
                 };
