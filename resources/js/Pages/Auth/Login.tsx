@@ -3,7 +3,6 @@ import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { FormEventHandler } from 'react';
-import { Blocks } from 'lucide-react';
 
 export default function Login() {
     const { data, setData, post, processing, errors } = useForm({
