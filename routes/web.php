@@ -28,6 +28,7 @@ Route::get('/', function () {
 // Legal (Público)
 Route::inertia('/termos-de-uso', 'Legal/Terms')->name('terms');
 Route::inertia('/politica-de-privacidade', 'Legal/Privacy')->name('privacy');
+Route::inertia('/exclusao-de-dados', 'Legal/DataDeletion')->name('data-deletion');
 
 // Páginas institucionais (Público)
 Route::inertia('/produto', 'Produto')->name('produto');

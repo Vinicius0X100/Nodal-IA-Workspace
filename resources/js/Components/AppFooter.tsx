@@ -22,6 +22,7 @@ export default function AppFooter() {
                     <div className="flex items-center gap-3">
                         <Link href={route('terms')} className="hover:text-neutral-600 transition-colors underline underline-offset-2">Termos de Uso</Link>
                         <Link href={route('privacy')} className="hover:text-neutral-600 transition-colors underline underline-offset-2">Privacidade</Link>
+                        <Link href={route('data-deletion')} className="hover:text-neutral-600 transition-colors underline underline-offset-2">Exclusão de Dados</Link>
                     </div>
                 </div>
                 <p className="text-xs text-neutral-400 text-center sm:text-right">

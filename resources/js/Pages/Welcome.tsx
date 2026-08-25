@@ -851,7 +851,7 @@ export default function Welcome() {
                             </div>
                             <div>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: '#1d1d1f', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>Legal</div>
-                                {[['Privacidade', '/politica-de-privacidade'], ['Termos de uso', '/termos-de-uso']].map(([l, h]) => (
+                                {[['Privacidade', '/politica-de-privacidade'], ['Termos de uso', '/termos-de-uso'], ['Exclusão de Dados', '/exclusao-de-dados']].map(([l, h]) => (
                                     <a key={l} href={h} style={{ display: 'block', fontSize: 13, color: '#8e8e93', textDecoration: 'none', marginBottom: 8, transition: 'color 0.2s' }}
                                        onMouseEnter={e => (e.currentTarget.style.color = '#1d1d1f')}
                                        onMouseLeave={e => (e.currentTarget.style.color = '#8e8e93')}>{l}</a>
