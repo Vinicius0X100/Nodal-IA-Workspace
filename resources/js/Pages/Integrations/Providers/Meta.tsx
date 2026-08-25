@@ -1,10 +1,8 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import React, { useState } from 'react';
-import { ArrowLeft, ExternalLink, Settings2, Activity, CheckCircle2, FileText } from 'lucide-react';
+import { ArrowLeft, Activity, CheckCircle2, FileText } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
-import { Input } from '@/Components/ui/input';
-import { Label } from '@/Components/ui/label';
 import { Button } from '@/Components/ui/button';
 
 export default function MetaConfig({ app_url, integration, config }: { app_url?: string, integration?: any, config?: any }) {
