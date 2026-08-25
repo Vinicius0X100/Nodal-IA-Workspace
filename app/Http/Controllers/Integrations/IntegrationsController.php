@@ -47,6 +47,7 @@ class IntegrationsController extends Controller
             'integration' => $integration,
             'config' => $config,
             'all_users' => $allUsers,
+            'google_service_account_client_id' => config('services.google_workspace.service_account_client_id'),
         ]);
     }
 
@@ -81,30 +82,49 @@ class IntegrationsController extends Controller
         ]);
     }
 
+    public function meta(Request $request)
+    {
+        $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
+        
+        $integration = \App\Domain\Integrations\Models\Integration::with([
+            'organizationData', 
+            'logs' => function($query) {
+                $query->latest()->limit(50);
+            }
+        ])->firstOrCreate(
+            ['organization_id' => $organization->id, 'provider' => 'meta'],
+            ['display_name' => 'Meta', 'status' => 'not_connected']
+        );
+        
+        $config = $integration->config;
+
+        return Inertia::render('Integrations/Providers/Meta', [
+            'app_url' => config('app.url'),
+            'integration' => $integration,
+            'config' => $config,
+        ]);
+    }
+
     public function saveConfig(Request $request, string $provider)
     {
         $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
+        abort_unless($organization->isOwner($request->user()), 403, 'Acesso restrito aos administradores.');
 
         $config = \App\Domain\Integrations\Models\IntegrationConfig::whereHas('integration', function ($query) use ($organization, $provider) {
             $query->where('organization_id', $organization->id)->where('provider', $provider);
         })->first();
 
         $rules = [
-            'client_id' => 'required|string',
-            'client_secret' => 'required|string',
+            'client_id' => 'nullable|string',
+            'client_secret' => 'nullable|string',
             'tenant' => 'nullable|string',
         ];
 
         if ($provider === 'google_workspace') {
-            if (!$config || empty($config->delegation_credentials_json)) {
-                $rules['delegation_credentials_json'] = 'required|json';
-            } else {
-                $rules['delegation_credentials_json'] = 'nullable|json';
-            }
+            $rules['delegation_credentials_json'] = 'nullable|json';
         }
 
         $request->validate($rules, [
-            'delegation_credentials_json.required' => 'O arquivo JSON da Service Account (Domain-Wide Delegation) é obrigatório.',
             'delegation_credentials_json.json' => 'O formato do JSON fornecido é inválido.'
         ]);
         
@@ -145,27 +165,47 @@ class IntegrationsController extends Controller
         return back()->with('success', 'Configurações salvas com sucesso.');
     }
 
+    private function getProviderConfig(string $provider, \App\Domain\Organizations\Models\Organization $organization): ?array
+    {
+        $globalConfig = config("services.{$provider}");
+        
+        if (!empty($globalConfig['client_id']) && !empty($globalConfig['client_secret'])) {
+            return [
+                'client_id' => $globalConfig['client_id'],
+                'client_secret' => $globalConfig['client_secret'],
+                'redirect_uri' => $globalConfig['redirect'] ?? config('app.url') . "/oauth/{$provider}/callback",
+                'service_account_json' => $globalConfig['service_account_json'] ?? null,
+            ];
+        }
+
+        $configModel = \App\Domain\Integrations\Models\IntegrationConfig::whereHas('integration', function ($query) use ($organization, $provider) {
+            $query->where('organization_id', $organization->id)->where('provider', $provider);
+        })->first();
+
+        if ($configModel && $configModel->client_id && $configModel->client_secret) {
+            return [
+                'client_id' => $configModel->client_id,
+                'client_secret' => $configModel->client_secret,
+                'redirect_uri' => $configModel->redirect_uri ?: config('app.url') . "/oauth/{$provider}/callback",
+            ];
+        }
+
+        return null;
+    }
+
     /**
      * Inicia o fluxo de conexão OAuth
      */
     public function connect(Request $request, string $provider, \App\Domain\Integrations\Services\IntegrationManager $manager)
     {
         $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
+        abort_unless($organization->isOwner($request->user()), 403, 'Acesso restrito aos administradores.');
 
-        // Aqui nós buscaríamos da tabela `integration_configs` a configuração da organização
-        $configModel = \App\Domain\Integrations\Models\IntegrationConfig::whereHas('integration', function ($query) use ($organization, $provider) {
-            $query->where('organization_id', $organization->id)->where('provider', $provider);
-        })->first();
+        $config = $this->getProviderConfig($provider, $organization);
 
-        if (!$configModel || !$configModel->client_id || !$configModel->client_secret) {
-            return back()->with('error', 'Por favor, salve suas configurações de Client ID e Client Secret antes de conectar.');
+        if (!$config || empty($config['client_id']) || empty($config['client_secret'])) {
+            return back()->with('error', 'Credenciais OAuth do app não estão configuradas.');
         }
-
-        $config = [
-            'client_id' => $configModel->client_id,
-            'client_secret' => $configModel->client_secret,
-            'redirect_uri' => $configModel->redirect_uri ?: config('app.url') . "/oauth/{$provider}/callback",
-        ];
 
         try {
             $connector = $manager->getConnector($provider);
@@ -185,16 +225,13 @@ class IntegrationsController extends Controller
         \App\Domain\AI\Services\AIToolRegistryService $aiToolRegistry
     ) {
         $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
+        abort_unless($organization->isOwner($request->user()), 403, 'Acesso restrito aos administradores.');
 
-        $configModel = \App\Domain\Integrations\Models\IntegrationConfig::whereHas('integration', function ($query) use ($organization, $provider) {
-            $query->where('organization_id', $organization->id)->where('provider', $provider);
-        })->first();
+        $config = $this->getProviderConfig($provider, $organization);
 
-        $config = [
-            'client_id' => $configModel->client_id ?? '',
-            'client_secret' => $configModel->client_secret ?? '',
-            'redirect_uri' => $configModel->redirect_uri ?: config('app.url') . "/oauth/{$provider}/callback",
-        ];
+        if (!$config) {
+            return redirect()->route('integrations.index')->with('error', 'Configurações de integração ausentes.');
+        }
 
         try {
             $connector = $manager->getConnector($provider);
@@ -228,10 +265,17 @@ class IntegrationsController extends Controller
                 }
             }
 
-            return redirect()->route("integrations." . str_replace('_', '-', $provider))->with('success', 'Integração conectada com sucesso!');
+            $routeMap = [
+                'google_workspace' => 'integrations.google-workspace',
+                'meta' => 'integrations.meta',
+            ];
+            $redirectRoute = $routeMap[$provider] ?? 'integrations.index';
+
+            return redirect()->route($redirectRoute)->with('success', 'Integração conectada com sucesso!');
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Erro OAuth Callback {$provider}: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            return redirect()->route("integrations." . str_replace('_', '-', $provider))->with('error', 'Falha ao conectar: ' . $e->getMessage());
+            $redirectRoute = $routeMap[$provider] ?? 'integrations.index';
+            return redirect()->route($redirectRoute)->with('error', 'Falha ao conectar: ' . $e->getMessage());
         }
     }
 
@@ -245,6 +289,7 @@ class IntegrationsController extends Controller
         \App\Domain\AI\Services\AIToolRegistryService $aiToolRegistry
     ) {
         $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
+        abort_unless($organization->isOwner($request->user()), 403, 'Acesso restrito aos administradores.');
 
         try {
             $connector = $manager->getConnector($provider);

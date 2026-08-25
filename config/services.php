@@ -43,4 +43,26 @@ return [
         'token' => env('AI_GATEWAY_TOKEN'),
     ],
 
+    'meta' => [
+        'client_id' => env('META_APP_ID'),
+        'client_secret' => env('META_APP_SECRET'),
+        'redirect' => env('META_REDIRECT_URI'),
+        'graph_version' => env('META_GRAPH_VERSION', 'v19.0'),
+    ],
+
+    // Driver usado pelo Socialite sob o capô
+    'facebook' => [
+        'client_id' => env('META_APP_ID'),
+        'client_secret' => env('META_APP_SECRET'),
+        'redirect' => env('META_REDIRECT_URI'),
+    ],
+
+    'google_workspace' => [
+        'client_id' => env('GOOGLE_WORKSPACE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_WORKSPACE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_WORKSPACE_REDIRECT_URI'),
+        'service_account_client_id' => env('GOOGLE_WORKSPACE_SERVICE_ACCOUNT_CLIENT_ID'),
+        'service_account_json' => env('GOOGLE_WORKSPACE_SERVICE_ACCOUNT_JSON'),
+    ],
+
 ];

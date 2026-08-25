@@ -23,6 +23,15 @@ const integrations = [
         href: route('integrations.google-workspace')
     },
     {
+        id: 'meta',
+        name: 'Meta',
+        description: 'Conecte sua conta do Facebook e Instagram para gerenciar recursos.',
+        category: 'productivity', // ou crm, etc
+        status: 'not_connected',
+        logo: '/images/meta-logo.svg', // Assumindo que este logo exista ou será criado, provisório
+        href: route('integrations.meta') // Redireciona para a página de detalhes da Meta
+    },
+    {
         id: 'microsoft-365',
         name: 'Microsoft 365',
         description: 'Integração completa com Azure AD e ferramentas Office.',
@@ -144,12 +153,33 @@ export default function IntegrationsIndex({ dbIntegrations = [] }: { dbIntegrati
                                 </p>
                                 
                                 {integration.status !== 'coming_soon' ? (
-                                    <Link
-                                        href={integration.href}
-                                        className="inline-flex items-center justify-center w-full bg-white text-neutral-700 border border-neutral-200 rounded-xl py-2.5 text-[14px] font-semibold hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-all group-hover:shadow-sm"
-                                    >
-                                        {integration.status === 'not_connected' ? 'Configurar' : 'Gerenciar'} <ArrowRight className="w-4 h-4 ml-1.5 opacity-70 group-hover:translate-x-0.5 transition-transform" />
-                                    </Link>
+                                    <div className="flex flex-col gap-2">
+                                        {integration.id === 'meta' && integration.status === 'connected' ? (
+                                            <div className="flex gap-2">
+                                                <Link
+                                                    href={route('integrations.connect', { provider: 'meta' })}
+                                                    className="inline-flex flex-1 items-center justify-center bg-white text-neutral-700 border border-neutral-200 rounded-xl py-2.5 text-[14px] font-semibold hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-all group-hover:shadow-sm"
+                                                >
+                                                    Reconectar <ArrowRight className="w-4 h-4 ml-1.5 opacity-70 group-hover:translate-x-0.5 transition-transform" />
+                                                </Link>
+                                                <Link
+                                                    href={route('integrations.disconnect', { provider: 'meta' })}
+                                                    method="post"
+                                                    as="button"
+                                                    className="inline-flex flex-1 items-center justify-center bg-red-50 text-red-600 border border-red-200 rounded-xl py-2.5 text-[14px] font-semibold hover:bg-red-600 hover:text-white transition-all group-hover:shadow-sm"
+                                                >
+                                                    Desconectar
+                                                </Link>
+                                            </div>
+                                        ) : (
+                                            <Link
+                                                href={integration.href}
+                                                className="inline-flex items-center justify-center w-full bg-white text-neutral-700 border border-neutral-200 rounded-xl py-2.5 text-[14px] font-semibold hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-all group-hover:shadow-sm"
+                                            >
+                                                {integration.status === 'not_connected' ? 'Configurar' : 'Gerenciar'} <ArrowRight className="w-4 h-4 ml-1.5 opacity-70 group-hover:translate-x-0.5 transition-transform" />
+                                            </Link>
+                                        )}
+                                    </div>
                                 ) : (
                                     <button
                                         disabled

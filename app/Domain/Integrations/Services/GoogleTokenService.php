@@ -103,13 +103,26 @@ class GoogleTokenService
         $this->assertIntegrationActive($integration);
 
         $config = $integration->config;
+        $serviceAccountJson = config('services.google_workspace.service_account_json') ?: ($config->delegation_credentials_json ?? null);
 
-        if (!$config || empty($config->delegation_credentials_json)) {
-            $this->logSecureError($integration, 'delegation_token', 'Credenciais de delegação de domínio não configuradas.');
+        if (empty($serviceAccountJson)) {
+            $this->logSecureError($integration, 'delegation_token', 'Credenciais de delegação de domínio não configuradas globalmente ou no tenant.');
             throw new ProviderDelegationRequiredException("A configuração de Domain-Wide Delegation (Service Account JSON) não foi realizada no Nodal para esta integração.");
         }
 
-        $serviceAccount = $config->delegation_credentials_json; // Já vem decodificado pelo cast encrypted:array
+        // Se a chave vier do ENV como string (pode ser o JSON puro, um base64 ou um caminho de arquivo)
+        $serviceAccount = $serviceAccountJson;
+        if (is_string($serviceAccountJson)) {
+            // Verifica se é um arquivo (relativo ou absoluto)
+            if (is_file(base_path($serviceAccountJson))) {
+                $serviceAccountJson = file_get_contents(base_path($serviceAccountJson));
+            } elseif (is_file($serviceAccountJson)) {
+                $serviceAccountJson = file_get_contents($serviceAccountJson);
+            }
+            
+            $serviceAccount = json_decode($serviceAccountJson, true);
+        }
+        
         if (empty($serviceAccount['client_email']) || empty($serviceAccount['private_key'])) {
             $this->logSecureError($integration, 'delegation_token', 'O JSON da Service Account é inválido ou incompleto.');
             throw new ProviderDelegationRequiredException("O JSON da Service Account configurado é inválido.");
@@ -178,15 +191,17 @@ class GoogleTokenService
     protected function refreshOAuthToken(Integration $integration): string
     {
         $config = $integration->config;
+        $clientId = config('services.google_workspace.client_id') ?: ($config->client_id ?? null);
+        $clientSecret = config('services.google_workspace.client_secret') ?: ($config->client_secret ?? null);
 
-        if (!$config || !$config->client_id || !$config->client_secret) {
-            $this->logSecureError($integration, 'token_refresh', 'Faltam credenciais (client_id, client_secret) na configuração da integração.');
+        if (!$clientId || !$clientSecret) {
+            $this->logSecureError($integration, 'token_refresh', 'Faltam credenciais globais (client_id, client_secret).');
             throw new Exception("Faltam credenciais para renovar o token.");
         }
 
         $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
-            'client_id' => $config->client_id,
-            'client_secret' => $config->client_secret,
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
             'refresh_token' => $integration->refresh_token,
             'grant_type' => 'refresh_token',
         ]);

@@ -24,14 +24,11 @@ import {
 import ImportWizard from './Components/ImportWizard';
 import CreateRoleWizard from '@/Pages/Directory/Partials/CreateRoleWizard';
 
-export default function GoogleWorkspaceConfig({ app_url, integration, config, all_users }: { app_url?: string, integration?: any, config?: any, all_users?: any[] }) {
+export default function GoogleWorkspaceConfig({ app_url, integration, config, all_users, google_service_account_client_id }: { app_url?: string, integration?: any, config?: any, all_users?: any[], google_service_account_client_id?: string }) {
     const redirectUri = `${app_url || 'https://nodal.app'}/oauth/google_workspace/callback`;
 
     const { data, setData, post, processing, errors } = useForm({
-        client_id: config?.client_id || '',
-        client_secret: config?.client_secret || '',
         tenant: config?.tenant || '',
-        delegation_credentials_json: '',
     });
 
     const [activeTab, setActiveTab] = useState('general');
@@ -334,48 +331,6 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                         {/* TAB: CONFIGURAÇÃO */}
                         <TabsContent value="config" className="space-y-6">
                             <form onSubmit={handleSaveConfig} className="grid gap-6 md:grid-cols-2">
-                                <div className="bg-white border border-neutral-200 rounded-2xl p-6">
-                                    <div className="flex items-center gap-2 mb-6">
-                                        <KeySquare className="w-5 h-5 text-neutral-500" />
-                                        <h3 className="text-lg font-bold text-neutral-900">Credenciais OAuth</h3>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="client_id">Client ID</Label>
-                                            <Input 
-                                                id="client_id" 
-                                                value={data.client_id}
-                                                onChange={e => setData('client_id', e.target.value)}
-                                                placeholder="Ex: 123456789-abcde.apps.googleusercontent.com" 
-                                            />
-                                            {errors.client_id && <p className="text-red-500 text-xs mt-1">{errors.client_id}</p>}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="client_secret">Client Secret</Label>
-                                            <Input 
-                                                id="client_secret" 
-                                                type="password" 
-                                                value={data.client_secret}
-                                                onChange={e => setData('client_secret', e.target.value)}
-                                                placeholder="••••••••••••••••" 
-                                            />
-                                            {errors.client_secret && <p className="text-red-500 text-xs mt-1">{errors.client_secret}</p>}
-                                        </div>
-                                        <div className="space-y-2 pt-2">
-                                            <Label>Redirect URI (Copie isto para o Google Cloud)</Label>
-                                            <div className="flex items-center gap-2">
-                                                <code className="flex-1 bg-neutral-100 text-neutral-600 px-3 py-2 rounded-lg text-sm border border-neutral-200 truncate">
-                                                    {redirectUri}
-                                                </code>
-                                                <Button type="button" variant="outline" size="sm" onClick={handleCopy} className={copied ? "text-green-600 border-green-200 bg-green-50 hover:bg-green-100 hover:text-green-700" : ""}>
-                                                    {copied ? <CheckCircle2 className="w-4 h-4 mr-1" /> : null}
-                                                    {copied ? 'Copiado!' : 'Copiar'}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
                                 <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col">
                                     <div className="flex items-center gap-2 mb-6">
                                         <Settings2 className="w-5 h-5 text-neutral-500" />
@@ -390,24 +345,8 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                                                 onChange={e => setData('tenant', e.target.value)}
                                                 placeholder="Ex: sacratech.com" 
                                             />
-                                        </div>
-                                        <div className="space-y-2 pt-2">
-                                            <div className="flex items-center justify-between">
-                                                <Label htmlFor="delegation_credentials_json">Chave JSON (Service Account - IA)</Label>
-                                                {config?.delegation_credentials_json && (
-                                                    <span className="text-[10px] font-bold tracking-wider text-green-700 bg-green-100 px-2 py-0.5 rounded uppercase">Já Configurada</span>
-                                                )}
-                                            </div>
-                                            <textarea 
-                                                id="delegation_credentials_json"
-                                                className={cn("flex min-h-[100px] w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 disabled:cursor-not-allowed disabled:opacity-50 font-mono text-xs", errors.delegation_credentials_json ? "border-red-500 focus-visible:ring-red-500" : "")}
-                                                value={data.delegation_credentials_json}
-                                                onChange={e => setData('delegation_credentials_json', e.target.value)}
-                                                placeholder={config?.delegation_credentials_json ? "Cole aqui um novo JSON caso queira sobrescrever a chave existente..." : 'Cole o conteúdo completo do arquivo JSON baixado no Passo 5 da documentação...'}
-                                            />
-                                            {errors.delegation_credentials_json && errors.delegation_credentials_json !== 'INVALID_SERVICE_ACCOUNT_JSON' && <p className="text-red-500 text-xs mt-1">{errors.delegation_credentials_json}</p>}
-                                            <p className="text-xs text-neutral-500 leading-relaxed">
-                                                Necessário para que a Inteligência Artificial consiga consultar dados em nome dos funcionários (Domain-Wide Delegation).
+                                            <p className="text-xs text-neutral-500 mt-2">
+                                                O domínio principal do Google Workspace da sua organização.
                                             </p>
                                         </div>
                                     </div>
@@ -419,6 +358,38 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                                         ) : <div/>}
                                         
                                         <Button type="submit" disabled={processing}>Salvar Configuração</Button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col">
+                                    <div className="flex items-center gap-2 mb-6">
+                                        <KeySquare className="w-5 h-5 text-neutral-500" />
+                                        <h3 className="text-lg font-bold text-neutral-900">Acesso Administrativo (DWD)</h3>
+                                    </div>
+                                    <div className="space-y-4 flex-1">
+                                        <p className="text-sm text-neutral-600 mb-4">
+                                            Para que as ferramentas de Inteligência Artificial do Nodal funcionem corretamente, um Super Administrador da sua organização precisa aprovar o acesso à conta de serviço no Google Admin Console.
+                                        </p>
+                                        
+                                        <div className="space-y-2">
+                                            <Label>Client ID da Conta de Serviço (Para delegação)</Label>
+                                            <div className="flex items-center gap-2">
+                                                <code className="flex-1 bg-neutral-100 text-neutral-600 px-3 py-2 rounded-lg text-sm border border-neutral-200 truncate">
+                                                    {google_service_account_client_id || 'ID não configurado no backend'}
+                                                </code>
+                                                <Button type="button" variant="outline" size="sm" onClick={() => {
+                                                    navigator.clipboard.writeText(google_service_account_client_id || '');
+                                                    setCopied(true);
+                                                    setTimeout(() => setCopied(false), 2000);
+                                                }} className={copied ? "text-green-600 border-green-200 bg-green-50 hover:bg-green-100 hover:text-green-700" : ""}>
+                                                    {copied ? <CheckCircle2 className="w-4 h-4 mr-1" /> : null}
+                                                    {copied ? 'Copiado!' : 'Copiar'}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-neutral-500 mt-2">
+                                            Siga os passos na aba "Documentação" para autorizar este Client ID no seu Google Workspace.
+                                        </p>
                                     </div>
                                 </div>
                             </form>
@@ -434,74 +405,36 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                                 
                                 <Accordion type="single" collapsible className="w-full">
                                     <AccordionItem value="item-1">
-                                        <AccordionTrigger className="text-left font-semibold">1. Criar um Projeto no Google Cloud</AccordionTrigger>
+                                        <AccordionTrigger className="text-left font-semibold">1. Conectar via OAuth</AccordionTrigger>
                                         <AccordionContent className="text-neutral-600 leading-relaxed pt-2 pb-4">
-                                            Acesse o <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer" className="text-primary-600 underline">Google Cloud Console</a>.
-                                            Clique no seletor de projetos no topo da página e crie um "Novo Projeto". Nomeie-o como "Nodal Workspace Integration".
+                                            Na aba <strong>Geral</strong>, clique em "Conectar via OAuth".
+                                            Faça login com sua conta de Super Administrador do Google Workspace e conceda as permissões solicitadas.
+                                            Isso vinculará sua organização ao Nodal.
                                         </AccordionContent>
                                     </AccordionItem>
                                     <AccordionItem value="item-2">
-                                        <AccordionTrigger className="text-left font-semibold">2. Ativar as APIs Necessárias</AccordionTrigger>
+                                        <AccordionTrigger className="text-left font-semibold">2. Configurar Domain-Wide Delegation no Google Workspace</AccordionTrigger>
                                         <AccordionContent className="text-neutral-600 leading-relaxed pt-2 pb-4">
-                                            No menu lateral esquerdo, vá em "APIs e Serviços" &gt; "Biblioteca". Busque e clique em "Ativar" para cada uma das seguintes APIs:
-                                            <ul className="list-disc ml-5 mt-2 space-y-1">
-                                                <li><strong>Admin SDK API</strong></li>
-                                                <li><strong>Google Drive API</strong></li>
-                                                <li><strong>Google Docs API</strong></li>
-                                                <li><strong>Google Sheets API</strong></li>
-                                                <li><strong>Google Calendar API</strong></li>
-                                                <li><strong>Gmail API</strong></li>
-                                            </ul>
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                    <AccordionItem value="item-3">
-                                        <AccordionTrigger className="text-left font-semibold">3. Configurar a Tela de Consentimento OAuth</AccordionTrigger>
-                                        <AccordionContent className="text-neutral-600 leading-relaxed pt-2 pb-4">
-                                            Vá em "Tela de consentimento OAuth". Escolha o tipo de usuário "Interno" (apenas usuários da sua organização).
-                                            Preencha o nome do App (ex: Nodal) e e-mails de suporte.
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                    <AccordionItem value="item-4">
-                                        <AccordionTrigger className="text-left font-semibold">4. Gerar Credenciais OAuth 2.0</AccordionTrigger>
-                                        <AccordionContent className="text-neutral-600 leading-relaxed pt-2 pb-4">
-                                            Vá na aba "Credenciais". Clique em "Criar credenciais" e escolha "ID do cliente OAuth".
-                                            Selecione "Aplicativo da Web". Adicione a <strong>URI de Redirecionamento</strong> que fornecemos na aba de Configuração.
-                                            Copie o Client ID e Client Secret gerados e cole na aba de Configuração.
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                    <AccordionItem value="item-5">
-                                        <AccordionTrigger className="text-left font-semibold">5. Criar uma Service Account (Para IA)</AccordionTrigger>
-                                        <AccordionContent className="text-neutral-600 leading-relaxed pt-2 pb-4">
-                                            Para que as ferramentas de IA do Nodal possam consultar os dados em nome dos usuários sem exigir que cada um se autentique individualmente, é necessário criar uma Service Account:
-                                            <ol className="list-decimal ml-5 mt-2 space-y-2">
-                                                <li>Ainda na aba "Credenciais" do Google Cloud, clique em "Criar credenciais" e escolha <strong>Conta de serviço (Service Account)</strong>.</li>
-                                                <li>Nomeie como "Nodal AI Delegation" e conclua a criação.</li>
-                                                <li>Na lista de contas de serviço, clique na conta recém-criada, vá na aba <strong>Chaves</strong>, clique em "Adicionar chave" &gt; "Criar nova chave".</li>
-                                                <li>Selecione o formato <strong>JSON</strong>. Um arquivo será baixado para o seu computador. Salve este arquivo com segurança.</li>
-                                                <li>Anote o <strong>Client ID</strong> (ID do Cliente) desta Service Account, você precisará dele no próximo passo.</li>
-                                            </ol>
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                    <AccordionItem value="item-6">
-                                        <AccordionTrigger className="text-left font-semibold">6. Configurar Domain-Wide Delegation no Google Workspace</AccordionTrigger>
-                                        <AccordionContent className="text-neutral-600 leading-relaxed pt-2 pb-4">
-                                            Este é o passo mais importante. Sem ele, a Service Account não terá permissão para operar em nome dos seus usuários:
+                                            Para que o Nodal realize ações em segundo plano com a Inteligência Artificial, você deve autorizar a nossa conta de serviço:
                                             <ol className="list-decimal ml-5 mt-2 space-y-2">
                                                 <li>Acesse o <a href="https://admin.google.com" target="_blank" rel="noreferrer" className="text-primary-600 underline">Google Admin Console</a>.</li>
-                                                <li>Navegue até <strong>Security</strong> &gt; <strong>Access and data control</strong> &gt; <strong>API controls</strong>.</li>
-                                                <li>Na seção inferior "Domain wide delegation", clique em <strong>Manage Domain Wide Delegation</strong>.</li>
-                                                <li>Clique em <strong>Add new</strong>.</li>
-                                                <li>No campo <strong>Client ID</strong>, cole o ID do Cliente da Service Account que você anotou no passo anterior.</li>
-                                                <li>No campo <strong>OAuth scopes</strong>, adicione os escopos estritamente necessários, separados por vírgula. Por exemplo:
+                                                <li>Navegue até <strong>Segurança</strong> &gt; <strong>Controle de acesso a dados</strong> &gt; <strong>Controles de API</strong>.</li>
+                                                <li>Na seção inferior "Delegação em todo o domínio", clique em <strong>Gerenciar a delegação em todo o domínio</strong>.</li>
+                                                <li>Clique em <strong>Adicionar novo</strong>.</li>
+                                                <li>No campo <strong>ID do Cliente</strong>, cole o Client ID fornecido na aba Configuração.</li>
+                                                <li>No campo <strong>Escopos OAuth</strong>, adicione os escopos estritamente necessários, separados por vírgula. Por exemplo:
                                                     <code className="block mt-2 p-2 bg-neutral-100 rounded text-xs break-all">
                                                         https://www.googleapis.com/auth/calendar.readonly, https://www.googleapis.com/auth/admin.directory.resource.calendar.readonly, https://www.googleapis.com/auth/calendar.events, https://www.googleapis.com/auth/gmail.readonly, https://www.googleapis.com/auth/drive.readonly, https://www.googleapis.com/auth/drive
                                                     </code>
                                                 </li>
-                                                <li>Clique em <strong>Authorize</strong>.</li>
+                                                <li>Clique em <strong>Autorizar</strong>.</li>
                                             </ol>
-                                            <p className="mt-4 text-sm bg-yellow-50 text-yellow-800 p-3 rounded-lg border border-yellow-200">
-                                                <strong>Atenção:</strong> Após concluir estes passos, lembre-se de configurar a chave JSON da Service Account nas configurações de integração do Nodal para ativar completamente as capacidades de Inteligência Artificial.
-                                            </p>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                    <AccordionItem value="item-3">
+                                        <AccordionTrigger className="text-left font-semibold">3. Finalização</AccordionTrigger>
+                                        <AccordionContent className="text-neutral-600 leading-relaxed pt-2 pb-4">
+                                            Após conceder as permissões via OAuth e autorizar o Client ID no Admin Console, a integração estará completamente operacional. Vá para a aba <strong>Organização</strong> e clique em "Sincronizar" para puxar o diretório de usuários e grupos para o Nodal.
                                         </AccordionContent>
                                     </AccordionItem>
                                 </Accordion>
