@@ -20,6 +20,9 @@ enum ResourceType: string
     case AD_ACCOUNT = 'ad_account';
     case FACEBOOK_PAGE = 'facebook_page';
     case INSTAGRAM_ACCOUNT = 'instagram_account';
+    case CAMPAIGN = 'campaign';
+    case AD_SET = 'ad_set';
+    case AD = 'ad';
     case OTHER = 'other';
 
     public function label(): string
@@ -41,6 +44,9 @@ enum ResourceType: string
             self::AD_ACCOUNT        => 'Conta de Anúncio',
             self::FACEBOOK_PAGE     => 'Página do Facebook',
             self::INSTAGRAM_ACCOUNT => 'Conta do Instagram',
+            self::CAMPAIGN          => 'Campanha',
+            self::AD_SET            => 'Conjunto de Anúncios',
+            self::AD                => 'Anúncio',
             self::OTHER             => 'Outro',
         };
     }

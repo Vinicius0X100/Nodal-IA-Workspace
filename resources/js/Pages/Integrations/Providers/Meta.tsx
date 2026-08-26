@@ -5,7 +5,7 @@ import { ArrowLeft, Activity, CheckCircle2, FileText, Megaphone, RefreshCcw } fr
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
 import { Button } from '@/Components/ui/button';
 
-export default function MetaConfig({ app_url, integration, config, ad_accounts = [], facebook_pages = [], instagram_accounts = [] }: { app_url?: string, integration?: any, config?: any, ad_accounts?: any[], facebook_pages?: any[], instagram_accounts?: any[] }) {
+export default function MetaConfig({ app_url, integration, config, ad_accounts = [], facebook_pages = [], instagram_accounts = [], campaigns_tree = [] }: { app_url?: string, integration?: any, config?: any, ad_accounts?: any[], facebook_pages?: any[], instagram_accounts?: any[], campaigns_tree?: any[] }) {
     const redirectUri = `${app_url || 'https://nodal.app'}/oauth/meta/callback`;
 
     const { data, setData, post, processing, errors } = useForm({});
@@ -13,6 +13,10 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
     const [activeTab, setActiveTab] = useState('general');
     const [copied, setCopied] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
+
+    // Verifica se o job está rodando baseado no último log
+    const latestLog = integration?.logs?.[0];
+    const isJobRunning = latestLog?.event === 'meta_sync_job_started';
 
     const handleCopy = () => {
         navigator.clipboard.writeText(redirectUri);
@@ -40,6 +44,10 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
         router.post(route('integrations.meta.sync-assets'), {}, {
             onFinish: () => setIsSyncing(false)
         });
+    };
+
+    const handleRefresh = () => {
+        router.reload({ only: ['integration', 'ad_accounts', 'facebook_pages', 'instagram_accounts', 'campaigns_tree'] });
     };
 
     const statusBadge = () => {
@@ -148,10 +156,21 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
                                             <h3 className="text-lg font-bold text-neutral-900 mb-1">Ativos da Meta</h3>
                                             <p className="text-neutral-500 text-sm">Gerencie Contas de Anúncio, Páginas e Instagram sincronizados com sua organização.</p>
                                         </div>
-                                        <Button onClick={handleSyncAssets} disabled={isSyncing}>
-                                            <RefreshCcw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-                                            Sincronizar Ativos
-                                        </Button>
+                                        <div className="flex items-center gap-3">
+                                            {isJobRunning && (
+                                                <span className="text-sm font-medium text-blue-600 animate-pulse flex items-center gap-2">
+                                                    <RefreshCcw className="w-4 h-4 animate-spin" /> Sincronização em andamento...
+                                                </span>
+                                            )}
+                                            <Button variant="outline" onClick={handleRefresh} disabled={isSyncing}>
+                                                <RefreshCcw className="w-4 h-4 mr-2" />
+                                                Atualizar Visualização
+                                            </Button>
+                                            <Button onClick={handleSyncAssets} disabled={isSyncing || isJobRunning}>
+                                                <Activity className="w-4 h-4 mr-2" />
+                                                Iniciar Sincronização
+                                            </Button>
+                                        </div>
                                     </div>
 
                                     {/* SECTION: AD ACCOUNTS */}
@@ -253,6 +272,63 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
                                             </div>
                                         ) : (
                                             <p className="text-sm text-neutral-500 italic">Nenhuma conta do Instagram sincronizada.</p>
+                                        )}
+                                    </div>
+
+                                    {/* SECTION: CAMPAIGNS */}
+                                    <div className="mt-10">
+                                        <h4 className="font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+                                            Campanhas e Anúncios <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full text-xs">{campaigns_tree.length}</span>
+                                        </h4>
+                                        {campaigns_tree.length > 0 ? (
+                                            <div className="space-y-4">
+                                                {campaigns_tree.map((campaign: any) => (
+                                                    <div key={campaign.uuid} className="border border-neutral-200 rounded-lg overflow-hidden bg-white">
+                                                        <div className="p-4 bg-neutral-50 border-b border-neutral-200 flex justify-between items-center">
+                                                            <div>
+                                                                <h5 className="font-bold text-neutral-900 text-sm">Campanha: {campaign.name}</h5>
+                                                                <p className="text-xs text-neutral-500">ID: {campaign.uuid} | Obj: {campaign.metadata_json?.objective || '-'}</p>
+                                                            </div>
+                                                            <span className="px-2 py-1 bg-neutral-200 text-neutral-700 text-xs rounded-full font-medium">{campaign.metadata_json?.status}</span>
+                                                        </div>
+                                                        <div className="p-4 space-y-4">
+                                                            {campaign.ad_sets && campaign.ad_sets.length > 0 ? (
+                                                                campaign.ad_sets.map((adSet: any) => (
+                                                                    <div key={adSet.uuid} className="pl-4 border-l-2 border-primary-200">
+                                                                        <div className="flex justify-between items-center mb-2">
+                                                                            <div>
+                                                                                <h6 className="font-semibold text-neutral-800 text-sm">Conjunto: {adSet.name}</h6>
+                                                                                <p className="text-xs text-neutral-500">ID: {adSet.uuid}</p>
+                                                                            </div>
+                                                                            <span className="text-xs font-medium text-neutral-500">{adSet.metadata_json?.status}</span>
+                                                                        </div>
+                                                                        
+                                                                        {adSet.ads && adSet.ads.length > 0 ? (
+                                                                            <div className="pl-4 mt-2 space-y-2">
+                                                                                {adSet.ads.map((ad: any) => (
+                                                                                    <div key={ad.uuid} className="flex justify-between items-center bg-neutral-50 p-2 rounded border border-neutral-100">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <Megaphone className="w-3 h-3 text-neutral-400" />
+                                                                                            <span className="text-xs font-medium text-neutral-700">{ad.name}</span>
+                                                                                        </div>
+                                                                                        <span className="text-[10px] uppercase font-bold text-neutral-400">{ad.metadata_json?.status}</span>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <p className="text-xs text-neutral-400 italic pl-4">Nenhum anúncio neste conjunto.</p>
+                                                                        )}
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <p className="text-sm text-neutral-500 italic">Nenhum conjunto de anúncios nesta campanha.</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-neutral-500 italic">Nenhuma campanha sincronizada. Tente iniciar a sincronização.</p>
                                         )}
                                     </div>
                                 </div>

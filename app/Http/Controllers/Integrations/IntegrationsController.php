@@ -102,15 +102,54 @@ class IntegrationsController extends Controller
         $adAccounts = [];
         $facebookPages = [];
         $instagramAccounts = [];
+        $campaigns = [];
         if ($integration->status === 'connected') {
             $resources = \App\Domain\Resources\Models\IntegrationResource::where('integration_id', $integration->id)
-                ->whereIn('resource_type', ['ad_account', 'facebook_page', 'instagram_account'])
-                ->get(['uuid', 'name', 'resource_type', 'parent_external_id', 'metadata_json', 'last_synced_at'])
+                ->whereIn('resource_type', ['ad_account', 'facebook_page', 'instagram_account', 'campaign', 'ad_set', 'ad'])
+                ->get(['uuid', 'name', 'resource_type', 'external_id', 'parent_external_id', 'metadata_json', 'last_synced_at'])
                 ->toArray();
             
             $adAccounts = array_values(array_filter($resources, fn($r) => $r['resource_type'] === 'ad_account'));
             $facebookPages = array_values(array_filter($resources, fn($r) => $r['resource_type'] === 'facebook_page'));
             $instagramAccounts = array_values(array_filter($resources, fn($r) => $r['resource_type'] === 'instagram_account'));
+            
+            // Montando a árvore de campanhas para o frontend
+            $campaignsRaw = array_values(array_filter($resources, fn($r) => $r['resource_type'] === 'campaign'));
+            $adSetsRaw = array_values(array_filter($resources, fn($r) => $r['resource_type'] === 'ad_set'));
+            $adsRaw = array_values(array_filter($resources, fn($r) => $r['resource_type'] === 'ad'));
+
+            // Agrupa ads por ad_set
+            $adsByAdSet = [];
+            foreach ($adsRaw as $ad) {
+                $adsByAdSet[$ad['parent_external_id']][] = $ad;
+            }
+
+            // Agrupa ad sets (com seus ads) por campaign
+            $adSetsByCampaign = [];
+            foreach ($adSetsRaw as $adSet) {
+                $adSet['ads'] = $adsByAdSet[$adSet['external_id']] ?? [];
+                $adSetsByCampaign[$adSet['parent_external_id']][] = $adSet;
+            }
+
+            // Monta as campaigns
+            foreach ($campaignsRaw as $campaign) {
+                $campaign['ad_sets'] = $adSetsByCampaign[$campaign['external_id']] ?? [];
+                $campaigns[] = $campaign;
+            }
+            
+            // Remove external_ids para segurança
+            $adAccounts = array_map(function($item) { unset($item['external_id']); return $item; }, $adAccounts);
+            $facebookPages = array_map(function($item) { unset($item['external_id']); return $item; }, $facebookPages);
+            $instagramAccounts = array_map(function($item) { unset($item['external_id']); return $item; }, $instagramAccounts);
+            $campaigns = array_map(function($campaign) {
+                unset($campaign['external_id']);
+                $campaign['ad_sets'] = array_map(function($adSet) {
+                    unset($adSet['external_id']);
+                    $adSet['ads'] = array_map(function($ad) { unset($ad['external_id']); return $ad; }, $adSet['ads'] ?? []);
+                    return $adSet;
+                }, $campaign['ad_sets'] ?? []);
+                return $campaign;
+            }, $campaigns);
         }
 
         return Inertia::render('Integrations/Providers/Meta', [
@@ -120,18 +159,17 @@ class IntegrationsController extends Controller
             'ad_accounts'        => $adAccounts,
             'facebook_pages'     => $facebookPages,
             'instagram_accounts' => $instagramAccounts,
+            'campaigns_tree'     => $campaigns,
         ]);
     }
 
     /**
-     * Dispara a sincronização de todos os ativos suportados da Meta (Ad Accounts, Pages, Instagram).
+     * Dispara a sincronização de todos os ativos suportados da Meta (Ad Accounts, Pages, Instagram, Campaigns, etc).
      * Segue o mesmo padrão de autorização (isOwner) de connect/disconnect.
      */
     public function syncMetaAssets(
         Request $request,
-        \App\Domain\Integrations\Services\IntegrationResolver $resolver,
-        \App\Domain\Integrations\Services\Meta\MetaAdAccountsService $adAccountsService,
-        \App\Domain\Integrations\Services\Meta\MetaPagesService $pagesService
+        \App\Domain\Integrations\Services\IntegrationResolver $resolver
     ) {
         $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
         abort_unless($organization->isOwner($request->user()), 403, 'Acesso restrito aos administradores.');
@@ -139,41 +177,15 @@ class IntegrationsController extends Controller
         try {
             $integration = $resolver->resolveOrFail($organization, 'meta');
             
-            $messages = [];
-            $hasError = false;
+            // Dispara o Job de forma assíncrona
+            \App\Domain\Integrations\Jobs\Meta\SyncMetaAssetsJob::dispatch($integration, $request->user()->id);
 
-            // 1. Sync Ad Accounts
-            try {
-                $countAds = $adAccountsService->syncAdAccounts($integration);
-                $messages[] = "{$countAds} conta(s) de anúncio";
-            } catch (\Exception $e) {
-                $hasError = true;
-                $messages[] = "Falha ao sincronizar contas de anúncio";
-            }
-
-            // 2. Sync Facebook Pages e Instagram Accounts
-            try {
-                $counts = $pagesService->syncPagesAndInstagram($integration);
-                $messages[] = "{$counts['pages']} página(s) e {$counts['instagram']} conta(s) Instagram";
-            } catch (\Exception $e) {
-                $hasError = true;
-                $messages[] = "Falha ao sincronizar páginas/Instagram";
-            }
-
-            $finalMessage = "Sincronização concluída: " . implode(', ', $messages) . ".";
-
-            if ($hasError) {
-                return back()->with('warning', $finalMessage . " Verifique os logs para mais detalhes.");
-            }
-
-            return back()->with('success', $finalMessage);
+            return back()->with('success', 'Sincronização iniciada. Os recursos aparecerão em breve assim que o processamento em background for concluído.');
             
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return back()->with('error', 'Integração Meta não encontrada ou não está conectada.');
-        } catch (\App\Domain\Integrations\Services\Meta\MetaRateLimitException $e) {
-            return back()->with('error', 'Limite de requisições da Meta atingido. Aguarde alguns minutos e tente novamente.');
         } catch (\Exception $e) {
-            return back()->with('error', 'Erro ao sincronizar: ' . $e->getMessage());
+            return back()->with('error', 'Erro ao iniciar sincronização: ' . $e->getMessage());
         }
     }
 
