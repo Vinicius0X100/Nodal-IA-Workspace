@@ -100,38 +100,74 @@ class IntegrationsController extends Controller
 
         // Ad Accounts sincronizadas — expostas pelo uuid (nunca pelo external_id)
         $adAccounts = [];
+        $facebookPages = [];
+        $instagramAccounts = [];
         if ($integration->status === 'connected') {
-            $adAccounts = \App\Domain\Resources\Models\IntegrationResource::where('integration_id', $integration->id)
-                ->where('resource_type', 'ad_account')
-                ->get(['uuid', 'name', 'metadata_json', 'last_synced_at'])
+            $resources = \App\Domain\Resources\Models\IntegrationResource::where('integration_id', $integration->id)
+                ->whereIn('resource_type', ['ad_account', 'facebook_page', 'instagram_account'])
+                ->get(['uuid', 'name', 'resource_type', 'parent_external_id', 'metadata_json', 'last_synced_at'])
                 ->toArray();
+            
+            $adAccounts = array_values(array_filter($resources, fn($r) => $r['resource_type'] === 'ad_account'));
+            $facebookPages = array_values(array_filter($resources, fn($r) => $r['resource_type'] === 'facebook_page'));
+            $instagramAccounts = array_values(array_filter($resources, fn($r) => $r['resource_type'] === 'instagram_account'));
         }
 
         return Inertia::render('Integrations/Providers/Meta', [
-            'app_url'     => config('app.url'),
-            'integration' => $integration,
-            'config'      => $config,
-            'ad_accounts' => $adAccounts,
+            'app_url'            => config('app.url'),
+            'integration'        => $integration,
+            'config'             => $config,
+            'ad_accounts'        => $adAccounts,
+            'facebook_pages'     => $facebookPages,
+            'instagram_accounts' => $instagramAccounts,
         ]);
     }
 
     /**
-     * Dispara a sincronização de Ad Accounts da Meta para a organização ativa.
+     * Dispara a sincronização de todos os ativos suportados da Meta (Ad Accounts, Pages, Instagram).
      * Segue o mesmo padrão de autorização (isOwner) de connect/disconnect.
      */
-    public function syncMetaAdAccounts(
+    public function syncMetaAssets(
         Request $request,
         \App\Domain\Integrations\Services\IntegrationResolver $resolver,
-        \App\Domain\Integrations\Services\Meta\MetaAdAccountsService $service
+        \App\Domain\Integrations\Services\Meta\MetaAdAccountsService $adAccountsService,
+        \App\Domain\Integrations\Services\Meta\MetaPagesService $pagesService
     ) {
         $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
         abort_unless($organization->isOwner($request->user()), 403, 'Acesso restrito aos administradores.');
 
         try {
             $integration = $resolver->resolveOrFail($organization, 'meta');
-            $count = $service->syncAdAccounts($integration);
+            
+            $messages = [];
+            $hasError = false;
 
-            return back()->with('success', "{$count} conta(s) de anúncio sincronizada(s) com sucesso.");
+            // 1. Sync Ad Accounts
+            try {
+                $countAds = $adAccountsService->syncAdAccounts($integration);
+                $messages[] = "{$countAds} conta(s) de anúncio";
+            } catch (\Exception $e) {
+                $hasError = true;
+                $messages[] = "Falha ao sincronizar contas de anúncio";
+            }
+
+            // 2. Sync Facebook Pages e Instagram Accounts
+            try {
+                $counts = $pagesService->syncPagesAndInstagram($integration);
+                $messages[] = "{$counts['pages']} página(s) e {$counts['instagram']} conta(s) Instagram";
+            } catch (\Exception $e) {
+                $hasError = true;
+                $messages[] = "Falha ao sincronizar páginas/Instagram";
+            }
+
+            $finalMessage = "Sincronização concluída: " . implode(', ', $messages) . ".";
+
+            if ($hasError) {
+                return back()->with('warning', $finalMessage . " Verifique os logs para mais detalhes.");
+            }
+
+            return back()->with('success', $finalMessage);
+            
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return back()->with('error', 'Integração Meta não encontrada ou não está conectada.');
         } catch (\App\Domain\Integrations\Services\Meta\MetaRateLimitException $e) {

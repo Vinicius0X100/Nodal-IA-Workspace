@@ -82,7 +82,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/oauth/{provider}/redirect', [IntegrationsController::class, 'redirect'])->name('oauth.redirect');
             
             // OAuth Genérico (Connect, Callback, Disconnect, Config)
-            Route::post('/meta/sync-ad-accounts', [\App\Http\Controllers\Integrations\IntegrationsController::class, 'syncMetaAdAccounts'])->name('meta.sync-ad-accounts');
+            Route::post('/meta/sync-assets', [\App\Http\Controllers\Integrations\IntegrationsController::class, 'syncMetaAssets'])->name('meta.sync-assets');
             Route::post('/{provider}/config', [IntegrationsController::class, 'saveConfig'])->name('config');
             Route::get('/{provider}/connect', [IntegrationsController::class, 'connect'])->name('connect');
             Route::post('/{provider}/disconnect', [IntegrationsController::class, 'disconnect'])->name('disconnect');

@@ -5,7 +5,7 @@ import { ArrowLeft, Activity, CheckCircle2, FileText, Megaphone, RefreshCcw } fr
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
 import { Button } from '@/Components/ui/button';
 
-export default function MetaConfig({ app_url, integration, config, ad_accounts = [] }: { app_url?: string, integration?: any, config?: any, ad_accounts?: any[] }) {
+export default function MetaConfig({ app_url, integration, config, ad_accounts = [], facebook_pages = [], instagram_accounts = [] }: { app_url?: string, integration?: any, config?: any, ad_accounts?: any[], facebook_pages?: any[], instagram_accounts?: any[] }) {
     const redirectUri = `${app_url || 'https://nodal.app'}/oauth/meta/callback`;
 
     const { data, setData, post, processing, errors } = useForm({});
@@ -35,9 +35,9 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
         }
     };
 
-    const handleSyncAdAccounts = () => {
+    const handleSyncAssets = () => {
         setIsSyncing(true);
-        router.post(route('integrations.meta.sync-ad-accounts'), {}, {
+        router.post(route('integrations.meta.sync-assets'), {}, {
             onFinish: () => setIsSyncing(false)
         });
     };
@@ -85,8 +85,8 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
                             <FileText className="w-4 h-4 mr-2" /> Geral
                         </TabsTrigger>
                         {integration?.status === 'connected' && (
-                            <TabsTrigger value="ad-accounts" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                                <Megaphone className="w-4 h-4 mr-2" /> Contas de Anúncio
+                            <TabsTrigger value="assets" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                                <Megaphone className="w-4 h-4 mr-2" /> Ativos
                             </TabsTrigger>
                         )}
                         <TabsTrigger value="logs" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
@@ -139,59 +139,122 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
                             </div>
                         </TabsContent>
 
-                        {/* TAB: CONTAS DE ANÚNCIO */}
+                        {/* TAB: ATIVOS */}
                         {integration?.status === 'connected' && (
-                            <TabsContent value="ad-accounts" className="space-y-6">
+                            <TabsContent value="assets" className="space-y-6">
                                 <div className="bg-white border border-neutral-200 rounded-2xl p-8">
-                                    <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-neutral-100">
                                         <div>
-                                            <h3 className="text-lg font-bold text-neutral-900 mb-1">Contas de Anúncio ({ad_accounts.length})</h3>
-                                            <p className="text-neutral-500 text-sm">Contas sincronizadas com sua organização.</p>
+                                            <h3 className="text-lg font-bold text-neutral-900 mb-1">Ativos da Meta</h3>
+                                            <p className="text-neutral-500 text-sm">Gerencie Contas de Anúncio, Páginas e Instagram sincronizados com sua organização.</p>
                                         </div>
-                                        <Button onClick={handleSyncAdAccounts} disabled={isSyncing}>
+                                        <Button onClick={handleSyncAssets} disabled={isSyncing}>
                                             <RefreshCcw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-                                            Sincronizar Contas
+                                            Sincronizar Ativos
                                         </Button>
                                     </div>
 
-                                    {ad_accounts.length > 0 ? (
-                                        <div className="border border-neutral-200 rounded-lg overflow-hidden">
-                                            <table className="min-w-full divide-y divide-neutral-200">
-                                                <thead className="bg-neutral-50">
-                                                    <tr>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Nome da Conta</th>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">ID Público (UUID)</th>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Status (Meta)</th>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Moeda/Fuso</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="bg-white divide-y divide-neutral-200">
-                                                    {ad_accounts.map((acc: any) => (
-                                                        <tr key={acc.uuid} className="hover:bg-neutral-50">
-                                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-900">
-                                                                {acc.name}
-                                                            </td>
-                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
-                                                                {acc.uuid}
-                                                            </td>
-                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
-                                                                {acc.metadata_json?.account_status || '-'}
-                                                            </td>
-                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
-                                                                {acc.metadata_json?.currency} ({acc.metadata_json?.timezone_name})
-                                                            </td>
+                                    {/* SECTION: AD ACCOUNTS */}
+                                    <div className="mb-10">
+                                        <h4 className="font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+                                            Contas de Anúncio <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full text-xs">{ad_accounts.length}</span>
+                                        </h4>
+                                        {ad_accounts.length > 0 ? (
+                                            <div className="border border-neutral-200 rounded-lg overflow-hidden">
+                                                <table className="min-w-full divide-y divide-neutral-200">
+                                                    <thead className="bg-neutral-50">
+                                                        <tr>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Nome da Conta</th>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">ID Público (UUID)</th>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Status (Meta)</th>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Moeda/Fuso</th>
                                                         </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-12 border border-dashed border-neutral-300 rounded-xl">
-                                            <Megaphone className="mx-auto h-12 w-12 text-neutral-400 mb-3" />
-                                            <h3 className="text-sm font-medium text-neutral-900">Nenhuma conta de anúncio</h3>
-                                            <p className="mt-1 text-sm text-neutral-500">Clique em sincronizar para buscar as contas da Meta.</p>
-                                        </div>
-                                    )}
+                                                    </thead>
+                                                    <tbody className="bg-white divide-y divide-neutral-200">
+                                                        {ad_accounts.map((acc: any) => (
+                                                            <tr key={acc.uuid} className="hover:bg-neutral-50">
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-900">
+                                                                    {acc.name}
+                                                                </td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
+                                                                    {acc.uuid}
+                                                                </td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
+                                                                    {acc.metadata_json?.account_status || '-'}
+                                                                </td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
+                                                                    {acc.metadata_json?.currency} ({acc.metadata_json?.timezone_name})
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-neutral-500 italic">Nenhuma conta de anúncio sincronizada.</p>
+                                        )}
+                                    </div>
+
+                                    {/* SECTION: FACEBOOK PAGES */}
+                                    <div className="mb-10">
+                                        <h4 className="font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+                                            Páginas do Facebook <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full text-xs">{facebook_pages.length}</span>
+                                        </h4>
+                                        {facebook_pages.length > 0 ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                {facebook_pages.map((page: any) => (
+                                                    <div key={page.uuid} className="border border-neutral-200 rounded-xl p-4 flex items-center gap-4 hover:border-neutral-300 transition-colors">
+                                                        {page.metadata_json?.picture ? (
+                                                            <img src={page.metadata_json.picture} alt={page.name} className="w-12 h-12 rounded-full border border-neutral-100 object-cover" />
+                                                        ) : (
+                                                            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-lg border border-blue-100">
+                                                                {page.name.charAt(0)}
+                                                            </div>
+                                                        )}
+                                                        <div className="flex-1 min-w-0">
+                                                            <h5 className="font-medium text-neutral-900 truncate">{page.name}</h5>
+                                                            <p className="text-xs text-neutral-500 truncate">{page.metadata_json?.category || 'Sem categoria'}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-neutral-500 italic">Nenhuma página do Facebook sincronizada.</p>
+                                        )}
+                                    </div>
+
+                                    {/* SECTION: INSTAGRAM ACCOUNTS */}
+                                    <div>
+                                        <h4 className="font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+                                            Contas do Instagram <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full text-xs">{instagram_accounts.length}</span>
+                                        </h4>
+                                        {instagram_accounts.length > 0 ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                {instagram_accounts.map((ig: any) => {
+                                                    const parentPage = facebook_pages.find((p: any) => p.external_id === ig.parent_external_id);
+                                                    return (
+                                                        <div key={ig.uuid} className="border border-neutral-200 rounded-xl p-4 flex items-center gap-4 hover:border-neutral-300 transition-colors">
+                                                            {ig.metadata_json?.profile_picture ? (
+                                                                <img src={ig.metadata_json.profile_picture} alt={ig.name} className="w-12 h-12 rounded-full border border-neutral-100 object-cover" />
+                                                            ) : (
+                                                                <div className="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 font-bold text-lg border border-pink-100">
+                                                                    {ig.name.charAt(0)}
+                                                                </div>
+                                                            )}
+                                                            <div className="flex-1 min-w-0">
+                                                                <h5 className="font-medium text-neutral-900 truncate">@{ig.metadata_json?.username || ig.name}</h5>
+                                                                {parentPage && (
+                                                                    <p className="text-xs text-neutral-500 truncate">Vinc. a: {parentPage.name}</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-neutral-500 italic">Nenhuma conta do Instagram sincronizada.</p>
+                                        )}
+                                    </div>
                                 </div>
                             </TabsContent>
                         )}

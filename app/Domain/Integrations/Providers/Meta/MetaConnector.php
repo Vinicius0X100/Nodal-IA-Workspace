@@ -47,7 +47,8 @@ class MetaConnector implements ConnectorInterface
             'pages_manage_posts',
             'business_management',
             'ads_management',
-            'ads_read'
+            'ads_read',
+            'instagram_basic',
         ];
 
         return Socialite::driver('facebook')
