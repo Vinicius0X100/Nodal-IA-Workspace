@@ -4,8 +4,9 @@ import React, { useState } from 'react';
 import { ArrowLeft, Activity, CheckCircle2, FileText, Megaphone, RefreshCcw } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
 import { Button } from '@/Components/ui/button';
+import MetaPerformanceTab from './Partials/MetaPerformanceTab';
 
-export default function MetaConfig({ app_url, integration, config, ad_accounts = [], facebook_pages = [], instagram_accounts = [], campaigns_tree = [] }: { app_url?: string, integration?: any, config?: any, ad_accounts?: any[], facebook_pages?: any[], instagram_accounts?: any[], campaigns_tree?: any[] }) {
+export default function MetaConfig({ app_url, integration, config, ad_accounts = [], facebook_pages = [], instagram_accounts = [], campaigns_tree = [], is_job_running = false }: { app_url?: string, integration?: any, config?: any, ad_accounts?: any[], facebook_pages?: any[], instagram_accounts?: any[], campaigns_tree?: any[], is_job_running?: boolean }) {
     const redirectUri = `${app_url || 'https://nodal.app'}/oauth/meta/callback`;
 
     const { data, setData, post, processing, errors } = useForm({});
@@ -13,10 +14,6 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
     const [activeTab, setActiveTab] = useState('general');
     const [copied, setCopied] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
-
-    // Verifica se o job está rodando baseado no último log
-    const latestLog = integration?.logs?.[0];
-    const isJobRunning = latestLog?.event === 'meta_sync_job_started';
 
     const handleCopy = () => {
         navigator.clipboard.writeText(redirectUri);
@@ -97,8 +94,13 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
                                 <Megaphone className="w-4 h-4 mr-2" /> Ativos
                             </TabsTrigger>
                         )}
+                        {integration?.status === 'connected' && (
+                            <TabsTrigger value="performance" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                                <Activity className="w-4 h-4 mr-2" /> Performance
+                            </TabsTrigger>
+                        )}
                         <TabsTrigger value="logs" className="data-[state=active]:border-primary-600 data-[state=active]:text-primary-900 border-b-2 border-transparent rounded-none px-0 py-3 text-neutral-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                            <Activity className="w-4 h-4 mr-2" /> Logs
+                            <FileText className="w-4 h-4 mr-2" /> Logs
                         </TabsTrigger>
                     </TabsList>
 
@@ -157,7 +159,7 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
                                             <p className="text-neutral-500 text-sm">Gerencie Contas de Anúncio, Páginas e Instagram sincronizados com sua organização.</p>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            {isJobRunning && (
+                                            {is_job_running && (
                                                 <span className="text-sm font-medium text-blue-600 animate-pulse flex items-center gap-2">
                                                     <RefreshCcw className="w-4 h-4 animate-spin" /> Sincronização em andamento...
                                                 </span>
@@ -166,7 +168,7 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
                                                 <RefreshCcw className="w-4 h-4 mr-2" />
                                                 Atualizar Visualização
                                             </Button>
-                                            <Button onClick={handleSyncAssets} disabled={isSyncing || isJobRunning}>
+                                            <Button onClick={handleSyncAssets} disabled={isSyncing || is_job_running}>
                                                 <Activity className="w-4 h-4 mr-2" />
                                                 Iniciar Sincronização
                                             </Button>
@@ -332,6 +334,13 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
                                         )}
                                     </div>
                                 </div>
+                            </TabsContent>
+                        )}
+
+                        {/* TAB: PERFORMANCE */}
+                        {integration?.status === 'connected' && (
+                            <TabsContent value="performance" className="space-y-6">
+                                <MetaPerformanceTab adAccounts={ad_accounts} />
                             </TabsContent>
                         )}
 

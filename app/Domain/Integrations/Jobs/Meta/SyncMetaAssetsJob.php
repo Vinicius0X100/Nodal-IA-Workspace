@@ -17,6 +17,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class SyncMetaAssetsJob implements ShouldQueue, ShouldBeUnique
 {
@@ -42,80 +43,96 @@ class SyncMetaAssetsJob implements ShouldQueue, ShouldBeUnique
         MetaAdSetsService $adSetsService,
         MetaAdsService $adsService
     ): void {
-        // Marca que começou no banco (poderia usar um status de job, mas IntegrationLog atende)
         $this->log('meta_sync_job_started', 'Iniciando sincronização assíncrona de ativos Meta.');
         
-        // Define is_syncing para true (para a UI)
-        // Se a coluna is_syncing existisse poderíamos usar. 
-        // Vamos usar o IntegrationLog para indicar o andamento
-        
-        $hasErrors = false;
-        $adAccountExternalIds = [];
-
-        // 1. Sync Ad Accounts
         try {
-            $adAccountsCount = $adAccountsService->syncAdAccounts($this->integration);
-            $this->log('meta_ad_accounts_sync_completed', "{$adAccountsCount} conta(s) de anúncio sincronizada(s).", 'success');
-            
-            // Busca as contas que acabaram de ser salvas para usar como parent
-            $adAccountExternalIds = IntegrationResource::where('integration_id', $this->integration->id)
-                ->where('resource_type', 'ad_account')
-                ->pluck('external_id')
-                ->toArray();
-        } catch (\Exception $e) {
-            $hasErrors = true;
-            $this->log('meta_ad_accounts_sync_failed', 'Falha ao sincronizar contas de anúncio: ' . $e->getMessage(), 'error');
-        }
+            $hasErrors = false;
+            $adAccountExternalIds = [];
+            $adAccountsSuccess = false;
 
-        // 2. Sync Pages e Instagram
-        try {
-            $pagesCounts = $pagesService->syncPagesAndInstagram($this->integration);
-            $this->log('meta_pages_sync_completed', "{$pagesCounts['pages']} página(s) e {$pagesCounts['instagram']} conta(s) IG sincronizada(s).", 'success');
-        } catch (\Exception $e) {
-            $hasErrors = true;
-            $this->log('meta_pages_sync_failed', 'Falha ao sincronizar páginas/Instagram: ' . $e->getMessage(), 'error');
-        }
-
-        // Se falhou ao pegar Ad Accounts, não tem como pegar campaigns
-        if (empty($adAccountExternalIds) && !$hasErrors) {
-            $this->log('meta_sync_job_completed', 'Sincronização concluída. Nenhuma conta de anúncios encontrada para buscar campanhas.', 'success');
-            return;
-        }
-
-        // 3. Sync Campaigns
-        if (!empty($adAccountExternalIds)) {
+            // 1. Sync Ad Accounts
             try {
-                $campaignsCount = $campaignsService->syncCampaigns($this->integration, $adAccountExternalIds);
-                $this->log('meta_campaigns_sync_completed', "{$campaignsCount} campanha(s) sincronizada(s).", 'success');
+                $adAccountsCount = $adAccountsService->syncAdAccounts($this->integration);
+                $this->log('meta_ad_accounts_sync_completed', "{$adAccountsCount} conta(s) de anúncio sincronizada(s).", 'success');
+                
+                $adAccountExternalIds = IntegrationResource::where('integration_id', $this->integration->id)
+                    ->where('resource_type', 'ad_account')
+                    ->pluck('external_id')
+                    ->toArray();
+                $adAccountsSuccess = true;
             } catch (\Exception $e) {
                 $hasErrors = true;
-                $this->log('meta_campaigns_sync_failed', 'Falha ao sincronizar campanhas: ' . $e->getMessage(), 'error');
+                $this->log('meta_ad_accounts_sync_failed', 'Falha ao sincronizar contas de anúncio: ' . $e->getMessage(), 'error');
             }
 
-            // 4. Sync Ad Sets
+            // 2. Sync Pages e Instagram (Independente)
             try {
-                $adSetsCount = $adSetsService->syncAdSets($this->integration, $adAccountExternalIds);
-                $this->log('meta_adsets_sync_completed', "{$adSetsCount} conjunto(s) de anúncios sincronizado(s).", 'success');
+                $pagesCounts = $pagesService->syncPagesAndInstagram($this->integration);
+                $this->log('meta_pages_sync_completed', "{$pagesCounts['pages']} página(s) e {$pagesCounts['instagram']} conta(s) IG sincronizada(s).", 'success');
             } catch (\Exception $e) {
                 $hasErrors = true;
-                $this->log('meta_adsets_sync_failed', 'Falha ao sincronizar conjuntos de anúncios: ' . $e->getMessage(), 'error');
+                $this->log('meta_pages_sync_failed', 'Falha ao sincronizar páginas/Instagram: ' . $e->getMessage(), 'error');
             }
 
-            // 5. Sync Ads
-            try {
-                $adsCount = $adsService->syncAds($this->integration, $adAccountExternalIds);
-                $this->log('meta_ads_sync_completed', "{$adsCount} anúncio(s) sincronizado(s).", 'success');
-            } catch (\Exception $e) {
-                $hasErrors = true;
-                $this->log('meta_ads_sync_failed', 'Falha ao sincronizar anúncios: ' . $e->getMessage(), 'error');
+            if (empty($adAccountExternalIds) && !$hasErrors) {
+                $this->log('meta_sync_job_completed', 'Sincronização concluída. Nenhuma conta de anúncios encontrada.', 'success');
+                return;
             }
-        }
 
-        if ($hasErrors) {
-            $this->log('meta_sync_job_finished_with_errors', 'Sincronização concluída com falhas parciais.', 'warning');
-        } else {
-            $this->log('meta_sync_job_completed', 'Sincronização concluída com sucesso.', 'success');
+            // 3. Sync Hierárquico (Campaigns -> AdSets -> Ads)
+            if ($adAccountsSuccess && !empty($adAccountExternalIds)) {
+                $campaignsSuccess = false;
+                try {
+                    $campaignsCount = $campaignsService->syncCampaigns($this->integration, $adAccountExternalIds);
+                    $this->log('meta_campaigns_sync_completed', "{$campaignsCount} campanha(s) sincronizada(s).", 'success');
+                    $campaignsSuccess = true;
+                } catch (\Exception $e) {
+                    $hasErrors = true;
+                    $this->log('meta_campaigns_sync_failed', 'Falha ao sincronizar campanhas: ' . $e->getMessage(), 'error');
+                }
+
+                if ($campaignsSuccess) {
+                    $adSetsSuccess = false;
+                    try {
+                        $adSetsCount = $adSetsService->syncAdSets($this->integration, $adAccountExternalIds);
+                        $this->log('meta_adsets_sync_completed', "{$adSetsCount} conjunto(s) de anúncios sincronizado(s).", 'success');
+                        $adSetsSuccess = true;
+                    } catch (\Exception $e) {
+                        $hasErrors = true;
+                        $this->log('meta_adsets_sync_failed', 'Falha ao sincronizar conjuntos de anúncios: ' . $e->getMessage(), 'error');
+                    }
+
+                    if ($adSetsSuccess) {
+                        try {
+                            $adsCount = $adsService->syncAds($this->integration, $adAccountExternalIds);
+                            $this->log('meta_ads_sync_completed', "{$adsCount} anúncio(s) sincronizado(s).", 'success');
+                        } catch (\Exception $e) {
+                            $hasErrors = true;
+                            $this->log('meta_ads_sync_failed', 'Falha ao sincronizar anúncios: ' . $e->getMessage(), 'error');
+                        }
+                    } else {
+                        $this->log('meta_ads_sync_skipped', 'Sincronização de anúncios ignorada porque os conjuntos de anúncios falharam.', 'warning');
+                    }
+                } else {
+                    $this->log('meta_adsets_sync_skipped', 'Sincronização de conjuntos de anúncios e anúncios ignorada porque as campanhas falharam.', 'warning');
+                }
+            } elseif (!$adAccountsSuccess) {
+                 $this->log('meta_campaigns_sync_skipped', 'Sincronização de Campanhas ignorada porque Ad Accounts falhou.', 'warning');
+            }
+
+            if ($hasErrors) {
+                $this->log('meta_sync_job_finished_with_errors', 'Sincronização concluída com falhas parciais.', 'warning');
+            } else {
+                $this->log('meta_sync_job_completed', 'Sincronização concluída com sucesso.', 'success');
+            }
+        } finally {
+            Cache::forget("meta_sync_{$this->integration->id}");
         }
+    }
+
+    public function failed(\Throwable $exception)
+    {
+        Cache::forget("meta_sync_{$this->integration->id}");
     }
 
     private function log(string $event, string $message, string $status = 'info'): void

@@ -160,6 +160,7 @@ class IntegrationsController extends Controller
             'facebook_pages'     => $facebookPages,
             'instagram_accounts' => $instagramAccounts,
             'campaigns_tree'     => $campaigns,
+            'is_job_running'     => \Illuminate\Support\Facades\Cache::has("meta_sync_{$integration->id}"),
         ]);
     }
 
@@ -177,6 +178,7 @@ class IntegrationsController extends Controller
         try {
             $integration = $resolver->resolveOrFail($organization, 'meta');
             
+            \Illuminate\Support\Facades\Cache::put("meta_sync_{$integration->id}", true, 3600);
             // Dispara o Job de forma assíncrona
             \App\Domain\Integrations\Jobs\Meta\SyncMetaAssetsJob::dispatch($integration, $request->user()->id);
 
@@ -189,6 +191,43 @@ class IntegrationsController extends Controller
         }
     }
 
+    /**
+     * Consulta Métricas e Insights da Meta (Phase 2D).
+     * O backend decide se roda síncrono ou se joga pra fila baseado no level/período.
+     */
+    public function metaInsights(
+        Request $request,
+        \App\Domain\Integrations\Services\IntegrationResolver $resolver,
+        \App\Domain\Integrations\Services\Meta\MetaReportRouterService $routerService
+    ) {
+        $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
+        // Verifica RBAC se aplicável. No momento, todos com org.access podem ver performance.
+        
+        $request->validate([
+            'resource_uuid' => 'required|uuid',
+            'level' => 'required|string|in:account,campaign,adset,ad',
+            'period' => 'required|string',
+        ]);
+
+        try {
+            $integration = $resolver->resolveOrFail($organization, 'meta');
+            
+            $result = $routerService->dispatchInsights($integration, $request->only(['resource_uuid', 'level', 'period']));
+
+            return response()->json([
+                'success' => true,
+                'data' => $result['data'],
+                'async' => $result['async']
+            ]);
+            
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Erro Meta Insights: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 400);
+        }
+    }
 
     public function saveConfig(Request $request, string $provider)
     {

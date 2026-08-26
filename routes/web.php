@@ -83,6 +83,7 @@ Route::middleware(['auth'])->group(function () {
             
             // OAuth Genérico (Connect, Callback, Disconnect, Config)
             Route::post('/meta/sync-assets', [\App\Http\Controllers\Integrations\IntegrationsController::class, 'syncMetaAssets'])->name('meta.sync-assets');
+            Route::post('/meta/insights', [\App\Http\Controllers\Integrations\IntegrationsController::class, 'metaInsights'])->name('meta.insights');
             Route::post('/{provider}/config', [IntegrationsController::class, 'saveConfig'])->name('config');
             Route::get('/{provider}/connect', [IntegrationsController::class, 'connect'])->name('connect');
             Route::post('/{provider}/disconnect', [IntegrationsController::class, 'disconnect'])->name('disconnect');
@@ -109,6 +110,9 @@ Route::middleware(['auth'])->group(function () {
         // Resources
         Route::get('/resources', [\App\Http\Controllers\Resources\ResourceExplorerController::class, 'index'])->name('resources.index');
         Route::post('/resources/sync', [\App\Http\Controllers\Resources\ResourceExplorerController::class, 'sync'])->name('resources.sync');
+
+        // Reports Genéricos (Async)
+        Route::get('/api/reports/{uuid}', [\App\Http\Controllers\Reports\ReportsController::class, 'show'])->name('reports.show');
 
         // AI Assistant
         Route::prefix('assistant')->name('assistant.')->group(function () {
