@@ -67,6 +67,13 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/gmail/messages/{messageId}', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'show']);
     Route::get('/gmail/messages/{messageId}/attachments/{attachmentId}', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'readAttachment']);
     Route::post('/gmail/messages/{messageId}/attachments/download-link', [\App\Domain\AI\Api\Controllers\AIGmailController::class, 'downloadLink']);
+
+    // Meta AI Gateway (read-only v1)
+    Route::get('/meta/accounts', [\App\Domain\AI\Api\Controllers\AIMetaController::class, 'accounts']);
+    Route::get('/meta/campaigns', [\App\Domain\AI\Api\Controllers\AIMetaController::class, 'campaigns']);
+    Route::get('/meta/resources/{uuid}', [\App\Domain\AI\Api\Controllers\AIMetaController::class, 'resource'])->whereUuid('uuid');
+    Route::post('/meta/insights', [\App\Domain\AI\Api\Controllers\AIMetaController::class, 'insights']);
+    Route::get('/reports/{uuid}', [\App\Domain\AI\Api\Controllers\AIMetaController::class, 'report'])->whereUuid('uuid');
 });
 
 // Webhooks
