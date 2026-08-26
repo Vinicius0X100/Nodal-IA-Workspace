@@ -17,6 +17,7 @@ enum ResourceType: string
     case FORM = 'form';
     case DRAWING = 'drawing';
     case SHORTCUT = 'shortcut';
+    case AD_ACCOUNT = 'ad_account';
     case OTHER = 'other';
 
     public function label(): string
@@ -34,8 +35,9 @@ enum ResourceType: string
             self::CALENDAR => 'Calendário',
             self::FORM => 'Formulário',
             self::DRAWING => 'Desenho',
-            self::SHORTCUT => 'Atalho',
-            self::OTHER => 'Outro',
+            self::SHORTCUT    => 'Atalho',
+            self::AD_ACCOUNT  => 'Conta de Anúncio',
+            self::OTHER       => 'Outro',
         };
     }
 }

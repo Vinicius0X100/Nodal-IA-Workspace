@@ -98,12 +98,49 @@ class IntegrationsController extends Controller
         
         $config = $integration->config;
 
+        // Ad Accounts sincronizadas — expostas pelo uuid (nunca pelo external_id)
+        $adAccounts = [];
+        if ($integration->status === 'connected') {
+            $adAccounts = \App\Domain\Resources\Models\IntegrationResource::where('integration_id', $integration->id)
+                ->where('resource_type', 'ad_account')
+                ->get(['uuid', 'name', 'metadata_json', 'last_synced_at'])
+                ->toArray();
+        }
+
         return Inertia::render('Integrations/Providers/Meta', [
-            'app_url' => config('app.url'),
+            'app_url'     => config('app.url'),
             'integration' => $integration,
-            'config' => $config,
+            'config'      => $config,
+            'ad_accounts' => $adAccounts,
         ]);
     }
+
+    /**
+     * Dispara a sincronização de Ad Accounts da Meta para a organização ativa.
+     * Segue o mesmo padrão de autorização (isOwner) de connect/disconnect.
+     */
+    public function syncMetaAdAccounts(
+        Request $request,
+        \App\Domain\Integrations\Services\IntegrationResolver $resolver,
+        \App\Domain\Integrations\Services\Meta\MetaAdAccountsService $service
+    ) {
+        $organization = \App\Domain\Organizations\Models\Organization::find(session('active_organization_id'));
+        abort_unless($organization->isOwner($request->user()), 403, 'Acesso restrito aos administradores.');
+
+        try {
+            $integration = $resolver->resolveOrFail($organization, 'meta');
+            $count = $service->syncAdAccounts($integration);
+
+            return back()->with('success', "{$count} conta(s) de anúncio sincronizada(s) com sucesso.");
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return back()->with('error', 'Integração Meta não encontrada ou não está conectada.');
+        } catch (\App\Domain\Integrations\Services\Meta\MetaRateLimitException $e) {
+            return back()->with('error', 'Limite de requisições da Meta atingido. Aguarde alguns minutos e tente novamente.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Erro ao sincronizar: ' . $e->getMessage());
+        }
+    }
+
 
     public function saveConfig(Request $request, string $provider)
     {
