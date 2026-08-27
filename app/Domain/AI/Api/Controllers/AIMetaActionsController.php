@@ -61,10 +61,13 @@ class AIMetaActionsController
             ], 422);
         }
 
+        $conversationUuid = $request->header('X-Conversation-UUID');
+
         // Criar ação pendente
         $action = AIAction::create([
             'organization_id' => $organization->id,
             'user_id' => $user->id,
+            'conversation_id' => $conversationUuid,
             'integration_id' => $integration->id,
             'provider' => 'meta',
             'action_type' => 'status.update',
@@ -179,5 +182,72 @@ class AIMetaActionsController
                 'message' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function getPendingAction(Request $request): JsonResponse
+    {
+        $organization = $request->get('_active_organization');
+        $user = $request->get('_active_user');
+        $conversationUuid = $request->header('X-Conversation-UUID');
+
+        $this->authorizationService->authorize($user, $organization, 'meta.write');
+
+        if (!$conversationUuid) {
+            return response()->json([
+                'success' => false,
+                'code' => 'META_MISSING_CONVERSATION',
+                'message' => 'O cabeçalho X-Conversation-UUID é obrigatório para resolver ações pendentes.'
+            ], 400);
+        }
+
+        $pendingActions = AIAction::where('organization_id', $organization->id)
+            ->where('user_id', $user->id)
+            ->where('conversation_id', $conversationUuid)
+            ->where('provider', 'meta')
+            ->where('status', 'pending')
+            ->where('expires_at', '>', now())
+            ->get();
+
+        if ($pendingActions->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'code' => 'META_PENDING_ACTION_NOT_FOUND',
+                'message' => 'Nenhuma ação pendente válida foi encontrada para esta conversa.'
+            ], 404);
+        }
+
+        if ($pendingActions->count() > 1) {
+            return response()->json([
+                'success' => false,
+                'code' => 'META_PENDING_ACTION_AMBIGUOUS',
+                'message' => 'Múltiplas ações pendentes foram encontradas nesta conversa. Não é possível determinar qual executar.',
+                'data' => [
+                    'count' => $pendingActions->count()
+                ]
+            ], 409);
+        }
+
+        $action = $pendingActions->first();
+        $resource = $this->resourceRepository->findByUuid($organization->id, $action->target_resource_uuid);
+
+        $resourceType = $resource->resource_type instanceof \BackedEnum
+            ? $resource->resource_type->value
+            : (string) $resource->resource_type;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'action_uuid' => $action->uuid,
+                'action_type' => 'status_update',
+                'resource' => [
+                    'uuid' => $resource->uuid,
+                    'type' => $resourceType,
+                    'name' => $resource->name,
+                ],
+                'from_status' => $action->snapshot['effective_status'] ?? 'UNKNOWN',
+                'to_status' => $action->prepared_params['status'] ?? 'UNKNOWN',
+                'expires_at' => $action->expires_at->toIso8601String(),
+            ]
+        ]);
     }
 }

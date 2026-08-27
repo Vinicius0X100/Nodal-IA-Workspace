@@ -76,6 +76,7 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::get('/reports/{uuid}', [\App\Domain\AI\Api\Controllers\AIMetaController::class, 'report'])->whereUuid('uuid');
     
     // Meta AI Gateway - Actions (Write Operations)
+    Route::get('/meta/actions/pending', [\App\Domain\AI\Api\Controllers\AIMetaActionsController::class, 'getPendingAction']);
     Route::post('/meta/actions/status/prepare', [\App\Domain\AI\Api\Controllers\AIMetaActionsController::class, 'prepareStatusUpdate']);
     Route::post('/meta/actions/{action_uuid}/execute', [\App\Domain\AI\Api\Controllers\AIMetaActionsController::class, 'executeStatusUpdate'])->whereUuid('action_uuid');
 });

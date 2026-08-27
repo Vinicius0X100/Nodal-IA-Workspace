@@ -26,7 +26,9 @@ class AIMetaActionsTest extends TestCase
     private Integration $integrationA;
     private Integration $integrationB;
     private IntegrationResource $campaignA;
+    private IntegrationResource $adSetA;
     private IntegrationResource $adAccountA;
+    private \App\Domain\AI\Models\Conversation $conversationA;
     private string $gatewayToken = 'test-ai-gateway-token-secret';
 
     protected function setUp(): void
@@ -91,6 +93,23 @@ class AIMetaActionsTest extends TestCase
             'external_id' => 'camp_111',
             'parent_external_id' => 'act_111',
             'metadata_json' => ['effective_status' => 'ACTIVE'],
+        ]);
+
+        $this->adSetA = IntegrationResource::create([
+            'organization_id' => $this->orgA->id,
+            'integration_id' => $this->integrationA->id,
+            'provider' => 'meta',
+            'resource_type' => 'ad_set',
+            'name' => 'AdSet A',
+            'external_id' => 'adset_111',
+            'parent_external_id' => 'camp_111',
+            'metadata_json' => ['effective_status' => 'ACTIVE'],
+        ]);
+
+        $this->conversationA = \App\Domain\AI\Models\Conversation::create([
+            'organization_id' => $this->orgA->id,
+            'user_id' => $this->ownerA->id,
+            'title' => 'Test Convo',
         ]);
     }
 
@@ -422,5 +441,135 @@ class AIMetaActionsTest extends TestCase
                 
         $action = AIAction::where('uuid', $actionUuid)->first();
         $this->assertEquals('failed', $action->status);
+    }
+
+    /** @test 15 - Find pending action in the same conversation */
+    public function test_get_pending_action_returns_correctly()
+    {
+        $conversationUuid = $this->conversationA->uuid;
+        
+        $prepare = $this->aiPost('/meta/actions/status/prepare', [
+            'resource_uuid' => $this->campaignA->uuid,
+            'status' => 'PAUSED',
+        ], ['X-Conversation-UUID' => $conversationUuid]);
+        
+        $actionUuid = $prepare->json('data.action_uuid');
+        
+        $get = $this->aiGet('/meta/actions/pending', ['X-Conversation-UUID' => $conversationUuid]);
+        
+        $get->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.action_uuid', $actionUuid)
+            ->assertJsonPath('data.action_type', 'status_update')
+            ->assertJsonPath('data.resource.uuid', $this->campaignA->uuid)
+            ->assertJsonPath('data.resource.type', 'campaign')
+            ->assertJsonPath('data.from_status', 'ACTIVE')
+            ->assertJsonPath('data.to_status', 'PAUSED')
+            ->assertJsonMissing(['external_id']);
+    }
+    
+    /** @test 16 - Missing conversation header */
+    public function test_get_pending_action_requires_conversation_header()
+    {
+        $get = $this->aiGet('/meta/actions/pending');
+        $get->assertStatus(400)
+            ->assertJsonPath('code', 'META_MISSING_CONVERSATION');
+    }
+    
+    /** @test 17 - Not found */
+    public function test_get_pending_action_returns_404_if_none()
+    {
+        $conversationUuid = $this->conversationA->uuid;
+        $get = $this->aiGet('/meta/actions/pending', ['X-Conversation-UUID' => $conversationUuid]);
+        $get->assertStatus(404)
+            ->assertJsonPath('code', 'META_PENDING_ACTION_NOT_FOUND');
+    }
+    
+    /** @test 18 - Ambiguous (Multiple pending) */
+    public function test_get_pending_action_returns_ambiguous_if_multiple()
+    {
+        $conversationUuid = $this->conversationA->uuid;
+        
+        $this->aiPost('/meta/actions/status/prepare', [
+            'resource_uuid' => $this->campaignA->uuid,
+            'status' => 'PAUSED',
+        ], ['X-Conversation-UUID' => $conversationUuid]);
+        
+        $this->aiPost('/meta/actions/status/prepare', [
+            'resource_uuid' => $this->adSetA->uuid,
+            'status' => 'PAUSED',
+        ], ['X-Conversation-UUID' => $conversationUuid]);
+        
+        $get = $this->aiGet('/meta/actions/pending', ['X-Conversation-UUID' => $conversationUuid]);
+        
+        $get->assertStatus(409)
+            ->assertJsonPath('code', 'META_PENDING_ACTION_AMBIGUOUS')
+            ->assertJsonPath('data.count', 2);
+    }
+    
+    /** @test 19 - Cross user/org isolation */
+    public function test_get_pending_action_isolated_by_user_org_conversation()
+    {
+        $conversationUuid = $this->conversationA->uuid;
+        
+        $this->aiPost('/meta/actions/status/prepare', [
+            'resource_uuid' => $this->campaignA->uuid,
+            'status' => 'PAUSED',
+        ], ['X-Conversation-UUID' => $conversationUuid]);
+        
+        // Outra conversa
+        $conversationB = \App\Domain\AI\Models\Conversation::create([
+            'organization_id' => $this->orgA->id,
+            'user_id' => $this->ownerA->id,
+            'title' => 'Convo B',
+        ]);
+        $get = $this->aiGet('/meta/actions/pending', ['X-Conversation-UUID' => $conversationB->uuid]);
+        $get->assertStatus(404);
+        
+        // Outro user/org com a mesma conversation
+        $defaultHeaders = [
+            'Authorization' => 'Bearer ' . $this->gatewayToken,
+            'X-Organization-UUID' => $this->orgB->uuid,
+            'X-User-UUID' => $this->ownerB->uuid,
+            'X-Conversation-UUID' => $conversationUuid,
+        ];
+        $get2 = $this->getJson('/api/ai/meta/actions/pending', $defaultHeaders);
+        $get2->assertStatus(404);
+    }
+    
+    /** @test 20 - Ignores expired or non-pending */
+    public function test_get_pending_ignores_expired_or_executed()
+    {
+        $conversationUuid = $this->conversationA->uuid;
+        
+        $prepare = $this->aiPost('/meta/actions/status/prepare', [
+            'resource_uuid' => $this->campaignA->uuid,
+            'status' => 'PAUSED',
+        ], ['X-Conversation-UUID' => $conversationUuid]);
+        
+        $actionUuid = $prepare->json('data.action_uuid');
+        
+        // Marca como expirado
+        \App\Domain\AI\Models\AIAction::where('uuid', $actionUuid)->update(['expires_at' => now()->subMinute()]);
+        
+        $get = $this->aiGet('/meta/actions/pending', ['X-Conversation-UUID' => $conversationUuid]);
+        $get->assertStatus(404);
+        
+        // Marca como executado
+        \App\Domain\AI\Models\AIAction::where('uuid', $actionUuid)->update(['status' => 'executed', 'expires_at' => now()->addMinutes(30)]);
+        
+        $get2 = $this->aiGet('/meta/actions/pending', ['X-Conversation-UUID' => $conversationUuid]);
+        $get2->assertStatus(404);
+    }
+    
+    protected function aiGet(string $uri, array $headers = [])
+    {
+        $defaultHeaders = [
+            'Authorization' => 'Bearer ' . $this->gatewayToken,
+            'X-Organization-UUID' => $this->orgA->uuid,
+            'X-User-UUID' => $this->ownerA->uuid,
+        ];
+
+        return $this->getJson('/api/ai' . $uri, array_merge($defaultHeaders, $headers));
     }
 }
