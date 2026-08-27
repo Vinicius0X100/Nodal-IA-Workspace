@@ -4,70 +4,101 @@ namespace App\Domain\Integrations\Services\Meta;
 
 use App\Domain\Reports\Models\AsyncReport;
 use App\Domain\Reports\Jobs\GenerateAsyncReportJob;
+use App\Domain\Reports\Services\InsightsCostEstimator;
+use App\Domain\Reports\Services\InsightsQuerySignature;
+use App\Domain\Reports\Services\IdempotentReportResolver;
 use App\Domain\Integrations\Models\Integration;
-use Illuminate\Support\Str;
 
+/**
+ * Roteia consultas de Insights para execução Síncrona ou Assíncrona.
+ *
+ * Decisão 100% backend-driven — o frontend e o AI Agent nunca escolhem.
+ * A decisão é delegada ao InsightsCostEstimator (configurável).
+ *
+ * Idempotência: via IdempotentReportResolver + InsightsQuerySignature.
+ */
 class MetaReportRouterService
 {
     public function __construct(
-        private MetaInsightsService $insightsService
+        private MetaInsightsService $insightsService,
+        private InsightsCostEstimator $costEstimator,
+        private IdempotentReportResolver $reportResolver,
     ) {}
 
     /**
-     * Roteia a consulta de Insights para execução Síncrona ou Assíncrona 
-     * com base nas estimativas de volume e tempo.
+     * Roteia a consulta de Insights para execução Síncrona ou Assíncrona.
+     *
+     * @return array{async: bool, data: array}
      */
     public function dispatchInsights(Integration $integration, array $params): array
     {
-        $resourceUuid = $params['resource_uuid'] ?? null;
-        $level = $params['level'] ?? 'campaign';
-        $periodString = $params['period'] ?? 'last_7d';
+        // Resolve período — suporta preset ou date_from/date_to
+        $periodString = $this->resolvePeriodString($params);
+
+        // Normaliza params para sempre ter 'period' internamente
+        $params['period'] = $periodString;
 
         $period = new MetaInsightsPeriod($periodString);
 
-        if ($this->shouldRunAsync($level, $period)) {
-            $report = AsyncReport::create([
-                'uuid' => (string) Str::uuid(),
-                'organization_id' => $integration->organization_id,
-                'integration_id' => $integration->id,
-                'provider' => 'meta',
-                'type' => 'insights',
-                'status' => 'queued',
-                'params' => $params,
-            ]);
-
-            GenerateAsyncReportJob::dispatch($report);
-
-            return [
-                'async' => true,
-                'data' => [
-                    'report_uuid' => $report->uuid,
-                    'status' => 'queued'
-                ]
-            ];
+        // Decisão de roteamento via policy configurável
+        if ($this->costEstimator->shouldRunAsync($integration, $params, $period)) {
+            return $this->dispatchAsync($integration, $params);
         }
 
-        // Executa síncrono (com cache)
+        // Execução síncrona (com cache)
+        $resourceUuid = $params['resource_uuid'] ?? null;
+        $level = $params['level'] ?? 'campaign';
         $data = $this->insightsService->getInsights($integration, $resourceUuid, $level, $period);
 
         return [
             'async' => false,
-            'data' => $data
+            'data' => $data,
         ];
     }
 
-    private function shouldRunAsync(string $level, MetaInsightsPeriod $period): bool
+    /**
+     * Resolve a string de período a partir dos params.
+     * Suporta presets ('last_7d') e datas customizadas (date_from/date_to).
+     */
+    private function resolvePeriodString(array $params): string
     {
-        // Se pedir nível de Ad, a resposta é muito densa (pode ter milhares)
-        if ($level === 'ad') {
-            return true;
+        if (!empty($params['period'])) {
+            return $params['period'];
         }
 
-        // Se o período for maior que 14 dias
-        if ($period->getDaysCount() > 14) {
-            return true;
+        if (!empty($params['date_from']) && !empty($params['date_to'])) {
+            return "custom:{$params['date_from']}:{$params['date_to']}";
         }
 
-        return false;
+        return 'last_7d';
+    }
+
+    /**
+     * Despacha ou reutiliza um Job assíncrono idempotente.
+     *
+     * @return array{async: true, data: array{report_uuid: string, status: string, reused: bool}}
+     */
+    private function dispatchAsync(Integration $integration, array $params): array
+    {
+        ['report' => $report, 'reused' => $reused] = $this->reportResolver->resolve(
+            $integration,
+            $params,
+            'meta',
+            'insights',
+        );
+
+        // Só despacha novo Job se o report acabou de ser criado (não reused)
+        if (!$reused) {
+            GenerateAsyncReportJob::dispatch($report);
+        }
+
+        return [
+            'async' => true,
+            'data' => [
+                'report_uuid' => $report->uuid,
+                'status' => $report->status,
+                'reused' => $reused,
+            ],
+        ];
     }
 }

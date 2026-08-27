@@ -150,12 +150,14 @@ class MetaInsightsTest extends TestCase
     {
         Queue::fake();
 
+        // level=ad (+50) + period >30 dias (+60) = 110 pontos → async
         $response = $this->actingAs($this->userA)
             ->withSession(['active_organization_id' => $this->orgA->id])
             ->postJson('/integrations/meta/insights', [
             'resource_uuid' => IntegrationResource::where('external_id', 'act_123')->first()->uuid,
-            'level' => 'ad', // Level AD aciona async automático
-            'period' => 'last_7d'
+            'level' => 'ad',
+            'date_from' => '2026-07-01',
+            'date_to' => '2026-08-26',  // 56 dias → >30 dias (+60)
         ]);
 
         $response->assertStatus(200)

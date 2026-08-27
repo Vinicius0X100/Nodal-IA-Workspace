@@ -206,13 +206,16 @@ class IntegrationsController extends Controller
         $request->validate([
             'resource_uuid' => 'required|uuid',
             'level' => 'required|string|in:account,campaign,adset,ad',
-            'period' => 'required|string',
+            'period' => 'required_without:date_from|string',
+            'date_from' => 'required_without:period|date_format:Y-m-d',
+            'date_to' => 'required_without:period|date_format:Y-m-d|after_or_equal:date_from',
         ]);
 
         try {
             $integration = $resolver->resolveOrFail($organization, 'meta');
-            
-            $result = $routerService->dispatchInsights($integration, $request->only(['resource_uuid', 'level', 'period']));
+
+            $params = $request->only(['resource_uuid', 'level', 'period', 'date_from', 'date_to']);
+            $result = $routerService->dispatchInsights($integration, $params);
 
             return response()->json([
                 'success' => true,

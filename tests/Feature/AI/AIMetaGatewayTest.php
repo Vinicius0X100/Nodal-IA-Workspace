@@ -465,16 +465,17 @@ class AIMetaGatewayTest extends TestCase
     {
         Queue::fake();
 
+        // level=ad (+50) + period >30 dias (+60) = 110 pontos → acima do threshold de 100 → async
         $response = $this->aiPost('/meta/insights', [
             'resource_uuid' => $this->adAccountA->uuid,
-            'level' => 'ad', // Aciona async
-            'period' => 'last_7d',
+            'level' => 'ad',
+            'date_from' => '2026-07-01',
+            'date_to' => '2026-08-26',  // 56 dias
         ]);
 
         $response->assertStatus(200)
                  ->assertJsonPath('success', true)
                  ->assertJsonPath('async', true)
-                 ->assertJsonPath('data.mode', 'async')
                  ->assertJsonPath('data.status', 'queued');
 
         $this->assertNotNull($response->json('data.report_uuid'));

@@ -11,6 +11,7 @@ use App\Domain\Permissions\Services\AuthorizationService;
 use App\Domain\Reports\Models\AsyncReport;
 use App\Domain\Resources\Models\IntegrationResource;
 use App\Domain\Resources\Repositories\ResourceRepository;
+use App\Domain\Reports\Services\AsyncReportResultStorage;
 use App\Http\Requests\AI\AIMetaCampaignsRequest;
 use App\Http\Requests\AI\AIMetaInsightsRequest;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -43,6 +44,7 @@ class AIMetaController
         private IntegrationResolver $resolver,
         private ResourceRepository $repository,
         private MetaReportRouterService $reportRouter,
+        private AsyncReportResultStorage $resultStorage,
     ) {}
 
     /**
@@ -301,32 +303,54 @@ class AIMetaController
                 ], 404);
             }
 
+            $pollingIntervals = config('reports.polling_interval', []);
+
             $data = [
-                'uuid' => $report->uuid,
-                'status' => $report->status,
+                'uuid'     => $report->uuid,
+                'status'   => $report->status,
                 'progress' => $report->progress ?? 0,
             ];
 
-            if ($report->status === 'completed') {
-                $data['progress'] = 100;
-                $data['result'] = $report->result;
-                $data['completed_at'] = $report->completed_at?->toIso8601String();
-            }
-
-            if ($report->status === 'failed') {
-                $data['error'] = [
-                    'code' => strtoupper($report->provider ?? 'GENERIC') . '_REPORT_FAILED',
-                    'message' => 'Não foi possível concluir o relatório.',
-                ];
+            // Sugestão de retry para o poller (Tool futura)
+            if (isset($pollingIntervals[$report->status])) {
+                $data['retry_after_seconds'] = $pollingIntervals[$report->status];
             }
 
             if ($report->started_at) {
                 $data['started_at'] = $report->started_at->toIso8601String();
             }
 
+            if ($report->status === 'completed') {
+                $data['progress'] = 100;
+                $data['completed_at'] = $report->completed_at?->toIso8601String();
+                // Recupera resultado de banco ou Storage de forma transparente
+                $data['result'] = $this->resultStorage->retrieve($report);
+            }
+
+            if ($report->status === 'partial') {
+                $data['result'] = $this->resultStorage->retrieve($report);
+                $data['partial'] = true;
+            }
+
+            if ($report->status === 'failed') {
+                $data['error'] = [
+                    'code'    => strtoupper($report->provider ?? 'GENERIC') . '_REPORT_FAILED',
+                    'message' => 'Não foi possível concluir o relatório.',
+                ];
+            }
+
+            // Observabilidade disponível para diagnóstico
+            if (!empty($report->metadata)) {
+                $data['_meta'] = [
+                    'pages'    => $report->metadata['pages'] ?? null,
+                    'records'  => $report->metadata['records'] ?? null,
+                    'duration_ms' => $report->metadata['duration_ms'] ?? null,
+                ];
+            }
+
             return response()->json([
                 'success' => true,
-                'data' => $data,
+                'data'    => $data,
             ]);
         } catch (\Exception $e) {
             return $this->handleMetaException($e);
