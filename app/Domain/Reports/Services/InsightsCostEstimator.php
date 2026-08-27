@@ -80,6 +80,11 @@ class InsightsCostEstimator
         array $params,
         MetaInsightsPeriod $period,
     ): bool {
+        // Fallback seguro para testes/dev: forçar execução assíncrona
+        if (config('reports.force_async') === true && !app()->isProduction()) {
+            return true;
+        }
+
         $cost = $this->estimate($integration, $params, $period);
         $threshold = (int) config('reports.async_threshold', 100);
         return $cost >= $threshold;

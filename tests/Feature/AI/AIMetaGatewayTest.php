@@ -481,6 +481,39 @@ class AIMetaGatewayTest extends TestCase
         $this->assertNotNull($response->json('data.report_uuid'));
     }
 
+    /** @test 23.5 - force async em testes/desenvolvimento */
+    public function test_force_async_config_routes_all_queries_to_async()
+    {
+        Queue::fake();
+
+        // Configura para forçar async
+        config(['reports.force_async' => true]);
+
+        // Custo baixo: campaign last_7d (deveria ser sync normalmente)
+        $response = $this->aiPost('/meta/insights', [
+            'resource_uuid' => $this->adAccountA->uuid,
+            'level' => 'campaign',
+            'period' => 'last_7d',
+        ]);
+
+        $response->assertStatus(200)
+                 ->assertJsonPath('success', true)
+                 ->assertJsonPath('async', true)
+                 ->assertJsonPath('data.status', 'queued');
+
+        $reportUuid = $response->json('data.report_uuid');
+        $this->assertNotNull($reportUuid);
+        
+        // Verifica se job foi disparado
+        Queue::assertPushed(\App\Domain\Reports\Jobs\GenerateAsyncReportJob::class);
+        
+        // E2E check da rota GET
+        $get = $this->aiGet('/reports/' . $reportUuid);
+        $get->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.status', 'queued');
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //  24-29: /reports/{uuid}
     // ═══════════════════════════════════════════════════════════════════

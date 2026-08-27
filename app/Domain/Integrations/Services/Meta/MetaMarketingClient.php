@@ -62,6 +62,18 @@ class MetaMarketingClient
     }
 
     /**
+     * Executa uma requisição POST à Graph API.
+     */
+    public function post(string $endpoint, Integration $integration, array $params = []): array
+    {
+        $token = $this->tokenService->getValidToken($integration);
+        $url = $this->buildUrl($endpoint);
+
+        $response = $this->requestWithRetry('POST', $url, $params, $token, $integration, $endpoint);
+        return $this->handleResponse($response, $integration, $endpoint);
+    }
+
+    /**
      * Busca TODOS os itens de um endpoint paginado, acumulando em memória.
      *
      * @deprecated Para volumes grandes, prefira getAllChunked() que não acumula em memória.
@@ -170,10 +182,15 @@ class MetaMarketingClient
             $attempt++;
 
             try {
-                $response = Http::withToken($token)
+                $request = Http::withToken($token)
                     ->connectTimeout(self::TIMEOUT_CONNECT_SECONDS)
-                    ->timeout(self::TIMEOUT_REQUEST_SECONDS)
-                    ->get($url, $params);
+                    ->timeout(self::TIMEOUT_REQUEST_SECONDS);
+                
+                if (strtoupper($method) === 'POST') {
+                    $response = $request->post($url, $params);
+                } else {
+                    $response = $request->get($url, $params);
+                }
 
                 // Sucesso ou erro definitivo — não retry
                 if ($response->successful()) {

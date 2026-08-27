@@ -13,6 +13,15 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Forçar processamento assíncrono (Apenas para Desenvolvimento/Testes)
+    |--------------------------------------------------------------------------
+    | Útil para forçar o AI Agent a sempre usar a fila de relatórios para testar
+    | o comportamento do worker localmente. É ignorado em produção.
+    */
+    'force_async' => env('REPORTS_FORCE_ASYNC', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Fatores de custo estimado (InsightsCostEstimator)
     |--------------------------------------------------------------------------
     | Cada fator adiciona pontos ao custo total estimado da consulta.
