@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 
 class MetaCampaignsService
 {
-    private const FIELDS = 'id,name,status,effective_status,objective,created_time,updated_time';
+    private const FIELDS = 'id,name,status,effective_status,objective,created_time,updated_time,daily_budget,lifetime_budget';
     private const LIMIT = 100;
 
     public function __construct(
@@ -92,6 +92,8 @@ class MetaCampaignsService
                 'status'           => $campaign['status'] ?? null,
                 'effective_status' => $campaign['effective_status'] ?? null,
                 'objective'        => $campaign['objective'] ?? null,
+                'daily_budget'     => $campaign['daily_budget'] ?? null,
+                'lifetime_budget'  => $campaign['lifetime_budget'] ?? null,
             ]),
         ];
     }
