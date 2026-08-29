@@ -290,6 +290,119 @@ class AIResourcesService
         ];
     }
 
+    public function createSpreadsheet(Organization $organization, \App\Domain\Identity\Models\User $user, \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext, string $name, ?string $parentResourceUuid = null): array
+    {
+        $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+            ->where('provider', 'google_workspace')
+            ->where('status', 'connected')
+            ->where('is_enabled', true)
+            ->first();
+
+        if (!$integration) {
+            throw new Exception("Integração do Google Workspace não está ativa ou configurada.", 403);
+        }
+
+        $parentResource = null;
+        if ($parentResourceUuid) {
+            $parentResource = $this->findByUuid($organization, $parentResourceUuid);
+            
+            if (!$parentResource) {
+                throw new Exception("Pasta pai não encontrada.", 404);
+            }
+
+            if (!$this->authorizationService->canAccessResource($user, $organization, $parentResource)) {
+                throw new \Illuminate\Auth\Access\AuthorizationException("Você não possui permissão para acessar a pasta pai.");
+            }
+
+            if ($parentResource->mime_type !== 'application/vnd.google-apps.folder' && !$parentResource->is_folder) {
+                throw new Exception("O recurso pai especificado não é uma pasta.", 422);
+            }
+        }
+
+        $url = "https://www.googleapis.com/drive/v3/files";
+        $payload = [
+            'name' => $name,
+            'mimeType' => 'application/vnd.google-apps.spreadsheet',
+        ];
+
+        if ($parentResource && $parentResource->external_id) {
+            $payload['parents'] = [$parentResource->external_id];
+        }
+
+        $identity = $accessContext->getResolvedIdentity();
+
+        $response = $this->googleTokenService->executeWithRetry($integration, function ($token) use ($url, $payload) {
+            return Http::withToken($token)->post($url, $payload);
+        }, $identity, ['https://www.googleapis.com/auth/drive']);
+
+        if (!$response->successful()) {
+            throw new Exception("Provider API Error: " . $response->body(), $response->status());
+        }
+
+        $googleData = $response->json();
+        $googleFileId = $googleData['id'] ?? null;
+
+        if (!$googleFileId) {
+            throw new Exception("A API do Google não retornou o ID do arquivo.", 500);
+        }
+
+        try {
+            $resource = IntegrationResource::create([
+                'integration_id' => $integration->id,
+                'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                'provider' => \App\Domain\Resources\Enums\Provider::GOOGLE_WORKSPACE->value,
+                'resource_type' => \App\Domain\Resources\Enums\ResourceType::SPREADSHEET->value,
+                'external_id' => $googleFileId,
+                'parent_external_id' => $parentResource ? $parentResource->external_id : null,
+                'name' => $name,
+                'mime_type' => 'application/vnd.google-apps.spreadsheet',
+                'is_folder' => false,
+                'created_by_provider_at' => now(),
+                'updated_by_provider_at' => now(),
+                'last_synced_at' => now(),
+            ]);
+        } catch (\Exception $dbException) {
+            // Compensação: tenta deletar o arquivo no Google caso a persistência falhe
+            try {
+                $deleteUrl = "https://www.googleapis.com/drive/v3/files/{$googleFileId}";
+                $this->googleTokenService->executeWithRetry($integration, function ($token) use ($deleteUrl) {
+                    return Http::withToken($token)->delete($deleteUrl);
+                }, $identity, ['https://www.googleapis.com/auth/drive']);
+                
+                $this->logAuditAction->execute('ai_create_spreadsheet_sync_failed_rollback', 'IntegrationResource', $googleFileId, [
+                    'provider' => 'google_workspace',
+                    'user_id' => $user->id,
+                    'name' => $name,
+                    'error' => $dbException->getMessage(),
+                ]);
+            } catch (\Exception $rollbackException) {
+                $this->logAuditAction->execute('ai_create_spreadsheet_sync_failed_orphan', 'IntegrationResource', $googleFileId, [
+                    'provider' => 'google_workspace',
+                    'user_id' => $user->id,
+                    'name' => $name,
+                    'error' => 'Rollback falhou: ' . $rollbackException->getMessage() . ' | Erro DB: ' . $dbException->getMessage(),
+                ]);
+            }
+
+            throw new Exception("A planilha foi criada no Google, mas ocorreu um erro interno ao salvá-la no sistema.", 500);
+        }
+
+        $this->logAuditAction->execute('ai_create_resource_spreadsheet', 'IntegrationResource', (string) $resource->id, [
+            'provider' => 'google_workspace',
+            'uuid' => $resource->uuid,
+            'user_id' => $user->id,
+            'parent_uuid' => $parentResourceUuid
+        ]);
+
+        return [
+            'resource_uuid' => $resource->uuid,
+            'name' => $resource->name,
+            'type' => \App\Domain\Resources\Enums\ResourceType::SPREADSHEET->value,
+            'provider' => \App\Domain\Resources\Enums\Provider::GOOGLE_WORKSPACE->value,
+            'parent_resource_uuid' => $parentResourceUuid,
+        ];
+    }
+
     /**
      * Search resources for the given organization.
      */
