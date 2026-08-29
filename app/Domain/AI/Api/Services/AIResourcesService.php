@@ -403,6 +403,105 @@ class AIResourcesService
         ];
     }
 
+    public function updateSpreadsheetValues(Organization $organization, \App\Domain\Identity\Models\User $user, \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext, string $uuid, array $updates): array
+    {
+        $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+            ->where('provider', 'google_workspace')
+            ->where('status', 'connected')
+            ->where('is_enabled', true)
+            ->first();
+
+        if (!$integration) {
+            throw new Exception("Integração do Google Workspace não está ativa ou configurada.", 403);
+        }
+
+        $resource = $this->findByUuid($organization, $uuid);
+
+        if (!$resource) {
+            throw new Exception("Resource not found.", 404);
+        }
+
+        if (!$this->authorizationService->canAccessResource($user, $organization, $resource)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException("Você não possui permissão para acessar este recurso.");
+        }
+
+        if ($resource->resource_type !== \App\Domain\Resources\Enums\ResourceType::SPREADSHEET) {
+            throw new Exception("Este recurso não é uma planilha.", 422);
+        }
+
+        $fileId = $resource->external_id;
+        if (empty($fileId)) {
+            throw new Exception("Resource lacks an external identifier.", 400);
+        }
+
+        $identity = $accessContext->getResolvedIdentity();
+
+        $dataPayload = [];
+        foreach ($updates as $update) {
+            $dataPayload[] = [
+                'range' => $update['range'],
+                'majorDimension' => 'ROWS',
+                'values' => $update['values']
+            ];
+        }
+
+        $payload = [
+            'valueInputOption' => 'USER_ENTERED',
+            'includeValuesInResponse' => false,
+            'data' => $dataPayload
+        ];
+
+        $url = "https://sheets.googleapis.com/v4/spreadsheets/{$fileId}/values:batchUpdate";
+
+        $response = $this->googleTokenService->executeWithRetry($integration, function ($token) use ($url, $payload) {
+            return Http::withToken($token)->post($url, $payload);
+        }, $identity, ['https://www.googleapis.com/auth/drive']);
+
+        if (!$response->successful()) {
+            throw new Exception("Provider API Error: " . $response->body(), $response->status());
+        }
+
+        $googleData = $response->json();
+        $responses = $googleData['responses'] ?? [];
+
+        $updatedRanges = [];
+        $totalUpdatedCells = $googleData['totalUpdatedCells'] ?? 0;
+
+        foreach ($responses as $idx => $res) {
+            $rangeString = $res['updatedRange'] ?? ($updates[$idx]['range'] ?? null);
+            $updatedRanges[] = [
+                'range' => $rangeString,
+                'updated_rows' => $res['updatedRows'] ?? 0,
+                'updated_columns' => $res['updatedColumns'] ?? 0,
+                'updated_cells' => $res['updatedCells'] ?? 0,
+            ];
+            
+            // If the root didn't have totalUpdatedCells, accumulate it just in case
+            if (!isset($googleData['totalUpdatedCells'])) {
+                $totalUpdatedCells += ($res['updatedCells'] ?? 0);
+            }
+        }
+
+        $resource->update([
+            'updated_by_provider_at' => now(),
+            'last_synced_at' => now(),
+        ]);
+
+        $this->logAuditAction->execute('ai_update_resource_spreadsheet_values', 'IntegrationResource', (string) $resource->id, [
+            'provider' => 'google_workspace',
+            'uuid' => $resource->uuid,
+            'user_id' => $user->id,
+            'total_updated_cells' => $totalUpdatedCells,
+            'ranges_count' => count($updatedRanges)
+        ]);
+
+        return [
+            'resource_uuid' => $resource->uuid,
+            'updated_ranges' => $updatedRanges,
+            'total_updated_cells' => $totalUpdatedCells,
+        ];
+    }
+
     /**
      * Search resources for the given organization.
      */
