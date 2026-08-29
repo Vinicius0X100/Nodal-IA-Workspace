@@ -156,6 +156,39 @@ class AIResourcesController
         }
     }
 
+    public function formatSpreadsheet(\App\Http\Requests\AI\FormatSpreadsheetRequest $request, string $uuid): JsonResponse
+    {
+        try {
+            $organization = $request->get('_active_organization');
+            $user = $request->get('_active_user');
+
+            $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+                ->where('provider', 'google_workspace')
+                ->where('status', 'connected')
+                ->where('is_enabled', true)
+                ->first();
+
+            $accessContext = $this->authorizationService->resolveAccessContext(
+                $user,
+                $organization,
+                'resources.write',
+                $integration,
+                $integration ? $integration->provider : 'google_workspace'
+            );
+
+            $operations = $request->input('operations');
+
+            $data = $this->service->formatSpreadsheet($organization, $user, $accessContext, $uuid, $operations);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            return $this->handleException($e, 'Error formatting spreadsheet');
+        }
+    }
+
     public function updateSpreadsheetValues(UpdateSpreadsheetValuesRequest $request, string $uuid): JsonResponse
     {
         try {

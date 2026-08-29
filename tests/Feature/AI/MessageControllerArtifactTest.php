@@ -38,7 +38,7 @@ class MessageControllerArtifactTest extends TestCase
             'email'    => 'user@test.com',
             'password' => bcrypt('password'),
         ]);
-        $this->organization->users()->attach($this->user->id, ['is_owner' => false]);
+        $this->organization->users()->attach($this->user->id, ['is_owner' => true]);
 
         $this->integration = Integration::create([
             'organization_id' => $this->organization->id,
@@ -47,6 +47,17 @@ class MessageControllerArtifactTest extends TestCase
             'status' => 'connected',
             'access_token' => 'valid-token',
             'is_enabled' => true,
+        ]);
+
+        \App\Domain\Identities\Models\ExternalIdentity::create([
+            'organization_id' => $this->organization->id,
+            'integration_id' => $this->integration->id,
+            'user_id' => $this->user->id,
+            'provider' => 'google_workspace',
+            'external_id' => 'google-user-123',
+            'primary_email' => 'user@test.com',
+            'access_token' => 'mock-token',
+            'status' => 'linked',
         ]);
 
         $this->conversation = Conversation::create([
@@ -89,9 +100,7 @@ class MessageControllerArtifactTest extends TestCase
             ]
         ]);
 
-        $this->mock(\App\Domain\Permissions\Services\AuthorizationService::class, function ($mock) {
-            $mock->shouldReceive('canAccessResource')->andReturn(true);
-        });
+        // Real AuthorizationService is used.
 
         $this->withoutExceptionHandling();
 

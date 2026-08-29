@@ -49,12 +49,23 @@ class MessageController extends Controller
             $result = $this->aiProvider->chat($conversation, $userMessage);
             
             $validArtifacts = $this->validateAndNormalizeArtifacts($result->artifacts, $organizationId, $request->user());
+            
+            \Illuminate\Support\Facades\Log::info('[ARTIFACT_OBSERVABILITY] Post-normalization', [
+                'normalized_artifact_count' => count($validArtifacts),
+                'content_present' => !empty($result->content)
+            ]);
+
             $metadata = [];
             if (!empty($validArtifacts)) {
                 $metadata['artifacts'] = $validArtifacts;
             }
 
-            $this->messageService->addAssistantMessage($conversation, $result->content, $metadata);
+            $message = $this->messageService->addAssistantMessage($conversation, $result->content, $metadata);
+
+            \Illuminate\Support\Facades\Log::info('[ARTIFACT_OBSERVABILITY] Persisted message', [
+                'message_id' => $message->id,
+                'metadata_json' => $message->metadata_json
+            ]);
         } else {
             $this->messageService->addAssistantMessage($conversation, "O Cérebro da Inteligência Artificial não está configurado ou disponível no momento.");
         }
@@ -69,35 +80,104 @@ class MessageController extends Controller
         $organization = \App\Domain\Organizations\Models\Organization::find($organizationId);
 
         foreach ($artifacts as $artifact) {
-            if (!is_array($artifact)) continue;
-
+            $type = $artifact['type'] ?? null;
             $uuid = $artifact['resource_uuid'] ?? null;
-            if (!$uuid || !\Illuminate\Support\Str::isUuid($uuid)) {
+
+            \Illuminate\Support\Facades\Log::info('[ARTIFACT_OBSERVABILITY] Received artifact', [
+                'type' => $type,
+                'resource_uuid' => $uuid,
+            ]);
+
+            if (!$type || !$uuid) {
+                \Illuminate\Support\Facades\Log::warning('[ARTIFACT_OBSERVABILITY] Discarded artifact', [
+                    'resource_uuid' => $uuid,
+                    'discard_reason' => 'INVALID_UUID_OR_TYPE',
+                ]);
                 continue;
             }
 
-            // Localiza IntegrationResource
-            $resource = \App\Domain\Resources\Models\IntegrationResource::where('uuid', $uuid)
-                ->whereHas('integration', function ($query) use ($organizationId) {
-                    $query->where('organization_id', $organizationId);
-                })
-                ->first();
+            if ($type === 'spreadsheet') {
+                $resource = \App\Domain\Resources\Models\IntegrationResource::where('uuid', $uuid)->first();
+                
+                $found = $resource !== null;
+                $integrationMatch = $found && $resource->integration && $resource->integration->organization_id === $organizationId;
 
-            if (!$resource) {
-                continue;
+                \Illuminate\Support\Facades\Log::info('[ARTIFACT_OBSERVABILITY] Resource lookup result', [
+                    'found' => $found,
+                    'resource_uuid' => $found ? $resource->uuid : null,
+                    'resource_type' => $found ? ($resource->resource_type instanceof \App\Domain\Resources\Enums\ResourceType ? $resource->resource_type->value : $resource->resource_type) : null,
+                    'integration_id' => $found ? $resource->integration_id : null,
+                    'active_organization' => $organizationId,
+                    'integration_belongs_to_active_organization' => $integrationMatch,
+                ]);
+
+                if (!$found) {
+                    \Illuminate\Support\Facades\Log::warning('[ARTIFACT_OBSERVABILITY] Discarded artifact', [
+                        'resource_uuid' => $uuid,
+                        'discard_reason' => 'RESOURCE_NOT_FOUND',
+                    ]);
+                    continue;
+                }
+                
+                if (!$integrationMatch) {
+                    \Illuminate\Support\Facades\Log::warning('[ARTIFACT_OBSERVABILITY] Discarded artifact', [
+                        'resource_uuid' => $uuid,
+                        'discard_reason' => 'TENANT_MISMATCH',
+                    ]);
+                    continue;
+                }
+
+                $providerString = $resource->provider instanceof \App\Domain\Resources\Enums\Provider ? $resource->provider->value : clone $resource->provider;
+                if (!is_string($providerString)) {
+                    $providerString = (string) $resource->provider;
+                }
+                
+                $accessContext = $authService->resolveAccessContext($user, $organization, 'resources.read', $resource->integration, $providerString);
+                
+                $canAccess = $authService->canAccessResource($user, $organization, $resource, $accessContext);
+
+                \Illuminate\Support\Facades\Log::info('[ARTIFACT_OBSERVABILITY] Authorization result', [
+                    'canAccessResource' => $canAccess,
+                    'resource_uuid' => $uuid,
+                ]);
+
+                if (!$canAccess) {
+                    \Illuminate\Support\Facades\Log::warning('[ARTIFACT_OBSERVABILITY] Discarded artifact', [
+                        'resource_uuid' => $uuid,
+                        'discard_reason' => 'ACCESS_DENIED',
+                    ]);
+                    continue;
+                }
+                
+                $actualResourceType = $resource->resource_type instanceof \App\Domain\Resources\Enums\ResourceType ? $resource->resource_type->value : $resource->resource_type;
+                \Illuminate\Support\Facades\Log::info('[ARTIFACT_OBSERVABILITY] Type validation', [
+                    'received_type' => $type,
+                    'actual_type' => $actualResourceType,
+                ]);
+
+                if ($actualResourceType !== 'spreadsheet') {
+                    \Illuminate\Support\Facades\Log::warning('[ARTIFACT_OBSERVABILITY] Discarded artifact', [
+                        'resource_uuid' => $uuid,
+                        'discard_reason' => 'TYPE_MISMATCH',
+                    ]);
+                    continue;
+                }
+
+                \Illuminate\Support\Facades\Log::info('[ARTIFACT_OBSERVABILITY] Artifact accepted', [
+                    'resource_uuid' => $uuid,
+                ]);
+
+                $valid[] = [
+                    'type' => 'spreadsheet',
+                    'resource_uuid' => $resource->uuid,
+                    'title' => $artifact['title'] ?? $resource->name,
+                ];
+            } else {
+                 \Illuminate\Support\Facades\Log::warning('[ARTIFACT_OBSERVABILITY] Discarded artifact', [
+                    'resource_uuid' => $uuid,
+                    'discard_reason' => 'UNSUPPORTED_TYPE',
+                ]);
             }
-
-            // Verifica permissão granular
-            if (!$authService->canAccessResource($user, $organization, $resource)) {
-                continue;
-            }
-
-            // Normaliza title e type a partir da fonte real
-            $valid[] = [
-                'type' => $resource->resource_type instanceof \App\Domain\Resources\Enums\ResourceType ? $resource->resource_type->value : $resource->resource_type,
-                'resource_uuid' => $resource->uuid,
-                'title' => $resource->name,
-            ];
         }
 
         return $valid;

@@ -403,7 +403,329 @@ class AIResourcesService
         ];
     }
 
+    public function formatSpreadsheet(Organization $organization, \App\Domain\Identity\Models\User $user, \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext, string $uuid, array $operations): array
+    {
+        $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
+            ->where('provider', 'google_workspace')
+            ->where('status', 'connected')
+            ->where('is_enabled', true)
+            ->first();
+
+        if (!$integration) {
+            throw new \Exception("Integração do Google Workspace não está ativa ou configurada.", 403);
+        }
+
+        $resource = $this->findByUuid($organization, $uuid);
+
+        if (!$resource) {
+            throw new \Exception("Resource not found.", 404);
+        }
+
+        if (!$this->authorizationService->canAccessResource($user, $organization, $resource, $accessContext)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException("Você não possui permissão para acessar este recurso.");
+        }
+
+        if ($resource->resource_type !== \App\Domain\Resources\Enums\ResourceType::SPREADSHEET) {
+            throw new \Exception("Este recurso não é uma planilha.", 422);
+        }
+
+        $fileId = $resource->external_id;
+        if (empty($fileId)) {
+            throw new \Exception("Resource lacks an external identifier.", 400);
+        }
+
+        $identity = $accessContext->getResolvedIdentity();
+        
+        // Obter metadata da planilha para resolver sheetIds
+        $metadataUrl = "https://sheets.googleapis.com/v4/spreadsheets/{$fileId}?fields=sheets(properties(sheetId,title,index))";
+        $metadataResponse = $this->googleTokenService->executeWithRetry($integration, function ($token) use ($metadataUrl) {
+            return \Illuminate\Support\Facades\Http::withToken($token)->get($metadataUrl);
+        }, $identity, ['https://www.googleapis.com/auth/drive']);
+        
+        if (!$metadataResponse->successful()) {
+            throw new \Exception("Erro ao obter metadados da planilha: " . $metadataResponse->body(), $metadataResponse->status());
+        }
+
+        $sheets = $metadataResponse->json('sheets') ?? [];
+        $sheetTitleToId = [];
+        $firstSheetId = null;
+
+        // Ordenar pelo índice para garantir que pegamos a primeira aba real
+        usort($sheets, fn($a, $b) => ($a['properties']['index'] ?? 0) <=> ($b['properties']['index'] ?? 0));
+
+        foreach ($sheets as $idx => $sheet) {
+            $sheetId = $sheet['properties']['sheetId'];
+            $title = $sheet['properties']['title'];
+            $sheetTitleToId[$title] = $sheetId;
+            if ($idx === 0) {
+                $firstSheetId = $sheetId;
+            }
+        }
+
+        $batchRequests = [];
+
+        foreach ($operations as $op) {
+            $type = $op['type'];
+            
+            // Resolve Sheet ID
+            $sheetId = $firstSheetId;
+            $rangeSheet = null;
+            $gridRange = null;
+
+            if (isset($op['range'])) {
+                $parsed = \App\Domain\AI\Utils\A1Parser::parse($op['range']);
+                $rangeSheet = $parsed['sheetTitle'];
+                $gridRange = $parsed['gridRange'];
+            }
+            
+            $opSheet = $op['sheet'] ?? null;
+            $targetSheetTitle = $rangeSheet ?? $opSheet;
+            
+            if ($targetSheetTitle) {
+                if (!isset($sheetTitleToId[$targetSheetTitle])) {
+                    throw new \Exception("Aba não encontrada: {$targetSheetTitle}", 422);
+                }
+                $sheetId = $sheetTitleToId[$targetSheetTitle];
+            }
+
+            if ($gridRange) {
+                $gridRange['sheetId'] = $sheetId;
+            }
+
+            if ($type === 'format_range') {
+                $format = $op['format'];
+                $cellFormat = [];
+                $fields = [];
+
+                if (isset($format['background_color'])) {
+                    $cellFormat['backgroundColorStyle'] = ['rgbColor' => $this->hexToRgb($format['background_color'])];
+                    $fields[] = 'userEnteredFormat.backgroundColorStyle';
+                }
+                if (isset($format['horizontal_alignment'])) {
+                    $cellFormat['horizontalAlignment'] = $format['horizontal_alignment'];
+                    $fields[] = 'userEnteredFormat.horizontalAlignment';
+                }
+                if (isset($format['vertical_alignment'])) {
+                    $cellFormat['verticalAlignment'] = $format['vertical_alignment'];
+                    $fields[] = 'userEnteredFormat.verticalAlignment';
+                }
+                if (isset($format['wrap'])) {
+                    $cellFormat['wrapStrategy'] = $format['wrap'] ? 'WRAP' : 'OVERFLOW_CELL';
+                    $fields[] = 'userEnteredFormat.wrapStrategy';
+                }
+
+                $textFormat = [];
+                if (isset($format['text_color'])) {
+                    $textFormat['foregroundColorStyle'] = ['rgbColor' => $this->hexToRgb($format['text_color'])];
+                    $fields[] = 'userEnteredFormat.textFormat.foregroundColorStyle';
+                }
+                if (isset($format['bold'])) {
+                    $textFormat['bold'] = $format['bold'];
+                    $fields[] = 'userEnteredFormat.textFormat.bold';
+                }
+                if (isset($format['italic'])) {
+                    $textFormat['italic'] = $format['italic'];
+                    $fields[] = 'userEnteredFormat.textFormat.italic';
+                }
+                if (isset($format['font_size'])) {
+                    $textFormat['fontSize'] = $format['font_size'];
+                    $fields[] = 'userEnteredFormat.textFormat.fontSize';
+                }
+
+                if (!empty($textFormat)) {
+                    $cellFormat['textFormat'] = $textFormat;
+                }
+
+                if (!empty($cellFormat)) {
+                    $batchRequests[] = [
+                        'repeatCell' => [
+                            'range' => $gridRange,
+                            'cell' => ['userEnteredFormat' => $cellFormat],
+                            'fields' => implode(',', $fields)
+                        ]
+                    ];
+                }
+            } elseif ($type === 'number_format') {
+                $presetPatterns = [
+                    'CURRENCY_BRL' => ['type' => 'CURRENCY', 'pattern' => '"R$"#,##0.00'],
+                    'CURRENCY_USD' => ['type' => 'CURRENCY', 'pattern' => '"$"#,##0.00'],
+                    'INTEGER' => ['type' => 'NUMBER', 'pattern' => '#,##0'],
+                    'DECIMAL_2' => ['type' => 'NUMBER', 'pattern' => '#,##0.00'],
+                    'PERCENT' => ['type' => 'PERCENT', 'pattern' => '0.00%'],
+                    'DATE_DMY' => ['type' => 'DATE', 'pattern' => 'dd/mm/yyyy'],
+                    'DATE_YMD' => ['type' => 'DATE', 'pattern' => 'yyyy-mm-dd'],
+                    'DATETIME_DMY' => ['type' => 'DATE_TIME', 'pattern' => 'dd/mm/yyyy hh:mm:ss']
+                ];
+                
+                $preset = $presetPatterns[$op['format']];
+                $batchRequests[] = [
+                    'repeatCell' => [
+                        'range' => $gridRange,
+                        'cell' => ['userEnteredFormat' => ['numberFormat' => $preset]],
+                        'fields' => 'userEnteredFormat.numberFormat'
+                    ]
+                ];
+            } elseif ($type === 'borders') {
+                $style = $op['style'];
+                if ($style === 'NONE') {
+                    // Limpar bordas
+                    $batchRequests[] = [
+                        'updateBorders' => [
+                            'range' => $gridRange,
+                            'top' => ['style' => 'NONE'],
+                            'bottom' => ['style' => 'NONE'],
+                            'left' => ['style' => 'NONE'],
+                            'right' => ['style' => 'NONE'],
+                            'innerHorizontal' => ['style' => 'NONE'],
+                            'innerVertical' => ['style' => 'NONE'],
+                        ]
+                    ];
+                } else {
+                    $googleStyle = 'SOLID';
+                    $color = ['red' => 0, 'green' => 0, 'blue' => 0]; // default black
+                    
+                    if ($style === 'SUBTLE') {
+                        $googleStyle = 'SOLID';
+                        $color = ['red' => 0.8, 'green' => 0.8, 'blue' => 0.8]; // light gray
+                    } elseif ($style === 'THICK') {
+                        $googleStyle = 'SOLID_THICK';
+                    }
+
+                    $borderDef = ['style' => $googleStyle, 'colorStyle' => ['rgbColor' => $color]];
+                    
+                    $batchRequests[] = [
+                        'updateBorders' => [
+                            'range' => $gridRange,
+                            'top' => $borderDef,
+                            'bottom' => $borderDef,
+                            'left' => $borderDef,
+                            'right' => $borderDef,
+                            'innerHorizontal' => $borderDef,
+                            'innerVertical' => $borderDef,
+                        ]
+                    ];
+                }
+            } elseif ($type === 'freeze') {
+                $gridProps = [];
+                $fields = [];
+                if (isset($op['rows'])) {
+                    $gridProps['frozenRowCount'] = $op['rows'];
+                    $fields[] = 'gridProperties.frozenRowCount';
+                }
+                if (isset($op['columns'])) {
+                    $gridProps['frozenColumnCount'] = $op['columns'];
+                    $fields[] = 'gridProperties.frozenColumnCount';
+                }
+                
+                if (!empty($gridProps)) {
+                    $batchRequests[] = [
+                        'updateSheetProperties' => [
+                            'properties' => [
+                                'sheetId' => $sheetId,
+                                'gridProperties' => $gridProps
+                            ],
+                            'fields' => implode(',', $fields)
+                        ]
+                    ];
+                }
+            } elseif ($type === 'auto_resize_columns') {
+                $batchRequests[] = [
+                    'autoResizeDimensions' => [
+                        'dimensions' => [
+                            'sheetId' => $sheetId,
+                            'dimension' => 'COLUMNS',
+                            'startIndex' => $gridRange['startColumnIndex'],
+                            'endIndex' => $gridRange['endColumnIndex']
+                        ]
+                    ]
+                ];
+            } elseif ($type === 'set_column_width') {
+                $batchRequests[] = [
+                    'updateDimensionProperties' => [
+                        'range' => [
+                            'sheetId' => $sheetId,
+                            'dimension' => 'COLUMNS',
+                            'startIndex' => $gridRange['startColumnIndex'],
+                            'endIndex' => $gridRange['endColumnIndex']
+                        ],
+                        'properties' => ['pixelSize' => $op['width_px']],
+                        'fields' => 'pixelSize'
+                    ]
+                ];
+            } elseif ($type === 'set_row_height') {
+                $batchRequests[] = [
+                    'updateDimensionProperties' => [
+                        'range' => [
+                            'sheetId' => $sheetId,
+                            'dimension' => 'ROWS',
+                            'startIndex' => $gridRange['startRowIndex'],
+                            'endIndex' => $gridRange['endRowIndex']
+                        ],
+                        'properties' => ['pixelSize' => $op['height_px']],
+                        'fields' => 'pixelSize'
+                    ]
+                ];
+            } elseif ($type === 'merge_cells') {
+                $batchRequests[] = [
+                    'mergeCells' => [
+                        'range' => $gridRange,
+                        'mergeType' => 'MERGE_ALL'
+                    ]
+                ];
+            }
+        }
+
+        if (empty($batchRequests)) {
+            throw new \Exception("Nenhuma formatação válida encontrada para aplicar.", 400);
+        }
+
+        $payload = ['requests' => $batchRequests];
+        $url = "https://sheets.googleapis.com/v4/spreadsheets/{$fileId}:batchUpdate";
+
+        $response = $this->googleTokenService->executeWithRetry($integration, function ($token) use ($url, $payload) {
+            return \Illuminate\Support\Facades\Http::withToken($token)->post($url, $payload);
+        }, $identity, ['https://www.googleapis.com/auth/drive']);
+
+        if (!$response->successful()) {
+            throw new \Exception("Erro na API do Google Sheets: " . $response->body(), $response->status());
+        }
+
+        // Registrar auditoria
+        $this->logAuditAction->execute(
+            'ai_format_resource_spreadsheet',
+            get_class($resource),
+            $resource->id,
+            [
+                'resource_uuid' => $resource->uuid,
+                'provider' => $integration->provider,
+                'applied_operations' => count($batchRequests),
+                'operation_types' => array_column($operations, 'type')
+            ]
+        );
+
+        return [
+            'resource_uuid' => $resource->uuid,
+            'applied_operations' => count($batchRequests),
+            'operation_types' => array_column($operations, 'type'),
+            'refresh_preview' => true
+        ];
+    }
+
+    private function hexToRgb(string $hex): array
+    {
+        $hex = ltrim($hex, '#');
+        if (strlen($hex) === 3) {
+            $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+        }
+        return [
+            'red' => hexdec(substr($hex, 0, 2)) / 255.0,
+            'green' => hexdec(substr($hex, 2, 2)) / 255.0,
+            'blue' => hexdec(substr($hex, 4, 2)) / 255.0
+        ];
+    }
+
     public function updateSpreadsheetValues(Organization $organization, \App\Domain\Identity\Models\User $user, \App\Domain\Permissions\Contexts\AuthorizedAccessContext $accessContext, string $uuid, array $updates): array
+
     {
         $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $organization->id)
             ->where('provider', 'google_workspace')
