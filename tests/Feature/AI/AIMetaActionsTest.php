@@ -395,6 +395,52 @@ class AIMetaActionsTest extends TestCase
         $this->assertEquals('failed', $action->status);
     }
     
+    /** @test 12.1 - Permission denied does not disconnect, just returns error */
+    public function test_permission_denied_handled_safely()
+    {
+        Http::fake([
+            'graph.facebook.com/*' => Http::response(['error' => ['message' => 'Permissions error', 'type' => 'OAuthException', 'code' => 200]], 403)
+        ]);
+
+        $prepare = $this->aiPost('/meta/actions/status/prepare', [
+            'resource_uuid' => $this->campaignA->uuid,
+            'status' => 'PAUSED',
+        ]);
+        
+        $actionUuid = $prepare->json('data.action_uuid');
+        
+        $execute = $this->aiPost("/meta/actions/{$actionUuid}/execute");
+        
+        $execute->assertStatus(403)
+                ->assertJsonPath('code', 'META_PERMISSION_DENIED');
+                
+        $action = AIAction::where('uuid', $actionUuid)->first();
+        $this->assertEquals('failed', $action->status);
+    }
+    
+    /** @test 12.2 - Invalid request */
+    public function test_invalid_request_handled_safely()
+    {
+        Http::fake([
+            'graph.facebook.com/*' => Http::response(['error' => ['message' => 'Invalid parameter', 'code' => 100]], 400)
+        ]);
+
+        $prepare = $this->aiPost('/meta/actions/status/prepare', [
+            'resource_uuid' => $this->campaignA->uuid,
+            'status' => 'PAUSED',
+        ]);
+        
+        $actionUuid = $prepare->json('data.action_uuid');
+        
+        $execute = $this->aiPost("/meta/actions/{$actionUuid}/execute");
+        
+        $execute->assertStatus(400)
+                ->assertJsonPath('code', 'META_INVALID_REQUEST');
+                
+        $action = AIAction::where('uuid', $actionUuid)->first();
+        $this->assertEquals('failed', $action->status);
+    }
+    
     /** @test 13 - Snapshot conflict */
     public function test_snapshot_conflict_rejects_execute()
     {

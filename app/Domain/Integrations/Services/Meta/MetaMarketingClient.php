@@ -4,6 +4,11 @@ namespace App\Domain\Integrations\Services\Meta;
 
 use App\Domain\Integrations\Models\Integration;
 use App\Domain\Integrations\Models\IntegrationLog;
+use App\Domain\Integrations\Services\Meta\Exceptions\MetaTokenInvalidException;
+use App\Domain\Integrations\Services\Meta\Exceptions\MetaPermissionDeniedException;
+use App\Domain\Integrations\Services\Meta\Exceptions\MetaInvalidRequestException;
+use App\Domain\Integrations\Services\Meta\Exceptions\MetaProviderException;
+use App\Domain\Integrations\Services\Meta\Enums\MetaErrorType;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -46,7 +51,8 @@ class MetaMarketingClient
     private const BACKOFF_BASE_SECONDS = 2;
 
     public function __construct(
-        private MetaTokenService $tokenService
+        private MetaTokenService $tokenService,
+        private MetaGraphErrorClassifier $errorClassifier
     ) {}
 
     /**
@@ -198,25 +204,25 @@ class MetaMarketingClient
                 }
 
                 // 401 → needs_reconnect imediato, sem retry
-                if ($response->status() === 401) {
+                if ($response->status() === 401 && !isset($response->json()['error'])) {
                     $this->tokenService->markAsNeedsReconnect($integration, "Graph API retornou 401 para {$endpoint}");
-                    throw new \RuntimeException('Token Meta inválido. A integração precisa ser reconectada.');
+                    throw new MetaTokenInvalidException('Token Meta inválido. A integração precisa ser reconectada.');
                 }
 
                 // Erros estruturados da Graph API
                 $body = $response->json() ?? [];
                 if (isset($body['error'])) {
+                    $errorType = $this->errorClassifier->classify($response->status(), $body['error']);
                     $errorCode = (int) ($body['error']['code'] ?? 0);
-                    $errorType = $body['error']['type'] ?? '';
+                    $errorMessage = $body['error']['message'] ?? 'Erro desconhecido';
 
-                    // 401 via código de erro ou OAuthException
-                    if ($errorCode === 190 || $errorType === 'OAuthException') {
-                        $this->tokenService->markAsNeedsReconnect($integration, "Token expirado: código {$errorCode}");
-                        throw new \RuntimeException('Token Meta inválido ou expirado. Reconecte a integração.');
+                    if ($errorType === MetaErrorType::TOKEN_INVALID) {
+                        $this->tokenService->markAsNeedsReconnect($integration, "Token expirado/inválido: código {$errorCode}");
+                        throw new MetaTokenInvalidException('Token Meta inválido ou expirado. Reconecte a integração.');
                     }
 
                     // Rate limit — retry com backoff, NUNCA needs_reconnect
-                    if (in_array($errorCode, self::RATE_LIMIT_CODES, true)) {
+                    if ($errorType === MetaErrorType::RATE_LIMITED) {
                         $this->logSecureError($integration, 'rate_limit', "Rate limit código {$errorCode} (tentativa {$attempt}/{$maxAttempts})");
 
                         if ($attempt >= $maxAttempts) {
@@ -229,9 +235,19 @@ class MetaMarketingClient
                         continue;
                     }
 
-                    // 4xx definitivo (não é rate limit)
+                    if ($errorType === MetaErrorType::PERMISSION_DENIED) {
+                        $this->logSecureError($integration, 'permission_denied', "Permissão negada (código {$errorCode}) em {$endpoint}");
+                        throw new MetaPermissionDeniedException('A integração Meta está conectada, mas não possui permissão para executar esta alteração.');
+                    }
+
+                    if ($errorType === MetaErrorType::INVALID_REQUEST) {
+                        $this->logSecureError($integration, 'invalid_request', "Requisição inválida (código {$errorCode}) em {$endpoint}");
+                        throw new MetaInvalidRequestException("Requisição inválida (código {$errorCode}): {$errorMessage}");
+                    }
+
+                    // Provider Error genérico ou não classificado (4xx definitivo)
                     $this->logSecureError($integration, 'graph_api_error', "Erro definitivo código {$errorCode} endpoint {$endpoint}");
-                    throw new \RuntimeException("Erro da Meta Graph API (código {$errorCode}): " . ($body['error']['message'] ?? 'Erro desconhecido'));
+                    throw new MetaProviderException("Erro da Meta Graph API (código {$errorCode}): {$errorMessage}");
                 }
 
                 // 5xx transitório → retry
@@ -248,9 +264,9 @@ class MetaMarketingClient
 
                 // Outros erros não-2xx sem retry
                 $this->logSecureError($integration, 'graph_api_http_error', "HTTP {$response->status()} definitivo em {$endpoint}");
-                throw new \RuntimeException("Erro HTTP {$response->status()} ao chamar a Meta Graph API.");
+                throw new MetaProviderException("Erro HTTP {$response->status()} ao chamar a Meta Graph API.");
 
-            } catch (MetaRateLimitException | \RuntimeException $e) {
+            } catch (MetaRateLimitException | MetaTokenInvalidException | MetaPermissionDeniedException | MetaInvalidRequestException | MetaProviderException $e) {
                 $lastException = $e;
                 // RuntimeException de needs_reconnect ou erro definitivo não tem retry
                 if (!($e instanceof MetaRateLimitException)) {
@@ -262,7 +278,7 @@ class MetaMarketingClient
             } catch (\Illuminate\Http\Client\ConnectionException $e) {
                 // Timeout de rede — retry
                 $this->logSecureError($integration, 'network_timeout', "Timeout de rede em {$endpoint} (tentativa {$attempt}/{$maxAttempts})");
-                $lastException = new \RuntimeException("Timeout de conexão com a Meta Graph API.");
+                $lastException = new MetaProviderException("Timeout de conexão com a Meta Graph API.");
 
                 if ($attempt >= $maxAttempts) {
                     throw $lastException;
@@ -271,7 +287,7 @@ class MetaMarketingClient
             }
         }
 
-        throw $lastException ?? new \RuntimeException('Erro desconhecido na Meta Graph API.');
+        throw $lastException ?? new MetaProviderException('Erro desconhecido na Meta Graph API.');
     }
 
     /**
@@ -316,27 +332,37 @@ class MetaMarketingClient
         $body = $response->json() ?? [];
 
         if (isset($body['error'])) {
+            $errorType = $this->errorClassifier->classify($response->status(), $body['error']);
             $errorCode = (int) ($body['error']['code'] ?? 0);
             $errorMessage = $body['error']['message'] ?? 'Erro desconhecido da Meta Graph API';
-            $errorType = $body['error']['type'] ?? '';
 
-            if (in_array($errorCode, self::RATE_LIMIT_CODES, true)) {
+            if ($errorType === MetaErrorType::RATE_LIMITED) {
                 $this->logSecureError($integration, 'rate_limit', "Rate limit código {$errorCode}");
                 throw new MetaRateLimitException("Meta rate limit (código {$errorCode}).");
             }
 
-            if ($errorCode === 190 || $errorType === 'OAuthException') {
+            if ($errorType === MetaErrorType::TOKEN_INVALID) {
                 $this->tokenService->markAsNeedsReconnect($integration, "Token inválido: código {$errorCode}");
-                throw new \RuntimeException('Token Meta inválido ou expirado. Reconecte a integração.');
+                throw new MetaTokenInvalidException('Token Meta inválido ou expirado. Reconecte a integração.');
+            }
+
+            if ($errorType === MetaErrorType::PERMISSION_DENIED) {
+                $this->logSecureError($integration, 'permission_denied', "Permissão negada (código {$errorCode}) em {$endpoint}");
+                throw new MetaPermissionDeniedException('A integração Meta está conectada, mas não possui permissão para executar esta alteração.');
+            }
+
+            if ($errorType === MetaErrorType::INVALID_REQUEST) {
+                $this->logSecureError($integration, 'invalid_request', "Requisição inválida (código {$errorCode}) em {$endpoint}");
+                throw new MetaInvalidRequestException("Requisição inválida (código {$errorCode}): {$errorMessage}");
             }
 
             $this->logSecureError($integration, 'graph_api_error', "Erro código {$errorCode} em {$endpoint}");
-            throw new \RuntimeException("Erro da Meta Graph API (código {$errorCode}): {$errorMessage}");
+            throw new MetaProviderException("Erro da Meta Graph API (código {$errorCode}): {$errorMessage}");
         }
 
         if (!$response->successful()) {
             $this->logSecureError($integration, 'graph_api_http_error', "HTTP {$response->status()} em {$endpoint}");
-            throw new \RuntimeException("Erro HTTP {$response->status()} ao chamar a Meta Graph API.");
+            throw new MetaProviderException("Erro HTTP {$response->status()} ao chamar a Meta Graph API.");
         }
 
         return $body;

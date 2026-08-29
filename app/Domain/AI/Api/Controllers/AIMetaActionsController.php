@@ -208,17 +208,28 @@ class AIMetaActionsController
                 'code' => 'META_NEEDS_RECONNECT',
                 'message' => $e->getMessage()
             ], 403);
-        } catch (\RuntimeException $e) {
-            if (str_contains($e->getMessage(), 'inválido') || str_contains($e->getMessage(), 'reconectada') || str_contains($e->getMessage(), 'expi')) {
-                return response()->json([
-                    'success' => false,
-                    'code' => 'META_NEEDS_RECONNECT',
-                    'message' => $e->getMessage()
-                ], 403);
-            }
+        } catch (\App\Domain\Integrations\Services\Meta\Exceptions\MetaTokenInvalidException $e) {
             return response()->json([
                 'success' => false,
-                'code' => 'META_API_ERROR',
+                'code' => 'META_NEEDS_RECONNECT',
+                'message' => $e->getMessage()
+            ], 403);
+        } catch (\App\Domain\Integrations\Services\Meta\Exceptions\MetaPermissionDeniedException $e) {
+            return response()->json([
+                'success' => false,
+                'code' => 'META_PERMISSION_DENIED',
+                'message' => $e->getMessage()
+            ], 403);
+        } catch (\App\Domain\Integrations\Services\Meta\Exceptions\MetaInvalidRequestException $e) {
+            return response()->json([
+                'success' => false,
+                'code' => 'META_INVALID_REQUEST',
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\App\Domain\Integrations\Services\Meta\Exceptions\MetaProviderException $e) {
+            return response()->json([
+                'success' => false,
+                'code' => 'META_PROVIDER_ERROR',
                 'message' => $e->getMessage()
             ], 500);
         } catch (\Exception $e) {
