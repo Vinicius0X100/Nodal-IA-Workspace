@@ -1,7 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSpreadsheetArtifact } from '@/Hooks/useSpreadsheetArtifact';
-import { Loader2, AlertCircle, RefreshCw, FileSpreadsheet } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { getCellReference } from '@/Utils/spreadsheet';
+
+import SpreadsheetHeader from './Spreadsheet/SpreadsheetHeader';
+import SpreadsheetToolbar from './Spreadsheet/SpreadsheetToolbar';
+import SpreadsheetFormulaBar from './Spreadsheet/SpreadsheetFormulaBar';
+import SpreadsheetGrid from './Spreadsheet/SpreadsheetGrid';
+import SpreadsheetTabs from './Spreadsheet/SpreadsheetTabs';
 
 interface Props {
     resourceUuid: string;
@@ -9,12 +15,40 @@ interface Props {
 
 export default function SpreadsheetArtifact({ resourceUuid }: Props) {
     const [activeSheetTitle, setActiveSheetTitle] = useState<string | undefined>();
+    const [activeCell, setActiveCell] = useState<{ row: number, col: number } | null>(null);
+
     const { data, isLoading, error, refetch } = useSpreadsheetArtifact(resourceUuid, activeSheetTitle);
+
+    const handleSelectSheet = (title: string) => {
+        setActiveSheetTitle(title);
+        setActiveCell(null); // Reset selection when changing tabs
+    };
+
+    const handleCellClick = (row: number, col: number) => {
+        setActiveCell({ row, col });
+    };
+
+    const activeCellRef = useMemo(() => {
+        if (!activeCell) return null;
+        return getCellReference(activeCell.row, activeCell.col);
+    }, [activeCell]);
+
+    const activeCellValue = useMemo(() => {
+        if (!activeCell || !data) return '';
+        const { row, col } = activeCell;
+        const cellData = data.grid.rows[row]?.[col];
+        if (!cellData) return '';
+        
+        if (cellData.formula) {
+            return cellData.formula;
+        }
+        return cellData.value !== null ? String(cellData.value) : '';
+    }, [activeCell, data]);
 
     if (isLoading && !data) {
         return (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-neutral-500">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-4" />
+            <div className="flex flex-col items-center justify-center h-full p-8 text-neutral-500 bg-white">
+                <Loader2 className="w-8 h-8 animate-spin text-[#0F9D58] mb-4" />
                 <p className="text-sm font-medium">Carregando planilha...</p>
             </div>
         );
@@ -22,7 +56,7 @@ export default function SpreadsheetArtifact({ resourceUuid }: Props) {
 
     if (error && !data) {
         return (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-red-500">
+            <div className="flex flex-col items-center justify-center h-full p-8 text-red-500 bg-white">
                 <AlertCircle className="w-10 h-10 mb-4" />
                 <p className="text-sm font-medium text-center mb-4">{error}</p>
                 <button
@@ -39,87 +73,35 @@ export default function SpreadsheetArtifact({ resourceUuid }: Props) {
 
     const { sheets, grid, name } = data;
     const currentSheetTitle = activeSheetTitle || data.active_sheet;
+    const currentSheet = sheets.find(s => s.title === currentSheetTitle) || sheets[0];
 
     return (
-        <div className="flex flex-col h-full bg-white font-sans text-neutral-800">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-green-600 shadow-sm border border-green-200/50">
-                        <FileSpreadsheet className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <h3 className="font-semibold text-neutral-900 truncate max-w-xs" title={name}>{name}</h3>
-                        <p className="text-xs text-neutral-500 mt-0.5">Google Sheets • Visualização rápida</p>
-                    </div>
-                </div>
-                
-                <button
-                    onClick={refetch}
-                    disabled={isLoading}
-                    title="Atualizar"
-                    className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/50 rounded-lg transition-colors disabled:opacity-50"
-                >
-                    <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                </button>
-            </div>
+        <div className="flex flex-col h-full bg-white font-sans text-neutral-800 border-l border-neutral-200">
+            <SpreadsheetHeader 
+                name={name} 
+                isLoading={isLoading} 
+                onRefresh={refetch} 
+            />
+            
+            <SpreadsheetToolbar />
+            
+            <SpreadsheetFormulaBar 
+                activeCellRef={activeCellRef}
+                activeCellValue={activeCellValue}
+            />
+            
+            <SpreadsheetGrid 
+                sheet={currentSheet}
+                grid={grid}
+                activeCell={activeCell}
+                onCellClick={handleCellClick}
+            />
 
-            {/* Grid Container */}
-            <div className="flex-1 overflow-auto relative bg-neutral-50/50 p-4">
-                <div className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden inline-block min-w-full">
-                    <table className="w-full border-collapse text-sm">
-                        <tbody>
-                            {grid.rows.map((row, rowIndex) => (
-                                <tr key={rowIndex}>
-                                    {row.map((cell, colIndex) => {
-                                        const isHeader = rowIndex < (sheets.find(s => s.title === currentSheetTitle)?.frozen_rows || 0);
-                                        const style: React.CSSProperties = {
-                                            backgroundColor: cell.format?.background_color || (isHeader ? '#f8fafc' : 'transparent'),
-                                            color: cell.format?.text_color || (isHeader ? '#475569' : '#1e293b'),
-                                            fontWeight: cell.format?.bold || isHeader ? '600' : 'normal',
-                                            textAlign: typeof cell.value === 'number' ? 'right' : 'left',
-                                        };
-
-                                        return (
-                                            <td
-                                                key={colIndex}
-                                                style={style}
-                                                className={`
-                                                    border border-neutral-200 px-3 py-2 whitespace-nowrap
-                                                    ${isHeader ? 'shadow-[0_1px_0_rgba(0,0,0,0.1)] z-10 sticky top-0' : ''}
-                                                `}
-                                            >
-                                                {cell.formatted_value || (cell.value !== null ? String(cell.value) : '')}
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* Sheet Tabs */}
-            {sheets.length > 1 && (
-                <div className="px-4 py-2 border-t border-neutral-200 bg-neutral-50 flex items-center gap-2 overflow-x-auto scrollbar-hide">
-                    {sheets.map(sheet => (
-                        <button
-                            key={sheet.title}
-                            onClick={() => setActiveSheetTitle(sheet.title)}
-                            className={`
-                                px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 whitespace-nowrap
-                                ${currentSheetTitle === sheet.title 
-                                    ? 'bg-white shadow-sm border border-neutral-200 text-green-700' 
-                                    : 'text-neutral-500 hover:bg-neutral-200/50 hover:text-neutral-700 border border-transparent'
-                                }
-                            `}
-                        >
-                            {sheet.title}
-                        </button>
-                    ))}
-                </div>
-            )}
+            <SpreadsheetTabs 
+                sheets={sheets}
+                activeSheetTitle={currentSheetTitle}
+                onSelectSheet={handleSelectSheet}
+            />
         </div>
     );
 }
