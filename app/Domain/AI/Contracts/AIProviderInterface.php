@@ -24,9 +24,9 @@ interface AIProviderInterface
      *
      * @param  Conversation  $conversation  Contexto completo da conversa
      * @param  Message       $message       Última mensagem do usuário
-     * @return string                       Conteúdo da resposta do assistente
+     * @return AIChatResult                  Resultado estruturado com texto e possíveis artefatos
      */
-    public function chat(Conversation $conversation, Message $message): string;
+    public function chat(Conversation $conversation, Message $message): AIChatResult;
 
     /**
      * Verifica se o provedor está disponível e configurado corretamente.

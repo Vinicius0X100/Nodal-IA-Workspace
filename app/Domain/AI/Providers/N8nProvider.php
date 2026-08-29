@@ -19,10 +19,10 @@ class N8nProvider implements AIProviderInterface
         $this->webhookUrl = config('services.n8n.webhook_url', '');
     }
 
-    public function chat(Conversation $conversation, Message $message): string
+    public function chat(Conversation $conversation, Message $message): \App\Domain\AI\Contracts\AIChatResult
     {
         if (!$this->isAvailable()) {
-            return "O Cérebro da Inteligência Artificial (n8n) não está configurado. Verifique as configurações de ambiente (N8N_WEBHOOK_URL).";
+            return new \App\Domain\AI\Contracts\AIChatResult("O Cérebro da Inteligência Artificial (n8n) não está configurado. Verifique as configurações de ambiente (N8N_WEBHOOK_URL).");
         }
 
         $user = Auth::user();
@@ -75,15 +75,24 @@ class N8nProvider implements AIProviderInterface
             if ($response->successful()) {
                 $data = $response->json();
                 
-                if (isset($data['response'])) {
-                    return (string) $data['response'];
+                $content = '';
+                $artifacts = [];
+
+                if (isset($data['content'])) {
+                    $content = (string) $data['content'];
+                } elseif (isset($data['response'])) {
+                    $content = (string) $data['response'];
+                } elseif (is_string($data) && !empty($data)) {
+                    $content = $data;
+                } else {
+                    $content = $response->body() ?: 'A IA processou a solicitação mas retornou uma resposta vazia.';
                 }
-                
-                if (is_string($data) && !empty($data)) {
-                    return $data;
+
+                if (isset($data['artifacts']) && is_array($data['artifacts'])) {
+                    $artifacts = $data['artifacts'];
                 }
-                
-                return $response->body() ?: 'A IA processou a solicitação mas retornou uma resposta vazia.';
+
+                return new \App\Domain\AI\Contracts\AIChatResult($content, $artifacts);
             }
 
             Log::error('N8nProvider error response', [
@@ -91,11 +100,11 @@ class N8nProvider implements AIProviderInterface
                 'body' => $response->body()
             ]);
 
-            return "Houve um problema de comunicação com o serviço de Inteligência Artificial. (Status: {$response->status()})";
+            return new \App\Domain\AI\Contracts\AIChatResult("Houve um problema de comunicação com o serviço de Inteligência Artificial. (Status: {$response->status()})");
 
         } catch (\Exception $e) {
             Log::error('N8nProvider exception', ['message' => $e->getMessage()]);
-            return "Falha de conexão com a IA: " . $e->getMessage();
+            return new \App\Domain\AI\Contracts\AIChatResult("Falha de conexão com a IA: " . $e->getMessage());
         }
     }
 

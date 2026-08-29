@@ -6,6 +6,8 @@ use App\Domain\Integrations\Models\Integration;
 use App\Domain\Resources\Jobs\SyncProviderResourcesJob;
 use App\Domain\Resources\Models\IntegrationResource;
 use App\Domain\Resources\Services\SearchService;
+use App\Domain\Organizations\Models\Organization;
+use App\Domain\Resources\Services\SpreadsheetService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,7 +16,8 @@ use Illuminate\Support\Facades\DB;
 class ResourceExplorerController extends Controller
 {
     public function __construct(
-        private SearchService $searchService
+        private SearchService $searchService,
+        private SpreadsheetService $spreadsheetService
     ) {
     }
 
@@ -69,5 +72,40 @@ class ResourceExplorerController extends Controller
         }
 
         return redirect()->back()->with('success', 'Sincronização agendada com sucesso. Os recursos serão atualizados em breve.');
+    }
+
+    public function spreadsheet(Request $request, string $uuid)
+    {
+        $organizationId = session('active_organization_id');
+        if (!$organizationId) {
+            return response()->json(['success' => false, 'code' => 'ORG_NOT_FOUND', 'message' => 'Organização não selecionada.'], 403);
+        }
+
+        $organization = Organization::find($organizationId);
+        if (!$organization) {
+            return response()->json(['success' => false, 'code' => 'ORG_NOT_FOUND', 'message' => 'Organização inválida.'], 404);
+        }
+
+        $user = $request->user();
+
+        $sheet = $request->query('sheet');
+        $range = $request->query('range');
+
+        try {
+            $data = $this->spreadsheetService->getSpreadsheetView($organization, $user, $uuid, $sheet, $range);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\App\Domain\Identities\Exceptions\ExternalIdentityRequiredException $e) {
+            return response()->json(['success' => false, 'code' => 'INTEGRATION_REQUIRED', 'message' => $e->getMessage()], 403);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json(['success' => false, 'code' => 'ACCESS_DENIED', 'message' => $e->getMessage()], 403);
+        } catch (\Exception $e) {
+            $code = $e->getCode();
+            $status = ($code >= 400 && $code < 600) ? $code : 500;
+            return response()->json(['success' => false, 'code' => 'INTERNAL_ERROR', 'message' => $e->getMessage()], $status);
+        }
     }
 }

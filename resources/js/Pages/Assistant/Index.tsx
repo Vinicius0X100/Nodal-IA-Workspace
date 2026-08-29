@@ -29,6 +29,8 @@ import {
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 
+import ArtifactPanel, { ActiveArtifact } from '@/Components/Artifacts/ArtifactPanel';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Message {
@@ -37,6 +39,7 @@ interface Message {
     role: 'user' | 'assistant' | 'system' | 'tool';
     content: string;
     attachments?: { name: string; mime_type?: string; size?: number }[];
+    artifacts?: ActiveArtifact[];
     created_at: string;
 }
 
@@ -107,7 +110,7 @@ function ShimmerSkeleton() {
 
 // ─── Message Bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, onArtifactClick }: { message: Message, onArtifactClick?: (a: ActiveArtifact) => void }) {
     const isUser = message.role === 'user';
 
     if (isUser) {
@@ -192,6 +195,26 @@ function MessageBubble({ message }: { message: Message }) {
                 >
                     {message.content}
                 </ReactMarkdown>
+                
+                {message.artifacts && message.artifacts.length > 0 && (
+                    <div className="mt-4 flex flex-col gap-2">
+                        {message.artifacts.map((artifact, i) => (
+                            <button
+                                key={i}
+                                onClick={() => onArtifactClick?.(artifact)}
+                                className="flex items-center gap-3 px-4 py-3 bg-white border border-neutral-200 hover:border-blue-300 hover:bg-blue-50 rounded-2xl w-fit max-w-[320px] transition-all duration-200 shadow-sm hover:shadow-md group/card text-left"
+                            >
+                                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-green-600 shrink-0">
+                                    {artifact.type === 'spreadsheet' ? <FileSpreadsheet className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="text-[14px] font-semibold text-neutral-800 group-hover/card:text-blue-700 truncate">{artifact.title || 'Recurso'}</span>
+                                    <span className="text-xs text-neutral-500 capitalize">{artifact.type}</span>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
         </motion.div>
     );
@@ -949,10 +972,26 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
     const [isSearchActive, setIsSearchActive] = useState(false);
     const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
     const [toolHint, setToolHint] = useState<string | null>(null);
+    const [activeArtifact, setActiveArtifact] = useState<ActiveArtifact | null>(null);
+    const handledArtifacts = useRef<Set<string>>(new Set());
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // Flag: tracks if the current navigation was triggered by a message send (not a page visit)
     const isSendingRef = useRef(false);
     const toolHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Automatic Artifact Opening
+    useEffect(() => {
+        if (!messages.length) return;
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage.role === 'assistant' && lastMessage.artifacts && lastMessage.artifacts.length > 0) {
+            const lastArtifact = lastMessage.artifacts[lastMessage.artifacts.length - 1];
+            const trackingKey = `${lastMessage.uuid}-${lastArtifact.resource_uuid}`;
+            if (!handledArtifacts.current.has(trackingKey)) {
+                handledArtifacts.current.add(trackingKey);
+                setActiveArtifact(lastArtifact);
+            }
+        }
+    }, [messages]);
 
     // Contextual labels for each AI tool slug
     const TOOL_HINTS: Record<string, string> = {
@@ -1100,7 +1139,7 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                             ) : (
                                 <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="py-8 space-y-6">
                                     {[...messages, ...optimisticMessages].map((msg) => (
-                                        <MessageBubble key={msg.uuid} message={msg} />
+                                        <MessageBubble key={msg.uuid} message={msg} onArtifactClick={setActiveArtifact} />
                                     ))}
                                     
                                     {/* AI Typing Indicator */}
@@ -1153,6 +1192,12 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
                         />
                     )}
                 </div>
+
+                {/* Artifact Panel Lateral */}
+                <ArtifactPanel 
+                    activeArtifact={activeArtifact} 
+                    onClose={() => setActiveArtifact(null)} 
+                />
             </div>
         </>
     );

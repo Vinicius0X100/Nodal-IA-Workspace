@@ -110,6 +110,7 @@ Route::middleware(['auth'])->group(function () {
         // Resources
         Route::get('/resources', [\App\Http\Controllers\Resources\ResourceExplorerController::class, 'index'])->name('resources.index');
         Route::post('/resources/sync', [\App\Http\Controllers\Resources\ResourceExplorerController::class, 'sync'])->name('resources.sync');
+        Route::get('/resources/{uuid}/spreadsheet', [\App\Http\Controllers\Resources\ResourceExplorerController::class, 'spreadsheet'])->name('resources.spreadsheet');
 
         // Reports Genéricos (Async)
         Route::get('/api/reports/{uuid}', [\App\Http\Controllers\Reports\ReportsController::class, 'show'])->name('reports.show');
