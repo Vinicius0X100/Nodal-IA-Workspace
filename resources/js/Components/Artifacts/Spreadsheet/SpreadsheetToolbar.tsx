@@ -2,7 +2,7 @@ import React from 'react';
 import { 
     Undo2, Redo2, Bold, Italic, Palette, Baseline, 
     AlignLeft, AlignCenter, AlignRight, WrapText,
-    BorderAll, Columns, Rows
+    Grid3X3, Columns, Rows
 } from 'lucide-react';
 
 export default function SpreadsheetToolbar() {
@@ -38,7 +38,7 @@ export default function SpreadsheetToolbar() {
             <Button icon={Italic} />
             <Button icon={Baseline} /> {/* Text Color */}
             <Button icon={Palette} /> {/* Background Color */}
-            <Button icon={BorderAll} />
+            <Button icon={Grid3X3} />
             
             <Divider />
             
