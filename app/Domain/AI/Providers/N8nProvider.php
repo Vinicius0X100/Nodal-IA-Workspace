@@ -70,7 +70,7 @@ class N8nProvider implements AIProviderInterface
 
         try {
             // Disparar requisição para o n8n
-            $response = Http::timeout(60)->post($this->webhookUrl, $payload);
+            $response = Http::timeout(240)->post($this->webhookUrl, $payload);
 
             if ($response->successful()) {
                 $data = $response->json();
