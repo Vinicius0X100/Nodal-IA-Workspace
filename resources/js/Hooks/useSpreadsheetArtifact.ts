@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+
 
 export interface SpreadsheetFormat {
     bold?: boolean;
@@ -78,16 +78,44 @@ export function useSpreadsheetArtifact(target: SpreadsheetTarget | undefined, sh
             const baseUrl = isDraft ? `/artifacts/${uuid}/spreadsheet` : `/resources/${uuid}/spreadsheet`;
             const url = `${baseUrl}${queryString ? `?${queryString}` : ''}`;
 
-            const response = await axios.get(url);
+            const response = await fetch(url, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
             
-            if (response.data?.success) {
-                setData(response.data.data);
+            if (!response.ok || response.redirected) {
+                let body = null;
+                try {
+                    body = await response.json();
+                } catch {
+                    body = await response.text();
+                }
+
+                console.error('[SPREADSHEET_ARTIFACT] Request failed or redirected', {
+                    url,
+                    status: response.status,
+                    redirected: response.redirected,
+                    responseUrl: response.url,
+                    body,
+                });
+
+                throw new Error(`Falha ao carregar a planilha (${response.status}${response.redirected ? ' redirected' : ''}).`);
+            }
+
+            const data = await response.json();
+            
+            if (data?.success) {
+                setData(data.data);
             } else {
-                throw new Error(response.data?.message || 'Falha ao carregar a planilha.');
+                throw new Error(data?.message || 'Falha ao carregar a planilha.');
             }
         } catch (err: any) {
             console.error('Error fetching spreadsheet:', err);
-            setError(err.response?.data?.message || err.message || 'Erro desconhecido');
+            setError(err.message || 'Erro desconhecido');
         } finally {
             setIsLoading(false);
         }

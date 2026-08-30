@@ -14,7 +14,7 @@ class SpreadsheetViewportService
         private SpreadsheetDraftRepositoryInterface $repository
     ) {}
 
-    public function getViewport(string $artifactUuid, int $organizationId, string $sheetIdentifier, string $range): array
+    public function getViewport(string $artifactUuid, int $organizationId, ?string $sheetIdentifier = null, ?string $range = null): array
     {
         $draft = ArtifactDraft::where('uuid', $artifactUuid)
             ->where('organization_id', $organizationId)
@@ -25,16 +25,24 @@ class SpreadsheetViewportService
             throw new ArtifactDraftNotFoundException();
         }
         
-        $sheet = $draft->sheets()->where(function ($q) use ($sheetIdentifier) {
-            $q->where('uuid', $sheetIdentifier)
-              ->orWhere('title', $sheetIdentifier)
-              ->orWhere('index', (int)$sheetIdentifier);
-        })->first();
+        $sheetQuery = $draft->sheets();
+        if ($sheetIdentifier) {
+            $sheetQuery->where(function ($q) use ($sheetIdentifier) {
+                $q->where('uuid', $sheetIdentifier)
+                  ->orWhere('title', $sheetIdentifier)
+                  ->orWhere('index', (int)$sheetIdentifier);
+            });
+        } else {
+            $sheetQuery->orderBy('index');
+        }
+        
+        $sheet = $sheetQuery->first();
         
         if (!$sheet) {
             throw new SpreadsheetSheetNotFoundException();
         }
 
+        $range = $range ?? 'A1:Z100';
         $coords = $this->parseRange($range);
         
         $chunks = $this->repository->getChunksInViewport($sheet, $coords['start_row'], $coords['end_row'], $coords['start_col'], $coords['end_col']);

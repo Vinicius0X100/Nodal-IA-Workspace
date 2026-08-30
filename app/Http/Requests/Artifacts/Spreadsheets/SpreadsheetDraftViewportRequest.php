@@ -14,8 +14,8 @@ class SpreadsheetDraftViewportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'sheet' => 'required|string',
-            'range' => 'required|string|max:50',
+            'sheet' => ['nullable', 'string'],
+            'range' => ['nullable', 'string', 'max:50'],
         ];
     }
 }
