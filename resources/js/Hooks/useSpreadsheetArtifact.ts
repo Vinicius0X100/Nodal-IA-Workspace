@@ -49,13 +49,22 @@ export interface SpreadsheetData {
     };
 }
 
-export function useSpreadsheetArtifact(resourceUuid: string | undefined, sheetTitle?: string, range?: string) {
+export type SpreadsheetTarget = 
+    | { mode: 'draft'; artifactUuid: string }
+    | { mode: 'resource'; resourceUuid: string };
+
+export function useSpreadsheetArtifact(target: SpreadsheetTarget | undefined, sheetTitle?: string, range?: string) {
     const [data, setData] = useState<SpreadsheetData | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const fetchSpreadsheet = useCallback(async () => {
-        if (!resourceUuid) return;
+        if (!target) return;
+        
+        const isDraft = target.mode === 'draft';
+        const uuid = isDraft ? target.artifactUuid : target.resourceUuid;
+        
+        if (!uuid) return;
 
         setIsLoading(true);
         setError(null);
@@ -66,7 +75,8 @@ export function useSpreadsheetArtifact(resourceUuid: string | undefined, sheetTi
             if (range) params.append('range', range);
             
             const queryString = params.toString();
-            const url = `/resources/${resourceUuid}/spreadsheet${queryString ? `?${queryString}` : ''}`;
+            const baseUrl = isDraft ? `/artifacts/${uuid}/spreadsheet` : `/resources/${uuid}/spreadsheet`;
+            const url = `${baseUrl}${queryString ? `?${queryString}` : ''}`;
 
             const response = await axios.get(url);
             
@@ -81,7 +91,7 @@ export function useSpreadsheetArtifact(resourceUuid: string | undefined, sheetTi
         } finally {
             setIsLoading(false);
         }
-    }, [resourceUuid, sheetTitle, range]);
+    }, [target?.mode, target?.mode === 'draft' ? target.artifactUuid : target?.mode === 'resource' ? target.resourceUuid : null, sheetTitle, range]);
 
     useEffect(() => {
         fetchSpreadsheet();

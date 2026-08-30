@@ -6,9 +6,11 @@ interface Props {
     isLoading: boolean;
     onRefresh: () => void;
     onClose?: () => void;
+    persistenceLabel?: string;
+    mode?: 'draft' | 'resource';
 }
 
-export default function SpreadsheetHeader({ name, isLoading, onRefresh, onClose }: Props) {
+export default function SpreadsheetHeader({ name, isLoading, onRefresh, onClose, persistenceLabel = 'Salvo no Google Drive', mode = 'resource' }: Props) {
     return (
         <div className="px-4 py-2 border-b border-neutral-200 flex items-center justify-between bg-white shrink-0">
             <div className="flex items-center gap-3">
@@ -16,11 +18,16 @@ export default function SpreadsheetHeader({ name, isLoading, onRefresh, onClose 
                     <FileSpreadsheet className="w-4 h-4" />
                 </div>
                 <div>
-                    <h3 className="text-sm font-semibold text-neutral-900 truncate max-w-[200px] sm:max-w-xs" title={name}>
+                    <h3 className="text-sm font-semibold text-neutral-900 truncate max-w-[200px] sm:max-w-xs flex items-center gap-2" title={name}>
                         {name}
+                        {mode === 'draft' && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 tracking-wider">
+                                RASCUNHO
+                            </span>
+                        )}
                     </h3>
                     <p className="text-[10px] text-neutral-500 mt-0.5 flex items-center gap-1">
-                        Salvo no Google Drive
+                        {persistenceLabel}
                     </p>
                 </div>
             </div>

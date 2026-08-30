@@ -9,15 +9,21 @@ import SpreadsheetFormulaBar from './Spreadsheet/SpreadsheetFormulaBar';
 import SpreadsheetGrid from './Spreadsheet/SpreadsheetGrid';
 import SpreadsheetTabs from './Spreadsheet/SpreadsheetTabs';
 
-interface Props {
-    resourceUuid: string;
-}
+export type SpreadsheetArtifactProps =
+    | {
+          mode: 'draft';
+          artifactUuid: string;
+      }
+    | {
+          mode: 'resource';
+          resourceUuid: string;
+      };
 
-export default function SpreadsheetArtifact({ resourceUuid }: Props) {
+export default function SpreadsheetArtifact(props: SpreadsheetArtifactProps) {
     const [activeSheetTitle, setActiveSheetTitle] = useState<string | undefined>();
     const [activeCell, setActiveCell] = useState<{ row: number, col: number } | null>(null);
 
-    const { data, isLoading, error, refetch } = useSpreadsheetArtifact(resourceUuid, activeSheetTitle);
+    const { data, isLoading, error, refetch } = useSpreadsheetArtifact(props, activeSheetTitle);
 
     const handleSelectSheet = (title: string) => {
         setActiveSheetTitle(title);
@@ -80,10 +86,12 @@ export default function SpreadsheetArtifact({ resourceUuid }: Props) {
             <SpreadsheetHeader 
                 name={name} 
                 isLoading={isLoading} 
-                onRefresh={refetch} 
+                onRefresh={refetch}
+                mode={props.mode}
+                persistenceLabel={props.mode === 'draft' ? 'Ainda não salvo no Google Drive' : 'Salvo no Google Drive'}
             />
             
-            <SpreadsheetToolbar />
+            <SpreadsheetToolbar disabled={props.mode === 'draft'} />
             
             <SpreadsheetFormulaBar 
                 activeCellRef={activeCellRef}

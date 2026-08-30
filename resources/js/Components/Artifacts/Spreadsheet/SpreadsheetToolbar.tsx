@@ -5,13 +5,13 @@ import {
     Grid3X3, Columns, Rows
 } from 'lucide-react';
 
-export default function SpreadsheetToolbar() {
+export default function SpreadsheetToolbar({ disabled = true }: { disabled?: boolean }) {
     // Toolbar is purely visual for now, as requested.
-    // When editing is supported, these will be active.
+    // When editing is supported, these will be active unless disabled=true is passed (e.g. Draft Mode).
 
-    const Button = ({ icon: Icon, disabled = true }: { icon: React.ElementType, disabled?: boolean }) => (
+    const Button = ({ icon: Icon, disabled: btnDisabled = disabled }: { icon: React.ElementType, disabled?: boolean }) => (
         <button 
-            disabled={disabled}
+            disabled={btnDisabled}
             className="p-1.5 text-neutral-400 rounded hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
         >
             <Icon className="w-4 h-4" />

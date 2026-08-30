@@ -3,11 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import SpreadsheetArtifact from './SpreadsheetArtifact';
 
-export interface ActiveArtifact {
-    type: string;
-    resource_uuid: string;
-    title: string;
-}
+export type ActiveArtifact =
+    | {
+          type: 'spreadsheet';
+          status: 'draft';
+          artifact_uuid: string;
+          title: string;
+      }
+    | {
+          type: 'spreadsheet';
+          status?: 'committed';
+          resource_uuid: string;
+          title: string;
+      };
 
 interface Props {
     activeArtifact: ActiveArtifact | null;
@@ -38,7 +46,11 @@ export default function ArtifactPanel({ activeArtifact, onClose }: Props) {
 
                     <div className="flex-1 w-full h-full relative">
                         {activeArtifact.type === 'spreadsheet' ? (
-                            <SpreadsheetArtifact resourceUuid={activeArtifact.resource_uuid} />
+                            activeArtifact.status === 'draft' ? (
+                                <SpreadsheetArtifact mode="draft" artifactUuid={activeArtifact.artifact_uuid} />
+                            ) : (
+                                <SpreadsheetArtifact mode="resource" resourceUuid={activeArtifact.resource_uuid} />
+                            )
                         ) : (
                             <div className="flex items-center justify-center h-full text-neutral-400">
                                 Tipo de artefato não suportado: {activeArtifact.type}

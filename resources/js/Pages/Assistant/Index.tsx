@@ -985,7 +985,8 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
         const lastMessage = messages[messages.length - 1];
         if (lastMessage.role === 'assistant' && lastMessage.artifacts && lastMessage.artifacts.length > 0) {
             const lastArtifact = lastMessage.artifacts[lastMessage.artifacts.length - 1];
-            const trackingKey = `${lastMessage.uuid}-${lastArtifact.resource_uuid}`;
+            const artifactId = lastArtifact.status === 'draft' ? lastArtifact.artifact_uuid : lastArtifact.resource_uuid;
+            const trackingKey = `${lastMessage.uuid}-${artifactId}`;
             if (!handledArtifacts.current.has(trackingKey)) {
                 handledArtifacts.current.add(trackingKey);
                 setActiveArtifact(lastArtifact);

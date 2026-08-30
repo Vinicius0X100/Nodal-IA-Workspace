@@ -82,45 +82,8 @@ class ConversationController extends Controller
 
     private function validateAndNormalizeArtifacts(array $artifacts, int $organizationId, \App\Domain\Identity\Models\User $user): array
     {
-        $valid = [];
-        $authService = app(\App\Domain\Permissions\Services\AuthorizationService::class);
-        $organization = \App\Domain\Organizations\Models\Organization::find($organizationId);
-
-        foreach ($artifacts as $artifact) {
-            if (!is_array($artifact)) continue;
-
-            $uuid = $artifact['resource_uuid'] ?? null;
-            if (!$uuid || !\Illuminate\Support\Str::isUuid($uuid)) {
-                continue;
-            }
-
-            // Localiza IntegrationResource
-            $resource = \App\Domain\Resources\Models\IntegrationResource::where('uuid', $uuid)
-                ->whereHas('integration', function ($query) use ($organizationId) {
-                    $query->where('organization_id', $organizationId);
-                })
-                ->first();
-
-            if (!$resource) {
-                continue;
-            }
-
-            // Verifica permissão (opcional dependendo de como canAccessResource funciona)
-            // if (!$authService->canAccessResource($user, $organization, $resource)) continue;
-            // The user rule says: "garantir que o usuário/contexto atual pode acessar o Resource"
-            if (!$authService->canAccessResource($user, $organization, $resource)) {
-                continue;
-            }
-
-            // Normaliza title e type
-            $valid[] = [
-                'type' => $resource->resource_type instanceof \App\Domain\Resources\Enums\ResourceType ? $resource->resource_type->value : $resource->resource_type,
-                'resource_uuid' => $resource->uuid,
-                'title' => $resource->name,
-            ];
-        }
-
-        return $valid;
+        $normalizer = app(\App\Domain\AI\Services\AIArtifactNormalizer::class);
+        return $normalizer->normalize($artifacts, $organizationId, $user);
     }
 
     /**
