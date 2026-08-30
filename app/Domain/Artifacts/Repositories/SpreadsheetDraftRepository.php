@@ -2,13 +2,13 @@
 
 namespace App\Domain\Artifacts\Repositories;
 
+use App\Domain\Artifacts\Exceptions\DraftRevisionConflictException;
 use App\Domain\Artifacts\Models\ArtifactDraft;
 use App\Domain\Artifacts\Models\SpreadsheetDraftChunk;
 use App\Domain\Artifacts\Models\SpreadsheetDraftSheet;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 
 class SpreadsheetDraftRepository implements SpreadsheetDraftRepositoryInterface
 {
@@ -20,7 +20,7 @@ class SpreadsheetDraftRepository implements SpreadsheetDraftRepositoryInterface
             ->update(['revision' => $expectedRevision + 1, 'updated_at' => now()]);
             
         if ($updated === 0) {
-            throw new InvalidArgumentException("DRAFT_REVISION_CONFLICT");
+            throw new DraftRevisionConflictException();
         }
         
         $draft->revision = $expectedRevision + 1;

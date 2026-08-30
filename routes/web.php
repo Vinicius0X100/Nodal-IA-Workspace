@@ -112,6 +112,15 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/resources/sync', [\App\Http\Controllers\Resources\ResourceExplorerController::class, 'sync'])->name('resources.sync');
         Route::get('/resources/{uuid}/spreadsheet', [\App\Http\Controllers\Resources\ResourceExplorerController::class, 'spreadsheet'])->name('resources.spreadsheet');
 
+        // Artifact Drafts (Frontend)
+        Route::get('/artifacts/{artifact_uuid}', [\App\Http\Controllers\Artifacts\ArtifactDraftsController::class, 'getArtifact'])->name('artifacts.show');
+        Route::get('/artifacts/{artifact_uuid}/spreadsheet', [\App\Http\Controllers\Artifacts\ArtifactDraftsController::class, 'getSpreadsheetViewport'])->name('artifacts.spreadsheet.viewport');
+        Route::patch('/artifacts/{artifact_uuid}/spreadsheet/values', [\App\Http\Controllers\Artifacts\ArtifactDraftsController::class, 'updateSpreadsheetValues'])->name('artifacts.spreadsheet.values');
+        Route::patch('/artifacts/{artifact_uuid}/spreadsheet/format', [\App\Http\Controllers\Artifacts\ArtifactDraftsController::class, 'updateSpreadsheetFormat'])->name('artifacts.spreadsheet.format');
+        
+        Route::post('/artifacts/{artifact_uuid}/commit', [\App\Http\Controllers\Api\V1\Artifacts\CommitController::class, 'commit'])->name('artifacts.commit');
+        Route::get('/artifacts/{artifact_uuid}/commit-status', [\App\Http\Controllers\Api\V1\Artifacts\CommitController::class, 'status'])->name('artifacts.commit.status');
+
         // Reports Genéricos (Async)
         Route::get('/api/reports/{uuid}', [\App\Http\Controllers\Reports\ReportsController::class, 'show'])->name('reports.show');
 

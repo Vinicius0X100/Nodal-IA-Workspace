@@ -12,6 +12,10 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(
+            \App\Domain\Artifacts\Repositories\SpreadsheetDraftRepositoryInterface::class,
+            \App\Domain\Artifacts\Repositories\SpreadsheetDraftRepository::class
+        );
+        $this->app->bind(
             \App\Domain\AI\Contracts\AIProviderInterface::class,
             \App\Domain\AI\Providers\N8nProvider::class
         );

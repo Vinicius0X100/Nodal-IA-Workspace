@@ -9,19 +9,35 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ArtifactCommitAttempt extends Model
 {
-    protected $guarded = [];
-    
+    protected $fillable = [
+        'commit_uuid',
+        'artifact_draft_id',
+        'source_revision',
+        'provider',
+        'status',
+        'current_stage',
+        'provider_external_id',
+        'checkpoint_json',
+        'error_payload',
+        'attempt_number',
+        'started_at',
+        'finished_at',
+    ];
+
     protected $casts = [
-        'status' => CommitAttemptStatus::class,
-        'current_stage' => CommitAttemptStage::class,
-        'source_revision' => 'integer',
-        'attempt_number' => 'integer',
+        'checkpoint_json' => 'array',
+        'error_payload' => 'array',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
     ];
 
-    public function artifactDraft(): BelongsTo
+    public function artifactDraft()
     {
         return $this->belongsTo(ArtifactDraft::class);
+    }
+
+    public function sheetMappings()
+    {
+        return $this->hasMany(ArtifactCommitSheetMapping::class);
     }
 }

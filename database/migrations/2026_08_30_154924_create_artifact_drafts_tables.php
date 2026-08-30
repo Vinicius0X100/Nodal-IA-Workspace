@@ -122,13 +122,11 @@ return new class extends Migration
             
             $table->string('provider');
             $table->string('status')->default('pending')->index(); 
+            $table->string('current_stage')->default('preflight')->index();
             $table->string('provider_external_id')->nullable(); 
             
-            $table->string('current_stage')->default('init');
-            $table->uuid('current_sheet_uuid')->nullable();
-            $table->string('current_chunk_key')->nullable();
-            
-            $table->string('last_error_code')->nullable();
+            $table->json('checkpoint_json')->nullable();
+            $table->json('error_payload')->nullable();
             $table->integer('attempt_number')->default(1);
             
             $table->timestamp('started_at')->nullable();
@@ -137,10 +135,22 @@ return new class extends Migration
             
             $table->index(['artifact_draft_id', 'status']);
         });
+
+        Schema::create('artifact_commit_sheet_mappings', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('artifact_commit_attempt_id')->constrained('artifact_commit_attempts')->onDelete('cascade');
+            $table->uuid('draft_sheet_uuid');
+            $table->string('provider_sheet_identifier');
+            $table->timestamps();
+
+            $table->unique(['artifact_commit_attempt_id', 'draft_sheet_uuid'], 'idx_commit_draft_sheet');
+            $table->unique(['artifact_commit_attempt_id', 'provider_sheet_identifier'], 'idx_commit_provider_sheet');
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('artifact_commit_sheet_mappings');
         Schema::dropIfExists('artifact_commit_attempts');
         Schema::dropIfExists('spreadsheet_draft_chunks');
         Schema::dropIfExists('spreadsheet_draft_merges');

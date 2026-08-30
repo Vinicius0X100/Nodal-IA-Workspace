@@ -3,6 +3,8 @@
 namespace Tests\Feature\Artifacts;
 
 use App\Domain\Artifacts\Enums\ArtifactDraftStatus;
+use App\Domain\Artifacts\Exceptions\ArtifactDraftNotEditableException;
+use App\Domain\Artifacts\Exceptions\DraftRevisionConflictException;
 use App\Domain\Artifacts\Models\ArtifactDraft;
 use App\Domain\Artifacts\Models\SpreadsheetDraftSheet;
 use App\Domain\Artifacts\Repositories\SpreadsheetDraftRepository;
@@ -12,8 +14,6 @@ use App\Domain\Identity\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
-use InvalidArgumentException;
-use RuntimeException;
 use Tests\TestCase;
 
 class SpreadsheetDraftDomainTest extends TestCase
@@ -113,8 +113,7 @@ class SpreadsheetDraftDomainTest extends TestCase
         $this->assertEquals(2, $this->draft->revision);
         
         // Conflict
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("DRAFT_REVISION_CONFLICT");
+        $this->expectException(DraftRevisionConflictException::class);
         $this->repository->incrementRevision($this->draft, 1);
     }
     
@@ -158,8 +157,7 @@ class SpreadsheetDraftDomainTest extends TestCase
         $this->assertEquals(ArtifactDraftStatus::COMMITTING, $lockedDraft->status);
         
         // Cannot edit committing
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage("ARTIFACT_DRAFT_NOT_EDITABLE");
+        $this->expectException(ArtifactDraftNotEditableException::class);
         $this->service->transitionToCommitting($lockedDraft);
     }
 }

@@ -3,10 +3,9 @@
 namespace App\Domain\Artifacts\Services;
 
 use App\Domain\Artifacts\Enums\ArtifactDraftStatus;
+use App\Domain\Artifacts\Exceptions\ArtifactDraftNotEditableException;
 use App\Domain\Artifacts\Models\ArtifactDraft;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
-use RuntimeException;
 
 class ArtifactDraftService
 {
@@ -19,7 +18,7 @@ class ArtifactDraftService
             $lockedDraft = ArtifactDraft::where('id', $draft->id)->lockForUpdate()->first();
             
             if ($lockedDraft->status !== ArtifactDraftStatus::DRAFT && $lockedDraft->status !== ArtifactDraftStatus::FAILED) {
-                throw new RuntimeException("ARTIFACT_DRAFT_NOT_EDITABLE");
+                throw new ArtifactDraftNotEditableException();
             }
             
             $lockedDraft->status = ArtifactDraftStatus::COMMITTING;

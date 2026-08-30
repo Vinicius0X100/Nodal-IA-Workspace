@@ -34,6 +34,15 @@ Route::prefix('v1')->group(function () {
 
 // AI Gateway API (n8n)
 Route::prefix('ai')->middleware('ai.gateway')->group(function () {
+    Route::post('/artifacts/spreadsheets/drafts', [\App\Domain\AI\Api\Controllers\AIArtifactDraftsController::class, 'createSpreadsheetDraft']);
+    Route::get('/artifacts/{artifact_uuid}/spreadsheet', [\App\Domain\AI\Api\Controllers\AIArtifactDraftsController::class, 'getSpreadsheetViewport']);
+    Route::get('/artifacts/{artifact_uuid}/changes', [\App\Domain\AI\Api\Controllers\AIArtifactDraftsController::class, 'getChanges']);
+    Route::post('/artifacts/{artifact_uuid}/commit', [\App\Http\Controllers\Api\AI\ArtifactCommitController::class, 'commit']);
+    Route::get('/artifacts/{artifact_uuid}/commit-status', [\App\Http\Controllers\Api\AI\ArtifactCommitController::class, 'status']);
+    
+    // Identity Routes
+    Route::get('/users/search', [\App\Domain\AI\Api\Controllers\AIUsersController::class, 'search']);
+
     Route::get('/organization', [\App\Domain\AI\Api\Controllers\AIOrganizationController::class, 'index']);
     Route::get('/current-user', [\App\Domain\AI\Api\Controllers\AIUsersController::class, 'currentUser']);
     Route::get('/users', [\App\Domain\AI\Api\Controllers\AIUsersController::class, 'index']);
