@@ -111,7 +111,7 @@ return new class extends Migration
             
             $table->timestamps();
             
-            $table->unique(['sheet_id', 'chunk_row', 'chunk_column']);
+            $table->unique(['sheet_id', 'chunk_row', 'chunk_column'], 'chunks_sheet_row_col_unique');
         });
 
         Schema::create('artifact_commit_attempts', function (Blueprint $table) {
@@ -138,7 +138,7 @@ return new class extends Migration
 
         Schema::create('artifact_commit_sheet_mappings', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('artifact_commit_attempt_id')->constrained('artifact_commit_attempts')->onDelete('cascade');
+            $table->foreignId('artifact_commit_attempt_id')->constrained('artifact_commit_attempts', 'id', 'fk_commit_sheet_attempt')->onDelete('cascade');
             $table->uuid('draft_sheet_uuid');
             $table->string('provider_sheet_identifier');
             $table->timestamps();
