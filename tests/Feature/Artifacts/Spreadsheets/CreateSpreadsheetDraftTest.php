@@ -116,9 +116,46 @@ class CreateSpreadsheetDraftTest extends TestCase
         $this->assertEquals(1, $changes->first()->revision);
     }
     
+    public function test_ai_creates_spreadsheet_draft_fails_if_sheets_missing()
+    {
+        $payload = [
+            'title' => 'Orçamento Profissional',
+        ];
+
+        $response = $this->postJson('/api/ai/artifacts/spreadsheets/drafts', $payload, [
+            'X-Organization-UUID' => $this->organization->uuid,
+            'X-User-UUID' => $this->user->uuid,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['sheets']);
+    }
+
+    public function test_ai_creates_spreadsheet_draft_fails_if_sheets_empty()
+    {
+        $payload = [
+            'title' => 'Orçamento Profissional',
+            'sheets' => [],
+        ];
+
+        $response = $this->postJson('/api/ai/artifacts/spreadsheets/drafts', $payload, [
+            'X-Organization-UUID' => $this->organization->uuid,
+            'X-User-UUID' => $this->user->uuid,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['sheets']);
+    }
+
     public function test_ai_create_fails_without_organization()
     {
-        $response = $this->postJson('/api/ai/artifacts/spreadsheets/drafts', ['title' => 'Test']);
+        $payload = [
+            'title' => 'Test',
+            'sheets' => [
+                ['title' => 'P1']
+            ]
+        ];
+        $response = $this->postJson('/api/ai/artifacts/spreadsheets/drafts', $payload);
         $response->assertStatus(404);
     }
 }

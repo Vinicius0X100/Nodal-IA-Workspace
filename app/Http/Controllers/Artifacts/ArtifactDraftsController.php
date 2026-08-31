@@ -55,14 +55,19 @@ class ArtifactDraftsController extends Controller
         SpreadsheetDraftViewportRequest $request,
         SpreadsheetViewportService $service
     ): JsonResponse {
-        \Illuminate\Support\Facades\Log::info('[DRAFT_VIEWPORT_DEBUG] Controller reached', [
+        \Illuminate\Support\Facades\Log::info('[DRAFT_VIEWPORT_DEBUG] controller reached', [
             'artifact_uuid' => $artifactUuid,
             'user_uuid' => auth()->user()?->uuid,
+            'request_path' => request()->path(),
             'query' => request()->query(),
-            'expects_json' => request()->expectsJson(),
         ]);
         
         $orgId = $this->getActiveOrganizationId();
+        
+        \Illuminate\Support\Facades\Log::info('[DRAFT_VIEWPORT_DEBUG] context resolved', [
+            'active_organization_id' => $orgId,
+            'searched_artifact_uuid' => $artifactUuid,
+        ]);
         
         $data = $service->getViewport($artifactUuid, $orgId, $request->input('sheet'), $request->input('range'));
         

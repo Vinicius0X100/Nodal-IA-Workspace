@@ -15,8 +15,8 @@ class CreateSpreadsheetDraftRequest extends FormRequest
     {
         return [
             'title' => 'nullable|string|max:255',
-            'sheets' => 'nullable|array|max:20', // Operational limit
-            'sheets.*.title' => 'nullable|string|max:100',
+            'sheets' => 'required|array|min:1|max:20', // Operational limit
+            'sheets.*.title' => 'required|string|max:100',
             
             'sheets.*.updates' => 'nullable|array',
             'sheets.*.updates.*.range' => 'required_with:sheets.*.updates|string',
