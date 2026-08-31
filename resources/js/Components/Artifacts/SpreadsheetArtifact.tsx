@@ -9,6 +9,8 @@ import SpreadsheetFormulaBar from './Spreadsheet/SpreadsheetFormulaBar';
 import SpreadsheetGrid from './Spreadsheet/SpreadsheetGrid';
 import SpreadsheetTabs from './Spreadsheet/SpreadsheetTabs';
 
+import ErrorBoundary from '../ErrorBoundary';
+
 export type SpreadsheetArtifactProps =
     | {
           mode: 'draft';
@@ -19,7 +21,7 @@ export type SpreadsheetArtifactProps =
           resourceUuid: string;
       };
 
-export default function SpreadsheetArtifact(props: SpreadsheetArtifactProps) {
+function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
     const [activeSheetTitle, setActiveSheetTitle] = useState<string | undefined>();
     const [activeCell, setActiveCell] = useState<{ row: number, col: number } | null>(null);
 
@@ -111,5 +113,15 @@ export default function SpreadsheetArtifact(props: SpreadsheetArtifactProps) {
                 onSelectSheet={handleSelectSheet}
             />
         </div>
+    );
+}
+
+export default function SpreadsheetArtifact(props: SpreadsheetArtifactProps) {
+    // A key baseada no target garante que se o UUID mudar, o componente anterior morre por completo e desmonta.
+    const key = props.mode === 'draft' ? `draft-${props.artifactUuid}` : `resource-${props.resourceUuid}`;
+    return (
+        <ErrorBoundary>
+            <SpreadsheetArtifactInner key={key} {...props} />
+        </ErrorBoundary>
     );
 }

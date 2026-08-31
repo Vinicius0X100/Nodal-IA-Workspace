@@ -110,12 +110,26 @@ class SpreadsheetViewportService
             }
         }
 
+        $sheetsMeta = $draft->sheets()->orderBy('index')->get(['uuid', 'title', 'index'])->map(function ($s) {
+            return [
+                'uuid' => $s->uuid,
+                'title' => $s->title,
+                'index' => $s->index,
+                // Add default properties expected by UI
+                'row_count' => 1000,
+                'column_count' => 26,
+                'frozen_rows' => 0,
+                'frozen_columns' => 0,
+            ];
+        })->toArray();
+
         return [
             'artifact_uuid' => $draft->uuid,
             'type' => $draft->type,
             'status' => $draft->status->value,
             'title' => $draft->title,
             'revision' => $draft->revision,
+            'sheets' => $sheetsMeta,
             'active_sheet' => [
                 'uuid' => $sheet->uuid,
                 'title' => $sheet->title,
