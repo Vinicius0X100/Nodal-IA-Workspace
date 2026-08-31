@@ -70,13 +70,13 @@ export function useSpreadsheetArtifact(target: SpreadsheetTarget | undefined, sh
         setError(null);
 
         try {
-            const params = newSearchParams();
-            if (sheetTitle) params.append('sheet', sheetTitle);
-            if (range) params.append('range', range);
+            const searchParams = new URLSearchParams();
+            if (sheetTitle) searchParams.set('sheet', sheetTitle);
+            if (range) searchParams.set('range', range);
             
-            const queryString = params.toString();
+            const queryString = searchParams.toString();
             const baseUrl = isDraft ? `/artifacts/${uuid}/spreadsheet` : `/resources/${uuid}/spreadsheet`;
-            const url = `${baseUrl}${queryString ? `?${queryString}` : ''}`;
+            const url = queryString ? `${baseUrl}?${queryString}` : baseUrl;
 
             const response = await fetch(url, {
                 method: 'GET',
