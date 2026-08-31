@@ -51,6 +51,8 @@ class IntegrationConnectedNotification extends Notification implements ShouldQue
             $logoFilename = 'google-logo.svg';
         } elseif (in_array($this->integration->provider, ['microsoft_365', 'microsoft'])) {
             $logoFilename = 'microsoft-logo.svg';
+        } elseif ($this->integration->provider === 'meta') {
+            $logoFilename = 'meta-logo.svg';
         }
         
         $logoUrl = $logoFilename ? config('app.url') . "/images/{$logoFilename}" : null;
