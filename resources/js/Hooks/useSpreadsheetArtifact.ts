@@ -32,6 +32,8 @@ export interface SpreadsheetData {
     name: string;
     type: string;
     provider: string;
+    status: string;
+    revision: number;
     capabilities: {
         preview: boolean;
         edit: boolean;
@@ -150,6 +152,8 @@ export function useSpreadsheetArtifact(target: SpreadsheetTarget | undefined, sh
                     name: raw.name || raw.title || 'Planilha',
                     type: raw.type || 'spreadsheet',
                     provider: raw.provider || 'system',
+                    status: raw.status || 'draft',
+                    revision: raw.revision || 1,
                     capabilities: raw.capabilities || { preview: true, edit: true, download: true },
                     active_sheet: activeSheetTitle,
                     requested_range: raw.requested_range || raw.viewport?.range || 'A1:Z100',
@@ -181,7 +185,19 @@ export function useSpreadsheetArtifact(target: SpreadsheetTarget | undefined, sh
     useEffect(() => {
         const abortController = new AbortController();
         fetchSpreadsheet(abortController.signal);
-        return () => abortController.abort();
+        
+        const handleRefresh = () => {
+            fetchSpreadsheet();
+        };
+        
+        window.addEventListener('focus', handleRefresh);
+        window.addEventListener('assistant:message_completed', handleRefresh);
+        
+        return () => {
+            abortController.abort();
+            window.removeEventListener('focus', handleRefresh);
+            window.removeEventListener('assistant:message_completed', handleRefresh);
+        };
     }, [fetchSpreadsheet]);
 
     return {

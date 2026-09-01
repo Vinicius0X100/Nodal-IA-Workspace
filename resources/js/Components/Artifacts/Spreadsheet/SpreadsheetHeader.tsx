@@ -8,9 +8,13 @@ interface Props {
     onClose?: () => void;
     persistenceLabel?: string;
     mode?: 'draft' | 'resource';
+    onCommit?: () => void;
+    commitStatus?: string;
 }
 
-export default function SpreadsheetHeader({ name, isLoading, onRefresh, onClose, persistenceLabel = 'Salvo no Google Drive', mode = 'resource' }: Props) {
+export default function SpreadsheetHeader({ name, isLoading, onRefresh, onClose, persistenceLabel = 'Salvo no Google Drive', mode = 'resource', onCommit, commitStatus }: Props) {
+    const isCommitting = commitStatus === 'committing';
+    
     return (
         <div className="px-4 py-2 border-b border-neutral-200 flex items-center justify-between bg-white shrink-0">
             <div className="flex items-center gap-3">
@@ -22,7 +26,7 @@ export default function SpreadsheetHeader({ name, isLoading, onRefresh, onClose,
                         {name}
                         {mode === 'draft' && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 tracking-wider">
-                                RASCUNHO
+                                {isCommitting ? 'SALVANDO' : 'RASCUNHO'}
                             </span>
                         )}
                     </h3>
@@ -32,32 +36,51 @@ export default function SpreadsheetHeader({ name, isLoading, onRefresh, onClose,
                 </div>
             </div>
             
-            <div className="flex items-center gap-1">
-                <button
-                    disabled
-                    title="Download indisponível no momento"
-                    className="p-1.5 text-neutral-300 rounded-md transition-colors cursor-not-allowed"
-                >
-                    <Download className="w-4 h-4" />
-                </button>
-                <div className="w-px h-4 bg-neutral-200 mx-1" />
-                <button
-                    onClick={onRefresh}
-                    disabled={isLoading}
-                    title="Atualizar"
-                    className="p-1.5 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded-md transition-colors disabled:opacity-50"
-                >
-                    <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                </button>
-                {onClose && (
+            <div className="flex items-center gap-2">
+                {mode === 'draft' && onCommit && (
                     <button
-                        onClick={onClose}
-                        title="Fechar"
-                        className="p-1.5 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        onClick={onCommit}
+                        disabled={isCommitting}
+                        className="px-3 py-1.5 text-xs font-medium text-white bg-[#0F9D58] hover:bg-[#0b8043] rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
-                        <X className="w-4 h-4" />
+                        {isCommitting ? (
+                            <>
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Salvando...
+                            </>
+                        ) : (
+                            'Criar no Google Drive'
+                        )}
                     </button>
                 )}
+                
+                <div className="flex items-center gap-1 ml-2">
+                    <button
+                        disabled
+                        title="Download indisponível no momento"
+                        className="p-1.5 text-neutral-300 rounded-md transition-colors cursor-not-allowed"
+                    >
+                        <Download className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-4 bg-neutral-200 mx-1" />
+                    <button
+                        onClick={onRefresh}
+                        disabled={isLoading}
+                        title="Atualizar"
+                        className="p-1.5 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded-md transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            title="Fechar"
+                            className="p-1.5 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );

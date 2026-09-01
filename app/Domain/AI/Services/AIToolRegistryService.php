@@ -76,6 +76,28 @@ class AIToolRegistryService
                 'required_permissions' => [],
                 'requires_external_identity' => false,
             ],
+            [
+                'slug'                 => 'commit_artifact_draft',
+                'name'                 => 'Confirmar e Criar Planilha',
+                'description'          => 'Confirma um Spreadsheet Artifact Draft existente e inicia sua materialização assíncrona no provider autorizado pelo Laravel. Use SOMENTE quando o usuário confirmar explicitamente que deseja criar/salvar a versão definitiva do Draft. Requer o parâmetro na rota {artifact_uuid}. Retorna HTTP 202 com status "committing" indicando que o processo iniciou.',
+                'endpoint'             => '/api/ai/artifacts/{artifact_uuid}/commit',
+                'http_method'          => 'POST',
+                'tool_type'            => 'write',
+                'requires_confirmation' => true,
+                'required_permissions' => [],
+                'requires_external_identity' => true, // Needs identity to create the file in the provider
+            ],
+            [
+                'slug'                 => 'get_artifact_commit_status',
+                'name'                 => 'Verificar Status do Commit',
+                'description'          => 'Verifica o progresso da materialização de um Spreadsheet Artifact Draft. Use somente se o usuário perguntar explicitamente se já terminou ou foi salvo. Requer {artifact_uuid} na rota. Se retornar status "committed" com "resource_uuid", significa que já foi salvo com sucesso.',
+                'endpoint'             => '/api/ai/artifacts/{artifact_uuid}/commit-status',
+                'http_method'          => 'GET',
+                'tool_type'            => 'read',
+                'requires_confirmation' => false,
+                'required_permissions' => [],
+                'requires_external_identity' => false,
+            ],
         ];
 
         $registeredSlugs = [];

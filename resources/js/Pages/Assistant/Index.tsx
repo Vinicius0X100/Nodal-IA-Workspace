@@ -979,10 +979,15 @@ export default function AssistantIndex({ conversation, messages, groups }: Props
     const isSendingRef = useRef(false);
     const toolHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Automatic Artifact Opening
+    // Automatic Artifact Opening and Message Updates
     useEffect(() => {
         if (!messages.length) return;
         const lastMessage = messages[messages.length - 1];
+        
+        if (lastMessage.role === 'assistant') {
+            window.dispatchEvent(new CustomEvent('assistant:message_completed'));
+        }
+        
         if (lastMessage.role === 'assistant' && lastMessage.artifacts && lastMessage.artifacts.length > 0) {
             const lastArtifact = lastMessage.artifacts[lastMessage.artifacts.length - 1];
             const artifactId = lastArtifact.status === 'draft' ? lastArtifact.artifact_uuid : lastArtifact.resource_uuid;

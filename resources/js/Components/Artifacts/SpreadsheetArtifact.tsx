@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSpreadsheetArtifact } from '@/Hooks/useSpreadsheetArtifact';
 import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { getCellReference } from '@/Utils/spreadsheet';
@@ -9,6 +9,7 @@ import SpreadsheetFormulaBar from './Spreadsheet/SpreadsheetFormulaBar';
 import SpreadsheetGrid from './Spreadsheet/SpreadsheetGrid';
 import SpreadsheetTabs from './Spreadsheet/SpreadsheetTabs';
 import { useSpreadsheetDraftMutations } from '@/Hooks/useSpreadsheetDraftMutations';
+import { useArtifactCommitPolling } from '@/Hooks/useArtifactCommitPolling';
 import { toast } from 'sonner';
 
 import ErrorBoundary from '../ErrorBoundary';
@@ -23,7 +24,7 @@ export type SpreadsheetArtifactProps =
           resourceUuid: string;
       };
 
-function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
+function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps & { onTransition?: (resourceUuid: string) => void }) {
     const [activeSheetTitle, setActiveSheetTitle] = useState<string | undefined>();
     const [activeCell, setActiveCell] = useState<{ row: number, col: number } | null>(null);
     const [isEditing, setIsEditing] = useState(false);
@@ -34,6 +35,21 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
         props.mode === 'draft' ? props.artifactUuid : ''
     );
 
+    const { status: commitStatus, stage: commitStage, isPolling, startCommit } = useArtifactCommitPolling({
+        artifactUuid: props.mode === 'draft' ? props.artifactUuid : '',
+        initialStatus: data?.status || (props.mode === 'draft' ? 'draft' : 'committed'),
+        onCommitted: (resourceUuid) => {
+            if (props.onTransition) {
+                props.onTransition(resourceUuid);
+            }
+        },
+        onFailed: (errorMsg) => {
+            toast.error(errorMsg);
+        }
+    });
+
+    const isLocked = isMutating || isPolling || (props.mode === 'draft' && commitStatus === 'committing');
+
     const handleSelectSheet = (title: string) => {
         setActiveSheetTitle(title);
         setActiveCell(null);
@@ -41,13 +57,13 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
     };
 
     const handleCellClick = (row: number, col: number) => {
-        if (isMutating) return;
+        if (isLocked) return;
         setActiveCell({ row, col });
         setIsEditing(false);
     };
 
     const handleCellDoubleClick = (row: number, col: number) => {
-        if (props.mode !== 'draft' || isMutating) return;
+        if (props.mode !== 'draft' || isLocked) return;
         
         setActiveCell({ row, col });
         setIsEditing(true);
@@ -78,7 +94,7 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
     }, [activeCell, data]);
 
     const handleSaveValue = async (value: string, moveToNext: 'down' | 'right' | 'left' | 'none' = 'none') => {
-        if (props.mode !== 'draft' || !activeCell || !data) return;
+        if (props.mode !== 'draft' || isLocked || !activeCell || !data) return;
 
         const currentRevision = data.revision;
         const currentSheet = data.sheets.find(s => s.title === (activeSheetTitle || data.active_sheet)) || data.sheets[0];
@@ -139,7 +155,7 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
     };
 
     const handleFormat = async (format: any) => {
-        if (props.mode !== 'draft' || !activeCell || !data) return;
+        if (props.mode !== 'draft' || isLocked || !activeCell || !data) return;
 
         const currentRevision = data.revision;
         const currentSheet = data.sheets.find(s => s.title === (activeSheetTitle || data.active_sheet)) || data.sheets[0];
@@ -175,6 +191,14 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
         }
     };
 
+    useEffect(() => {
+        if (props.mode === 'draft' && data?.status === 'committed' && data?.resource_uuid) {
+            if (props.onTransition) {
+                props.onTransition(data.resource_uuid);
+            }
+        }
+    }, [props.mode, data?.status, data?.resource_uuid, props.onTransition]);
+
     if (isLoading && !data) {
         return (
             <div className="flex flex-col items-center justify-center h-full p-8 text-neutral-500 bg-white">
@@ -205,6 +229,16 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
     const currentSheetTitle = activeSheetTitle || data.active_sheet;
     const currentSheet = sheets.find(s => s.title === currentSheetTitle) || sheets[0];
 
+    // Build persistence label
+    let persistenceLabel = props.mode === 'draft' ? 'Ainda não salvo no Google Drive' : 'Salvo no Google Drive';
+    if (commitStatus === 'committing') {
+        persistenceLabel = commitStage;
+    } else if (commitStatus === 'failed') {
+        persistenceLabel = 'Falha ao salvar no Google Drive';
+    } else if (commitStatus === 'committed' || props.mode === 'resource') {
+        persistenceLabel = 'Salvo no Google Drive';
+    }
+
     return (
         <div className="flex flex-col h-full bg-white font-sans text-neutral-800 border-l border-neutral-200">
             <SpreadsheetHeader 
@@ -212,11 +246,13 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
                 isLoading={isLoading} 
                 onRefresh={refetch}
                 mode={props.mode}
-                persistenceLabel={props.mode === 'draft' ? 'Ainda não salvo no Google Drive' : 'Salvo no Google Drive'}
+                persistenceLabel={persistenceLabel}
+                onCommit={startCommit}
+                commitStatus={commitStatus}
             />
             
             <SpreadsheetToolbar 
-                disabled={props.mode === 'draft' && isMutating}
+                disabled={props.mode !== 'draft' || isLocked}
                 isDraft={props.mode === 'draft'}
                 onFormat={handleFormat} 
             />
@@ -225,11 +261,11 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
                 activeCellRef={activeCellRef}
                 activeCellValue={isEditing ? editingValue : activeCellValue}
                 isEditing={isEditing}
-                isMutating={isMutating}
+                isMutating={isLocked}
                 onChange={setEditingValue}
                 onSave={() => handleSaveValue(editingValue, 'down')}
                 onCancel={() => setIsEditing(false)}
-                disabled={props.mode !== 'draft'}
+                disabled={props.mode !== 'draft' || isLocked}
             />
             
             <SpreadsheetGrid 
@@ -238,7 +274,7 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
                 activeCell={activeCell}
                 isEditing={isEditing}
                 editingValue={editingValue}
-                isMutating={isMutating}
+                isMutating={isLocked}
                 onCellClick={handleCellClick}
                 onCellDoubleClick={handleCellDoubleClick}
                 onEditingValueChange={setEditingValue}
@@ -256,11 +292,32 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
 }
 
 export default function SpreadsheetArtifact(props: SpreadsheetArtifactProps) {
-    // A key baseada no target garante que se o UUID mudar, o componente anterior morre por completo e desmonta.
-    const key = props.mode === 'draft' ? `draft-${props.artifactUuid}` : `resource-${props.resourceUuid}`;
+    const [resolvedTarget, setResolvedTarget] = useState<SpreadsheetArtifactProps>(props);
+
+    const incomingIdentity = props.mode === 'draft' ? `draft:${props.artifactUuid}` : `resource:${props.resourceUuid}`;
+    const [lastIncomingIdentity, setLastIncomingIdentity] = useState(incomingIdentity);
+
+    // Sync state only if the incoming prop identity REALLY changes (e.g. user opens a different artifact)
+    useEffect(() => {
+        if (incomingIdentity !== lastIncomingIdentity) {
+            setResolvedTarget(props);
+            setLastIncomingIdentity(incomingIdentity);
+        }
+    }, [incomingIdentity, lastIncomingIdentity, props]);
+
+    // Use a stable key that doesn't unmount the wrapper on mode change
+    const outerKey = props.mode === 'draft' ? `container-draft-${props.artifactUuid}` : `container-resource-${props.resourceUuid}`;
+
+    const handleTransition = (resourceUuid: string) => {
+        setResolvedTarget({
+            mode: 'resource',
+            resourceUuid,
+        });
+    };
+
     return (
-        <ErrorBoundary>
-            <SpreadsheetArtifactInner key={key} {...props} />
+        <ErrorBoundary key={outerKey}>
+            <SpreadsheetArtifactInner {...resolvedTarget} onTransition={handleTransition} />
         </ErrorBoundary>
     );
 }
