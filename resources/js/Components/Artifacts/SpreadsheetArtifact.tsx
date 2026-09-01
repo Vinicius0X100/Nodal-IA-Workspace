@@ -8,6 +8,8 @@ import SpreadsheetToolbar from './Spreadsheet/SpreadsheetToolbar';
 import SpreadsheetFormulaBar from './Spreadsheet/SpreadsheetFormulaBar';
 import SpreadsheetGrid from './Spreadsheet/SpreadsheetGrid';
 import SpreadsheetTabs from './Spreadsheet/SpreadsheetTabs';
+import { useSpreadsheetDraftMutations } from '@/Hooks/useSpreadsheetDraftMutations';
+import { toast } from 'sonner';
 
 import ErrorBoundary from '../ErrorBoundary';
 
@@ -24,16 +26,38 @@ export type SpreadsheetArtifactProps =
 function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
     const [activeSheetTitle, setActiveSheetTitle] = useState<string | undefined>();
     const [activeCell, setActiveCell] = useState<{ row: number, col: number } | null>(null);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingValue, setEditingValue] = useState('');
 
     const { data, isLoading, error, refetch } = useSpreadsheetArtifact(props, activeSheetTitle);
+    const { updateValues, isMutating } = useSpreadsheetDraftMutations(
+        props.mode === 'draft' ? props.artifactUuid : ''
+    );
 
     const handleSelectSheet = (title: string) => {
         setActiveSheetTitle(title);
-        setActiveCell(null); // Reset selection when changing tabs
+        setActiveCell(null);
+        setIsEditing(false);
     };
 
     const handleCellClick = (row: number, col: number) => {
+        if (isMutating) return;
         setActiveCell({ row, col });
+        setIsEditing(false);
+    };
+
+    const handleCellDoubleClick = (row: number, col: number) => {
+        if (props.mode !== 'draft' || isMutating) return;
+        
+        setActiveCell({ row, col });
+        setIsEditing(true);
+        
+        const cellData = data?.grid.rows[row]?.[col];
+        if (cellData) {
+            setEditingValue(cellData.formula || (cellData.value !== null ? String(cellData.value) : ''));
+        } else {
+            setEditingValue('');
+        }
     };
 
     const activeCellRef = useMemo(() => {
@@ -52,6 +76,104 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
         }
         return cellData.value !== null ? String(cellData.value) : '';
     }, [activeCell, data]);
+
+    const handleSaveValue = async (value: string, moveToNext: 'down' | 'right' | 'left' | 'none' = 'none') => {
+        if (props.mode !== 'draft' || !activeCell || !data) return;
+
+        const currentRevision = data.revision;
+        const currentSheet = data.sheets.find(s => s.title === (activeSheetTitle || data.active_sheet)) || data.sheets[0];
+        
+        if (!currentSheet) return;
+
+        const { row, col } = activeCell;
+        const range = getCellReference(row, col);
+
+        // Normalize value
+        let parsedValue: any = value;
+        if (value === '') {
+            parsedValue = null;
+        } else if (!value.startsWith('=')) {
+            const num = Number(value);
+            // Conservatively treat as number if it doesn't lose precision or leading zeros
+            if (!isNaN(num) && String(num) === value && !value.startsWith('0') || value === '0') {
+                parsedValue = num;
+            } else if (value.toLowerCase() === 'true') {
+                parsedValue = true;
+            } else if (value.toLowerCase() === 'false') {
+                parsedValue = false;
+            }
+        }
+
+        try {
+            const result = await updateValues({
+                sheetUuid: currentSheet.uuid,
+                expectedRevision: currentRevision,
+                updates: [
+                    {
+                        range,
+                        values: [[parsedValue]]
+                    }
+                ]
+            });
+
+            if (result?.revision) {
+                await refetch();
+                setIsEditing(false);
+                
+                if (moveToNext === 'down') {
+                    setActiveCell({ row: row + 1, col });
+                } else if (moveToNext === 'right') {
+                    setActiveCell({ row, col: col + 1 });
+                } else if (moveToNext === 'left') {
+                    setActiveCell({ row, col: Math.max(0, col - 1) });
+                }
+            }
+        } catch (err: any) {
+            if (err.status === 409 || err.code === 'DRAFT_REVISION_CONFLICT') {
+                toast.warning('A planilha foi atualizada. Recarregamos a versão mais recente.');
+                await refetch();
+            } else {
+                toast.error(err.message || 'Erro ao salvar valor.');
+            }
+        }
+    };
+
+    const handleFormat = async (format: any) => {
+        if (props.mode !== 'draft' || !activeCell || !data) return;
+
+        const currentRevision = data.revision;
+        const currentSheet = data.sheets.find(s => s.title === (activeSheetTitle || data.active_sheet)) || data.sheets[0];
+        
+        if (!currentSheet) return;
+
+        const { row, col } = activeCell;
+        const range = getCellReference(row, col);
+
+        try {
+            const result = await updateFormatting({
+                sheetUuid: currentSheet.uuid,
+                expectedRevision: currentRevision,
+                operations: [
+                    {
+                        type: 'format_range',
+                        range,
+                        format
+                    }
+                ]
+            });
+
+            if (result?.revision) {
+                await refetch();
+            }
+        } catch (err: any) {
+            if (err.status === 409 || err.code === 'DRAFT_REVISION_CONFLICT') {
+                toast.warning('A planilha foi atualizada. Recarregamos a versão mais recente.');
+                await refetch();
+            } else {
+                toast.error(err.message || 'Erro ao aplicar formatação.');
+            }
+        }
+    };
 
     if (isLoading && !data) {
         return (
@@ -93,18 +215,35 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
                 persistenceLabel={props.mode === 'draft' ? 'Ainda não salvo no Google Drive' : 'Salvo no Google Drive'}
             />
             
-            <SpreadsheetToolbar disabled={props.mode === 'draft'} />
+            <SpreadsheetToolbar 
+                disabled={props.mode === 'draft' && isMutating}
+                isDraft={props.mode === 'draft'}
+                onFormat={handleFormat} 
+            />
             
             <SpreadsheetFormulaBar 
                 activeCellRef={activeCellRef}
-                activeCellValue={activeCellValue}
+                activeCellValue={isEditing ? editingValue : activeCellValue}
+                isEditing={isEditing}
+                isMutating={isMutating}
+                onChange={setEditingValue}
+                onSave={() => handleSaveValue(editingValue, 'down')}
+                onCancel={() => setIsEditing(false)}
+                disabled={props.mode !== 'draft'}
             />
             
             <SpreadsheetGrid 
                 sheet={currentSheet}
                 grid={grid}
                 activeCell={activeCell}
+                isEditing={isEditing}
+                editingValue={editingValue}
+                isMutating={isMutating}
                 onCellClick={handleCellClick}
+                onCellDoubleClick={handleCellDoubleClick}
+                onEditingValueChange={setEditingValue}
+                onSaveValue={handleSaveValue}
+                onCancelEdit={() => setIsEditing(false)}
             />
 
             <SpreadsheetTabs 

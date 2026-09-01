@@ -28,10 +28,29 @@ interface Props {
     sheet: SheetData;
     grid: GridData;
     activeCell: { row: number, col: number } | null;
+    isEditing: boolean;
+    editingValue: string;
+    isMutating: boolean;
     onCellClick: (row: number, col: number) => void;
+    onCellDoubleClick: (row: number, col: number) => void;
+    onEditingValueChange: (value: string) => void;
+    onSaveValue: (value: string, moveToNext?: 'down' | 'right' | 'left' | 'none') => void;
+    onCancelEdit: () => void;
 }
 
-export default function SpreadsheetGrid({ sheet, grid, activeCell, onCellClick }: Props) {
+export default function SpreadsheetGrid({ 
+    sheet, 
+    grid, 
+    activeCell, 
+    isEditing,
+    editingValue,
+    isMutating,
+    onCellClick,
+    onCellDoubleClick,
+    onEditingValueChange,
+    onSaveValue,
+    onCancelEdit
+}: Props) {
     const { rows } = grid;
     
     // Calcula o tamanho da matriz a ser exibida com base nos dados reais vindos da API
@@ -148,11 +167,18 @@ export default function SpreadsheetGrid({ sheet, grid, activeCell, onCellClick }
                                             colIndex={cIdx}
                                             cell={cell}
                                             isSelected={isSelected}
+                                            isEditing={isSelected && isEditing}
+                                            editingValue={isSelected && isEditing ? editingValue : ''}
+                                            isMutating={isMutating}
                                             isFrozenRow={isFrozenRow}
                                             isFrozenCol={isFrozenCol}
                                             rowSpan={mergeData?.rowSpan}
                                             colSpan={mergeData?.colSpan}
                                             onClick={() => onCellClick(rIdx, cIdx)}
+                                            onDoubleClick={() => onCellDoubleClick(rIdx, cIdx)}
+                                            onEditingValueChange={onEditingValueChange}
+                                            onSaveValue={onSaveValue}
+                                            onCancelEdit={onCancelEdit}
                                         />
                                     );
                                 })}

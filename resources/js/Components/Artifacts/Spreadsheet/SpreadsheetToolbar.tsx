@@ -5,13 +5,25 @@ import {
     Grid3X3, Columns, Rows
 } from 'lucide-react';
 
-export default function SpreadsheetToolbar({ disabled = true }: { disabled?: boolean }) {
-    // Toolbar is purely visual for now, as requested.
-    // When editing is supported, these will be active unless disabled=true is passed (e.g. Draft Mode).
+interface Props {
+    disabled?: boolean;
+    isDraft?: boolean;
+    onFormat?: (format: any) => void;
+}
 
-    const Button = ({ icon: Icon, disabled: btnDisabled = disabled }: { icon: React.ElementType, disabled?: boolean }) => (
+export default function SpreadsheetToolbar({ disabled = true, isDraft = false, onFormat }: Props) {
+    const Button = ({ 
+        icon: Icon, 
+        disabled: btnDisabled = disabled, 
+        onClick 
+    }: { 
+        icon: React.ElementType, 
+        disabled?: boolean, 
+        onClick?: () => void 
+    }) => (
         <button 
             disabled={btnDisabled}
+            onClick={onClick}
             className="p-1.5 text-neutral-400 rounded hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
         >
             <Icon className="w-4 h-4" />
@@ -20,10 +32,12 @@ export default function SpreadsheetToolbar({ disabled = true }: { disabled?: boo
 
     const Divider = () => <div className="w-px h-4 bg-neutral-200 mx-1" />;
 
+    const formatBtnsDisabled = disabled || !isDraft; // Disable format buttons if not draft or global disabled
+
     return (
         <div className="flex items-center gap-1 px-4 py-1.5 border-b border-neutral-200 bg-neutral-50 shrink-0 overflow-x-auto scrollbar-hide">
-            <Button icon={Undo2} />
-            <Button icon={Redo2} />
+            <Button icon={Undo2} disabled />
+            <Button icon={Redo2} disabled />
             
             <Divider />
             
@@ -34,23 +48,25 @@ export default function SpreadsheetToolbar({ disabled = true }: { disabled?: boo
             
             <Divider />
 
-            <Button icon={Bold} />
-            <Button icon={Italic} />
-            <Button icon={Baseline} /> {/* Text Color */}
-            <Button icon={Palette} /> {/* Background Color */}
-            <Button icon={Grid3X3} />
+            <Button icon={Bold} disabled={formatBtnsDisabled} onClick={() => onFormat?.({ bold: true })} />
+            <Button icon={Italic} disabled={formatBtnsDisabled} onClick={() => onFormat?.({ italic: true })} />
+            
+            <Button icon={Baseline} disabled={formatBtnsDisabled} onClick={() => onFormat?.({ text_color: '#0B57D0' })} /> 
+            <Button icon={Palette} disabled={formatBtnsDisabled} onClick={() => onFormat?.({ background_color: '#e8f0fe' })} /> 
+            
+            <Button icon={Grid3X3} disabled />
             
             <Divider />
             
-            <Button icon={AlignLeft} />
-            <Button icon={AlignCenter} />
-            <Button icon={AlignRight} />
-            <Button icon={WrapText} />
+            <Button icon={AlignLeft} disabled={formatBtnsDisabled} onClick={() => onFormat?.({ horizontal_alignment: 'left' })} />
+            <Button icon={AlignCenter} disabled={formatBtnsDisabled} onClick={() => onFormat?.({ horizontal_alignment: 'center' })} />
+            <Button icon={AlignRight} disabled={formatBtnsDisabled} onClick={() => onFormat?.({ horizontal_alignment: 'right' })} />
+            <Button icon={WrapText} disabled={formatBtnsDisabled} onClick={() => onFormat?.({ wrap: true })} />
             
             <Divider />
             
-            <Button icon={Columns} /> {/* Merge placeholder */}
-            <Button icon={Rows} /> {/* Freeze placeholder */}
+            <Button icon={Columns} disabled /> {/* Merge placeholder */}
+            <Button icon={Rows} disabled /> {/* Freeze placeholder */}
         </div>
     );
 }
