@@ -15,7 +15,8 @@ class SpreadsheetDraftFrontendNormalizationTest extends TestCase
     public function test_draft_viewport_returns_sheets_metadata_for_frontend()
     {
         $org = Organization::create(['name' => 'Org', 'slug' => 'org']);
-        $user = User::create(['name' => 'U', 'email' => 'u@u.com', 'password' => '123', 'organization_id' => $org->id]);
+        $user = User::create(['name' => 'U', 'email' => 'u@u.com', 'password' => '123']);
+        $user->organizations()->attach($org->id);
         
         $draft = ArtifactDraft::create([
             'uuid' => \Illuminate\Support\Str::uuid(),

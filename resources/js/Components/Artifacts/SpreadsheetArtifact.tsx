@@ -30,7 +30,7 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
     const [editingValue, setEditingValue] = useState('');
 
     const { data, isLoading, error, refetch } = useSpreadsheetArtifact(props, activeSheetTitle);
-    const { updateValues, isMutating } = useSpreadsheetDraftMutations(
+    const { updateValues, updateFormatting, isMutating } = useSpreadsheetDraftMutations(
         props.mode === 'draft' ? props.artifactUuid : ''
     );
 
@@ -95,7 +95,7 @@ function SpreadsheetArtifactInner(props: SpreadsheetArtifactProps) {
         } else if (!value.startsWith('=')) {
             const num = Number(value);
             // Conservatively treat as number if it doesn't lose precision or leading zeros
-            if (!isNaN(num) && String(num) === value && !value.startsWith('0') || value === '0') {
+            if (!isNaN(num) && String(num) === value) {
                 parsedValue = num;
             } else if (value.toLowerCase() === 'true') {
                 parsedValue = true;
