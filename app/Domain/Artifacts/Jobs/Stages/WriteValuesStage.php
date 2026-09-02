@@ -40,7 +40,7 @@ class WriteValuesStage implements StageInterface
             externalUrl: ''
         );
 
-        $capabilities = $provider->getCapabilities();
+        $capabilities = $provider->capabilities();
         $maxBatchesPerJob = config('artifacts.commit.max_batches_per_job', 5);
 
         // Resume from checkpoint

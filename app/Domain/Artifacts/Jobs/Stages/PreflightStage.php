@@ -31,11 +31,11 @@ class PreflightStage implements StageInterface
             ->firstOrFail();
 
         $provider = $this->resolver->resolve($integration);
-        $capabilities = $provider->getCapabilities();
+        $capabilities = $provider->capabilities();
 
         // The preflight validator checks if the draft structure can be applied
         // It throws SpreadsheetProviderUnsupportedOperationException if it fails
-        $this->validator->validate($capabilities, $draft, $this->reader);
+        $this->validator->validate($draft, $capabilities);
 
         return new StageResult(true);
     }

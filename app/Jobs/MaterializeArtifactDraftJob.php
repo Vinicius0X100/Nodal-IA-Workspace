@@ -57,17 +57,28 @@ class MaterializeArtifactDraftJob implements ShouldQueue
                 // We let the job fail so Laravel Queue retries it
                 throw $e;
             } catch (\Throwable $e) {
-                // Permanent failure
+                // Permanent failure — mark attempt AND draft as failed so the
+                // frontend does not get stuck in "committing" forever.
+                $draft = $attempt->artifactDraft;
+
                 $attempt->update([
-                    'status' => 'failed',
-                    'finished_at' => now(),
+                    'status'        => 'failed',
+                    'finished_at'   => now(),
                     'error_payload' => [
                         'message' => $e->getMessage(),
-                        'code' => $e->getCode(),
-                        'stage' => $attempt->current_stage,
+                        'code'    => $e->getCode(),
+                        'stage'   => $attempt->current_stage,
                     ]
                 ]);
-                
+
+                // Propagate failure to the Draft only when no external resource
+                // was created yet (provider_external_id is null). If the file
+                // already exists on Google, the draft stays in committing so a
+                // future retry can reconcile rather than leaving an orphan.
+                if (empty($attempt->provider_external_id) && $draft) {
+                    $draft->update(['status' => \App\Domain\Artifacts\Enums\ArtifactDraftStatus::FAILED]);
+                }
+
                 // Cleanup/Restart logic will be evaluated by manual/cron processes for V1
                 return 'abort';
             }

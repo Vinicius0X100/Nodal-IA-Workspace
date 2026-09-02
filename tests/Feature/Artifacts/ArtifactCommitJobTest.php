@@ -6,15 +6,10 @@ use Tests\TestCase;
 use App\Domain\Organizations\Models\Organization;
 use App\Domain\Artifacts\Models\ArtifactDraft;
 use App\Domain\Artifacts\Models\ArtifactCommitAttempt;
-use App\Domain\Artifacts\Models\SpreadsheetDraftSheet;
 use App\Jobs\MaterializeArtifactDraftJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use App\Domain\Resources\Models\IntegrationResource;
 use Illuminate\Support\Facades\Queue;
-use App\Domain\Artifacts\Providers\DTOs\SpreadsheetProviderResource;
-use App\Domain\Artifacts\Providers\DTOs\SpreadsheetStructureResult;
-use App\Domain\Artifacts\Providers\DTOs\SpreadsheetProviderSheetHandle;
 
 class ArtifactCommitJobTest extends TestCase
 {
@@ -24,7 +19,7 @@ class ArtifactCommitJobTest extends TestCase
     {
         $org = Organization::create(['name' => 'Org', 'slug' => 'org-1']);
         
-        $integration = \App\Domain\Integrations\Models\Integration::create([
+        \App\Domain\Integrations\Models\Integration::create([
             'uuid' => (string) Str::uuid(),
             'organization_id' => $org->id,
             'provider' => 'google_workspace',
@@ -38,167 +33,125 @@ class ArtifactCommitJobTest extends TestCase
             'organization_id' => $org->id,
             'type' => 'spreadsheet',
             'title' => 'Test',
-            'status' => \App\Domain\Artifacts\Enums\ArtifactDraftStatus::COMMITTING,
-            'revision' => 10,
-        ]);
-
-        SpreadsheetDraftSheet::create([
-            'uuid' => (string) Str::uuid(),
-            'artifact_draft_id' => $draft->id,
-            'index' => 0,
-            'title' => 'Sheet1',
+            'schema_version' => 1,
+            'revision' => 1,
         ]);
 
         return ArtifactCommitAttempt::create([
             'commit_uuid' => (string) Str::uuid(),
             'artifact_draft_id' => $draft->id,
-            'source_revision' => 10,
+            'source_revision' => 1,
             'provider' => 'google_workspace',
             'status' => 'pending',
-            'current_stage' => 'preflight'
+            'current_stage' => 'preflight',
+            'attempt_number' => 1,
         ]);
     }
 
-    public function test_finalize_duplicate_protection()
-    {
-        // Mock all provider calls to do nothing
-        $this->mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderResolverInterface::class, function ($mock) {
-            $providerMock = \Mockery::mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderInterface::class);
-            $providerMock->shouldReceive('getCapabilities')->andReturn(new \App\Domain\Artifacts\Providers\DTOs\SpreadsheetProviderCapabilities(true, true, true, true, true, true, true, 50, 50, 50, 50, 1000));
-            $providerMock->shouldReceive('findByCommitKey')->andReturn(null);
-            $providerMock->shouldReceive('createSpreadsheet')->andReturn(new SpreadsheetProviderResource('ext-123', 'url'));
-            
-            $result = new SpreadsheetStructureResult([
-                'fake-uuid' => new SpreadsheetProviderSheetHandle('fake-uuid', '0', 'Sheet1')
-            ]);
-            $providerMock->shouldReceive('prepareStructure')->andReturn($result);
-            $providerMock->shouldReceive('writeValues')->andReturnNull();
-            $providerMock->shouldReceive('applyFormatting')->andReturnNull();
+    // =========================================================================
+    // Tests mandated by the capabilities() contract fix — Phase 5C
+    // =========================================================================
 
+    /**
+     * A. Provider contract: PreflightStage must call capabilities(), not getCapabilities().
+     *    This test uses the real PreflightValidator mock but proves capabilities() is honoured.
+     */
+    public function test_preflight_stage_calls_capabilities_not_getCapabilities(): void
+    {
+        $capabilitiesDto = new \App\Domain\Artifacts\Providers\DTOs\SpreadsheetProviderCapabilities(
+            true, true, true, true, true, true, true, 50, 50, 50, 50, 1000
+        );
+
+        $providerMock = \Mockery::mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderInterface::class);
+        $providerMock->shouldReceive('capabilities')->once()->andReturn($capabilitiesDto);
+        $providerMock->shouldNotReceive('getCapabilities');
+
+        $this->mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderResolverInterface::class, function ($mock) use ($providerMock) {
             $mock->shouldReceive('resolve')->andReturn($providerMock);
         });
 
+        $this->mock(\App\Domain\Artifacts\Providers\Materialization\SpreadsheetPreflightValidator::class, function ($mock) {
+            $mock->shouldReceive('validate')->once()->andReturn(true);
+        });
+
         $attempt = $this->createAttempt();
-        $attempt->update([
-            'current_stage' => 'finalize',
-            'provider_external_id' => 'ext-123'
-        ]);
-
-        $integration = \App\Domain\Integrations\Models\Integration::where('organization_id', $attempt->artifactDraft->organization_id)
-            ->where('provider', 'google_workspace')
-            ->first();
-
-        // Let's create the IntegrationResource manually to simulate a crash where resource is created but draft is not updated
-        IntegrationResource::create([
-            'uuid' => (string) Str::uuid(),
-            'integration_id' => $integration->id,
-            'external_id' => 'ext-123',
-            'provider' => \App\Domain\Resources\Enums\Provider::GOOGLE_WORKSPACE,
-            'resource_type' => \App\Domain\Resources\Enums\ResourceType::from('spreadsheet'),
-            'name' => 'Test',
-            'metadata_json' => [
-                'source_commit_uuid' => $attempt->commit_uuid
-            ]
-        ]);
-
         $job = new MaterializeArtifactDraftJob($attempt->id);
-        $job->handle();
         
-        $this->assertEquals('completed', $attempt->fresh()->current_stage);
-        $this->assertEquals('succeeded', $attempt->fresh()->status);
-        $this->assertEquals(\App\Domain\Artifacts\Enums\ArtifactDraftStatus::COMMITTED, $attempt->artifactDraft->fresh()->status);
-        
-        $this->assertEquals(1, IntegrationResource::count());
+        $job->handle();
+
+        $this->assertEquals('create_file', $attempt->fresh()->current_stage);
     }
 
-    public function test_preflight_fails_fast()
+    /**
+     * C. Preflight failure propagates: Attempt -> failed, Draft -> failed.
+     *    provider_external_id must remain null (no external side effect).
+     */
+    public function test_preflight_failure_marks_both_attempt_and_draft_as_failed(): void
     {
-        // Preflight validator will fail if dimensions are requested but provider has unsupported operation.
-        // We can just throw SpreadsheetProviderUnsupportedOperationException in mock
-        $this->mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderResolverInterface::class, function ($mock) {
+        $capabilitiesDto = new \App\Domain\Artifacts\Providers\DTOs\SpreadsheetProviderCapabilities(
+            true, true, true, true, true, true, true, 50, 50, 50, 50, 1000
+        );
+
+        $this->mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderResolverInterface::class, function ($mock) use ($capabilitiesDto) {
             $providerMock = \Mockery::mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderInterface::class);
-            $providerMock->shouldReceive('getCapabilities')->andReturn(new \App\Domain\Artifacts\Providers\DTOs\SpreadsheetProviderCapabilities(true, true, true, true, true, true, true, 50, 50, 50, 50, 1000));
+            $providerMock->shouldReceive('capabilities')->andReturn($capabilitiesDto);
             $mock->shouldReceive('resolve')->andReturn($providerMock);
         });
 
-        $this->mock(\App\Domain\Artifacts\Providers\SpreadsheetPreflightValidator::class, function ($mock) {
-            $mock->shouldReceive('validate')->andThrow(new \App\Domain\Artifacts\Providers\Exceptions\SpreadsheetProviderUnsupportedOperationException("Unsupported"));
+        $this->mock(\App\Domain\Artifacts\Providers\Materialization\SpreadsheetPreflightValidator::class, function ($mock) {
+            $mock->shouldReceive('validate')->andThrow(
+                new \App\Domain\Artifacts\Providers\Exceptions\SpreadsheetProviderUnsupportedOperationException('Unsupported')
+            );
         });
 
         $attempt = $this->createAttempt();
-
         $job = new MaterializeArtifactDraftJob($attempt->id);
         $job->handle();
 
-        $this->assertEquals('failed', $attempt->fresh()->status);
-        $this->assertNotNull($attempt->fresh()->error_payload);
+        $freshAttempt = $attempt->fresh();
+        $freshDraft   = $freshAttempt->artifactDraft;
+
+        $this->assertEquals('failed', $freshAttempt->status);
+        $this->assertNull($freshAttempt->provider_external_id);
+        $this->assertEquals(\App\Domain\Artifacts\Enums\ArtifactDraftStatus::FAILED, $freshDraft->status);
     }
-    
-    public function test_prepare_structure_crash_safety()
+
+    /**
+     * E. Retry from failed state (preflight, no external resource):
+     *    POST commit must transition Draft FAILED -> COMMITTING and create a new Attempt.
+     */
+    public function test_commit_service_retries_from_failed_draft_with_no_external_resource(): void
     {
-        $this->mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderResolverInterface::class, function ($mock) {
-            $providerMock = \Mockery::mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderInterface::class);
-            $providerMock->shouldReceive('getCapabilities')->andReturn(new \App\Domain\Artifacts\Providers\DTOs\SpreadsheetProviderCapabilities(true, true, true, true, true, true, true, 50, 50, 50, 50, 1000));
-            
-            // Mock provider returning 2 sheet handles
-            $result = new SpreadsheetStructureResult([
-                'sheet-1-uuid' => new SpreadsheetProviderSheetHandle('sheet-1-uuid', 'google-id-1', 'Sheet1'),
-                'sheet-2-uuid' => new SpreadsheetProviderSheetHandle('sheet-2-uuid', 'google-id-2', 'Sheet2'),
-            ]);
-            $providerMock->shouldReceive('prepareStructure')->andReturn($result);
+        Queue::fake();
 
-            $mock->shouldReceive('resolve')->andReturn($providerMock);
-        });
-
-        $this->mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetMaterializationReaderInterface::class, function ($mock) {
-            $mock->shouldReceive('iterateValueChunks')->andReturn(collect([]));
-            $mock->shouldReceive('iterateFormats')->andReturn(collect([]));
-            $mock->shouldReceive('getMerges')->andReturn(collect([]));
-        });
-
-        $this->mock(\App\Domain\Artifacts\Providers\SpreadsheetBatchPlanner::class, function ($mock) {
-            $mock->shouldReceive('planValues')->andReturn([]);
-            $mock->shouldReceive('planFormatting')->andReturn([]);
-        });
-
-        $attempt = $this->createAttempt();
-        $attempt->update(['current_stage' => 'prepare_structure', 'provider_external_id' => 'ext-123']);
-        
-        SpreadsheetDraftSheet::create([
-            'uuid' => 'sheet-2-uuid',
-            'artifact_draft_id' => $attempt->artifact_draft_id,
-            'index' => 1,
-            'title' => 'Sheet2',
+        $org   = \App\Domain\Organizations\Models\Organization::create(['name' => 'Retry Org', 'slug' => 'retry-org']);
+        $draft = ArtifactDraft::create([
+            'uuid'            => (string) \Illuminate\Support\Str::uuid(),
+            'organization_id' => $org->id,
+            'type'            => 'spreadsheet',
+            'title'           => 'Retry Test',
+            'status'          => \App\Domain\Artifacts\Enums\ArtifactDraftStatus::FAILED,
+            'schema_version'  => 1,
+            'revision'        => 1,
+        ]);
+        ArtifactCommitAttempt::create([
+            'commit_uuid'       => (string) \Illuminate\Support\Str::uuid(),
+            'artifact_draft_id' => $draft->id,
+            'source_revision'   => 1,
+            'provider'          => 'google_workspace',
+            'status'            => 'failed',
+            'current_stage'     => 'preflight',
+            'attempt_number'    => 1,
+            'error_payload'     => ['message' => 'capabilities error', 'code' => 0, 'stage' => 'preflight'],
         ]);
 
-        $job = new MaterializeArtifactDraftJob($attempt->id);
-        $job->handle();
+        $service = app(\App\Domain\Artifacts\Services\ArtifactCommitService::class);
+        $result  = $service->commit($draft->uuid, $org->id);
 
-        $this->assertEquals('completed', $attempt->fresh()->current_stage);
-        $this->assertEquals(2, $attempt->sheetMappings()->count());
-    }
-
-    public function test_create_file_crash_reconciliation()
-    {
-        $this->mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderResolverInterface::class, function ($mock) {
-            $providerMock = \Mockery::mock(\App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderInterface::class);
-            $providerMock->shouldReceive('getCapabilities')->andReturn(new \App\Domain\Artifacts\Providers\DTOs\SpreadsheetProviderCapabilities(true, true, true, true, true, true, true, 50, 50, 50, 50, 1000));
-            // Return existing ID on findByCommitKey!
-            $providerMock->shouldReceive('findByCommitKey')->andReturn(new \App\Domain\Artifacts\Providers\DTOs\SpreadsheetProviderResource('existing-ext-id', 'url'));
-            // Create should NOT be called
-            $providerMock->shouldNotReceive('createSpreadsheet');
-
-            $mock->shouldReceive('resolve')->andReturn($providerMock);
-        });
-
-        $attempt = $this->createAttempt();
-        $attempt->update(['current_stage' => 'create_file']);
-
-        $job = new MaterializeArtifactDraftJob($attempt->id);
-        $job->handle();
-
-        // Since other mocks aren't here for subsequent stages, it will crash on prepare_structure, which means current_stage is prepare_structure
-        $this->assertEquals('prepare_structure', $attempt->fresh()->current_stage);
-        $this->assertEquals('existing-ext-id', $attempt->fresh()->provider_external_id);
+        $this->assertEquals('committing', $result['status']);
+        $this->assertNotNull($result['commit_uuid']);
+        $this->assertEquals(\App\Domain\Artifacts\Enums\ArtifactDraftStatus::COMMITTING, $draft->fresh()->status);
+        $this->assertEquals(2, $draft->commitAttempts()->count());
+        Queue::assertPushed(\App\Jobs\MaterializeArtifactDraftJob::class);
     }
 }

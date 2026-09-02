@@ -53,12 +53,49 @@ class ArtifactCommitService
 
                 return [
                     'artifact_uuid' => $draft->uuid,
-                    'commit_uuid' => $attempt?->commit_uuid,
-                    'status' => 'committing',
+                    'commit_uuid'   => $attempt?->commit_uuid,
+                    'status'        => 'committing',
                 ];
             }
 
-            // 3. If draft
+            // 3. FAILED recovery — safe retry when no external resource was created
+            // (e.g. preflight or create_file failures). The user clicked "Create" again.
+            if ($draft->status === \App\Domain\Artifacts\Enums\ArtifactDraftStatus::FAILED) {
+                $lastAttempt = $draft->commitAttempts()->orderBy('id', 'desc')->first();
+
+                // Only allow retry if no external file was created yet.
+                // If provider_external_id exists, a manual reconciliation is needed.
+                if ($lastAttempt && !empty($lastAttempt->provider_external_id)) {
+                    throw new InvalidArgumentException(
+                        'Draft has a failed commit with a partial external resource. Manual reconciliation required.'
+                    );
+                }
+
+                // Safe to retry: reset draft and create a fresh attempt
+                $draft->update(['status' => \App\Domain\Artifacts\Enums\ArtifactDraftStatus::COMMITTING]);
+
+                $newAttempt = ArtifactCommitAttempt::create([
+                    'commit_uuid'       => (string) Str::uuid(),
+                    'artifact_draft_id' => $draft->id,
+                    'source_revision'   => $draft->revision,
+                    'provider'          => 'google_workspace',
+                    'status'            => 'pending',
+                    'current_stage'     => 'preflight',
+                    'attempt_number'    => ($lastAttempt?->attempt_number ?? 0) + 1,
+                ]);
+
+                DB::afterCommit(function () use ($newAttempt) {
+                    MaterializeArtifactDraftJob::dispatch($newAttempt->id);
+                });
+
+                return [
+                    'artifact_uuid' => $draft->uuid,
+                    'commit_uuid'   => $newAttempt->commit_uuid,
+                    'status'        => 'committing',
+                ];
+            }
+
+            // 4. If draft — normal first commit
             if ($draft->status !== \App\Domain\Artifacts\Enums\ArtifactDraftStatus::DRAFT) {
                 throw new InvalidArgumentException("Draft is in invalid state for commit: {$draft->status->value}");
             }
@@ -103,39 +140,52 @@ class ArtifactCommitService
         if ($draft->status === \App\Domain\Artifacts\Enums\ArtifactDraftStatus::COMMITTED) {
             return [
                 'artifact_uuid' => $draft->uuid,
-                'commit_uuid' => null,
-                'status' => 'committed',
+                'commit_uuid'   => null,
+                'status'        => 'committed',
                 'resource_uuid' => $draft->committed_resource_uuid,
             ];
         }
 
-        $attempt = $draft->commitAttempts()->orderBy('id', 'desc')->first();
-        
-        if (!$attempt) {
+        // Draft was marked failed (propagated from a terminal Attempt failure)
+        if ($draft->status === \App\Domain\Artifacts\Enums\ArtifactDraftStatus::FAILED) {
+            $attempt = $draft->commitAttempts()->orderBy('id', 'desc')->first();
             return [
                 'artifact_uuid' => $draft->uuid,
-                'status' => $draft->status->value,
+                'commit_uuid'   => $attempt?->commit_uuid,
+                'status'        => 'failed',
+                'stage'         => $attempt?->current_stage,
+                'error'         => $attempt?->error_payload ?? [],
             ];
         }
 
+        $attempt = $draft->commitAttempts()->orderBy('id', 'desc')->first();
+
+        if (!$attempt) {
+            return [
+                'artifact_uuid' => $draft->uuid,
+                'status'        => $draft->status->value,
+            ];
+        }
+
+        // Attempt-level failure (draft may still be in committing if external resource exists)
         if ($attempt->status === 'failed') {
             return [
                 'artifact_uuid' => $draft->uuid,
-                'commit_uuid' => $attempt->commit_uuid,
-                'status' => 'failed',
-                'stage' => $attempt->current_stage,
-                'error' => $attempt->error_payload ?? [],
+                'commit_uuid'   => $attempt->commit_uuid,
+                'status'        => 'failed',
+                'stage'         => $attempt->current_stage,
+                'error'         => $attempt->error_payload ?? [],
             ];
         }
 
         return [
             'artifact_uuid' => $draft->uuid,
-            'commit_uuid' => $attempt->commit_uuid,
-            'status' => $draft->status->value, // usually committing
-            'stage' => $attempt->current_stage,
-            'progress' => [
+            'commit_uuid'   => $attempt->commit_uuid,
+            'status'        => $draft->status->value, // usually committing
+            'stage'         => $attempt->current_stage,
+            'progress'      => [
                 'processed_batches' => $attempt->checkpoint_json['processed_batches'] ?? 0,
-                'total_batches' => null
+                'total_batches'     => null
             ]
         ];
     }
