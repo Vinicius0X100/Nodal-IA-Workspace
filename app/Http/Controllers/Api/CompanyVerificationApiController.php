@@ -96,7 +96,8 @@ class CompanyVerificationApiController extends Controller
      */
     public function approve(Request $request, $uuid)
     {
-        $verification = CompanyVerification::with('organization.users')->findByUuidOrFail($uuid);
+        $verification = CompanyVerification::findByUuidOrFail($uuid);
+        $verification->load('organization.users');
 
         if ($verification->verification_status !== 'under_review') {
             return response()->json(['message' => 'Verification is not pending.'], 400);
