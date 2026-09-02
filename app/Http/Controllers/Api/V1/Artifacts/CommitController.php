@@ -18,7 +18,11 @@ class CommitController extends Controller
 
     public function commit(Request $request, string $uuid): JsonResponse
     {
-        $organizationId = $request->user()->current_organization_id;
+        $organizationId = session('active_organization_id');
+
+        if (!$organizationId) {
+            abort(403, 'No active organization found in session.');
+        }
 
         $result = $this->commitService->commit($uuid, $organizationId);
 
@@ -32,7 +36,11 @@ class CommitController extends Controller
 
     public function status(Request $request, string $uuid): JsonResponse
     {
-        $organizationId = $request->user()->current_organization_id;
+        $organizationId = session('active_organization_id');
+
+        if (!$organizationId) {
+            abort(403, 'No active organization found in session.');
+        }
 
         $result = $this->commitService->getStatus($uuid, $organizationId);
 

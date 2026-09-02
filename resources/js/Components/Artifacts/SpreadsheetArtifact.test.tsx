@@ -1,6 +1,7 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import axios from 'axios';
 import SpreadsheetArtifact from './SpreadsheetArtifact';
 import * as useSpreadsheetDraftMutationsHook from '@/Hooks/useSpreadsheetDraftMutations';
 import * as useSpreadsheetArtifactHook from '@/Hooks/useSpreadsheetArtifact';
@@ -101,4 +102,30 @@ describe('SpreadsheetArtifact', () => {
         });
     });
 
+    it('handles POST commit 500 correctly without locking toolbar', async () => {
+        // Mock a failure for the commit endpoint
+        vi.spyOn(axios, 'post').mockRejectedValueOnce({
+            response: { data: { message: 'Internal Server Error' } }
+        });
+
+        const { getAllByText, getByText } = render(
+            <SpreadsheetArtifact mode="draft" artifactUuid="draft-123" />
+        );
+
+        // Hook is mocked synchronously, button is immediately available
+        const commitBtn = getAllByText('Criar no Google Drive')[0];
+        fireEvent.click(commitBtn);
+
+        // The persistence label updates
+        await waitFor(() => {
+            expect(getByText('Falha ao salvar no Google Drive')).toBeTruthy();
+        });
+
+        // The toolbar should NOT be locked. A toolbar button like Bold should not be disabled.
+        // Wait for unlock
+        await waitFor(() => {
+            const boldBtn = document.querySelector('button .lucide-bold')?.closest('button');
+            expect(boldBtn?.disabled).toBe(false);
+        });
+    });
 });

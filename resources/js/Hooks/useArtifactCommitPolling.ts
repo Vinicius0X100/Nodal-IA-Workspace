@@ -38,7 +38,6 @@ export function useArtifactCommitPolling({
     const [isPolling, setIsPolling] = useState(initialStatus === 'committing');
 
     const startCommit = async () => {
-        setIsPolling(true);
         setStatus('committing');
         setStage('preflight');
         
@@ -51,17 +50,15 @@ export function useArtifactCommitPolling({
             });
 
             if (response.data?.success && response.data?.data?.status === 'committing') {
-                // Polling starts automatically because isPolling is true
                 setStatus('committing');
+                setIsPolling(true); // ONLY start polling if the backend accepted it
             } else if (response.data?.success && response.data?.data?.status === 'committed') {
-                setIsPolling(false);
                 setStatus('committed');
                 onCommitted(response.data.data.resource_uuid);
             } else {
                 throw new Error(response.data?.message || 'Falha ao iniciar o commit.');
             }
         } catch (error: any) {
-            setIsPolling(false);
             setStatus('failed');
             const msg = error.response?.data?.message || error.message || 'Falha ao iniciar o commit.';
             onFailed(msg);
