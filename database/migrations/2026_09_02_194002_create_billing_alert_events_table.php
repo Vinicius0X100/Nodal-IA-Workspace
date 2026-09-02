@@ -34,7 +34,7 @@ return new class extends Migration
             $table->foreign('organization_id')->references('id')->on('organizations')->onDelete('cascade');
             $table->foreign('usage_period_id')->references('id')->on('ai_usage_periods')->onDelete('set null');
 
-            $table->index(['organization_id', 'alert_type', 'triggered_at']);
+            $table->index(['organization_id', 'alert_type', 'triggered_at'], 'idx_alert_events_org_type_date');
         });
     }
 
