@@ -141,3 +141,12 @@ Route::middleware(['auth'])->group(function () {
         // Audit
     });
 });
+
+        // Billing e Uso de IA
+        Route::prefix('settings/billing')->name('billing.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Billing\BillingController::class, 'index'])->name('index');
+            Route::get('/usage', [\App\Http\Controllers\Billing\BillingController::class, 'usage'])->name('usage');
+            Route::get('/users', [\App\Http\Controllers\Billing\BillingController::class, 'users'])->name('users');
+            Route::get('/alerts', [\App\Http\Controllers\Billing\BillingController::class, 'alerts'])->name('alerts');
+            Route::get('/invoices', [\App\Http\Controllers\Billing\BillingController::class, 'invoices'])->name('invoices');
+        });

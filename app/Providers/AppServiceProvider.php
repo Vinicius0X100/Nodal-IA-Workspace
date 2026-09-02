@@ -2,6 +2,14 @@
 
 namespace App\Providers;
 
+use App\Domain\Billing\Policies\BillingPolicy;
+use App\Domain\Billing\Services\AICostCalculator;
+use App\Domain\Billing\Services\AIUsageLimitService;
+use App\Domain\Billing\Services\AIUsageService;
+use App\Domain\Billing\Services\BillingAlertService;
+use App\Domain\Billing\Services\BillingSubscriptionService;
+use App\Domain\Organizations\Models\Organization;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -33,6 +41,13 @@ class AppServiceProvider extends ServiceProvider
             \App\Domain\Artifacts\Providers\Contracts\SpreadsheetBatchPlannerInterface::class,
             \App\Domain\Artifacts\Providers\Materialization\SpreadsheetBatchPlanner::class
         );
+
+        // Billing domain — singleton services
+        $this->app->singleton(AICostCalculator::class);
+        $this->app->singleton(BillingSubscriptionService::class);
+        $this->app->singleton(BillingAlertService::class);
+        $this->app->singleton(AIUsageLimitService::class);
+        $this->app->singleton(AIUsageService::class);
     }
 
     /**

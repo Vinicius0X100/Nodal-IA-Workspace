@@ -92,6 +92,10 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::post('/meta/actions/status/prepare', [\App\Domain\AI\Api\Controllers\AIMetaActionsController::class, 'prepareStatusUpdate']);
     Route::post('/meta/actions/budget/prepare', [\App\Domain\AI\Api\Controllers\AIMetaActionsController::class, 'prepareBudgetUpdate']);
     Route::post('/meta/actions/{action_uuid}/execute', [\App\Domain\AI\Api\Controllers\AIMetaActionsController::class, 'executeAction'])->whereUuid('action_uuid');
+
+    // AI Usage Metering — Preparado para integração n8n (Fase 5D)
+    // Recebe apenas usage facts (tokens). Laravel calcula custo e créditos.
+    Route::post('/usage/events', [\App\Http\Controllers\Billing\AIUsageApiController::class, 'store']);
 });
 
 // Webhooks

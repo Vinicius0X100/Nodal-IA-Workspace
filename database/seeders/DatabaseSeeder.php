@@ -37,6 +37,9 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             CapabilitiesSeeder::class,
+            BillingPlansSeeder::class,
+            AiModelRatesSeeder::class,
+            BillingExchangeRatesSeeder::class,
         ]);
     }
 }
