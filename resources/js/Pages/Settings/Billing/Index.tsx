@@ -1,6 +1,6 @@
 import React from 'react';
-import AppLayout from '@/Layouts/AppLayout';
-import { Head, Link } from '@inertiajs/react';
+import SettingsLayout from '@/Layouts/SettingsLayout';
+import { Link } from '@inertiajs/react';
 import {
     CreditCard, Zap, TrendingUp, AlertTriangle,
     Calendar, ChevronRight, ArrowUp, Users,
@@ -59,30 +59,6 @@ interface Props {
     projection: Projection;
 }
 
-const BillingNav = () => (
-    <div className="flex items-center gap-1 mb-6 text-sm border-b border-neutral-100 pb-4">
-        {[
-            { label: 'Visão Geral', href: route('billing.index') },
-            { label: 'Uso de IA', href: route('billing.usage') },
-            { label: 'Por Usuário', href: route('billing.users') },
-            { label: 'Alertas', href: route('billing.alerts') },
-            { label: 'Faturas', href: route('billing.invoices') },
-        ].map((item) => (
-            <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                    'px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                    window.location.pathname === new URL(item.href).pathname
-                        ? 'bg-primary-50 text-primary-700'
-                        : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50'
-                )}
-            >
-                {item.label}
-            </Link>
-        ))}
-    </div>
-);
 
 function formatCredits(n: number): string {
     return new Intl.NumberFormat('pt-BR').format(Math.round(n));
@@ -105,16 +81,13 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
         : '—';
 
     return (
-        <AppLayout title="Faturamento e Uso">
-            <Head title="Faturamento e Uso — Nodal" />
+        <SettingsLayout title="Faturamento e Uso">
             <div className="max-w-5xl mx-auto space-y-6">
                 {/* Header */}
                 <div>
                     <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Faturamento e Uso</h1>
                     <p className="text-sm text-neutral-500 mt-1">Gerencie seu plano, créditos de IA e alertas de consumo.</p>
                 </div>
-
-                <BillingNav />
 
                 {/* Estado sem plano */}
                 {!usage_state.has_plan && (
@@ -280,6 +253,6 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
                     ))}
                 </div>
             </div>
-        </AppLayout>
+        </SettingsLayout>
     );
 }

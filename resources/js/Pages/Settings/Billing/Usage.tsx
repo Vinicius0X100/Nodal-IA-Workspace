@@ -1,28 +1,9 @@
 import React, { useState } from 'react';
-import AppLayout from '@/Layouts/AppLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import SettingsLayout from '@/Layouts/SettingsLayout';
+import { Link, router } from '@inertiajs/react';
 import { Zap, Activity, Hash, ArrowRight, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const BillingNav = () => (
-    <div className="flex items-center gap-1 mb-6 text-sm border-b border-neutral-100 pb-4">
-        {[
-            { label: 'Visão Geral', href: route('billing.index') },
-            { label: 'Uso de IA', href: route('billing.usage') },
-            { label: 'Por Usuário', href: route('billing.users') },
-            { label: 'Alertas', href: route('billing.alerts') },
-            { label: 'Faturas', href: route('billing.invoices') },
-        ].map((item) => (
-            <Link key={item.href} href={item.href}
-                className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                    window.location.pathname === new URL(item.href).pathname
-                        ? 'bg-primary-50 text-primary-700' : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50'
-                )}>
-                {item.label}
-            </Link>
-        ))}
-    </div>
-);
 
 function formatCredits(n: number) { return new Intl.NumberFormat('pt-BR').format(Math.round(n)); }
 function formatBrl(n: number) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n); }
@@ -50,14 +31,12 @@ export default function BillingUsage({ daily_rollups, totals, by_model, by_categ
     const maxCredits = Math.max(...daily_rollups.map(r => r.credits_used), 1);
 
     return (
-        <AppLayout title="Uso de IA">
-            <Head title="Uso de IA — Faturamento — Nodal" />
+        <SettingsLayout title="Uso de IA">
             <div className="max-w-5xl mx-auto space-y-6">
                 <div>
                     <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Uso de IA</h1>
                     <p className="text-sm text-neutral-500 mt-1">Detalhamento de créditos, tokens e custos.</p>
                 </div>
-                <BillingNav />
                 <div className="flex items-center gap-3 flex-wrap">
                     <div className="flex items-center gap-2">
                         <label className="text-xs text-neutral-500 font-medium">De</label>
@@ -135,6 +114,6 @@ export default function BillingUsage({ daily_rollups, totals, by_model, by_categ
                     </div>
                 </div>
             </div>
-        </AppLayout>
+        </SettingsLayout>
     );
 }

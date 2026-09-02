@@ -1,28 +1,9 @@
 import React from 'react';
-import AppLayout from '@/Layouts/AppLayout';
-import { Head, Link } from '@inertiajs/react';
+import SettingsLayout from '@/Layouts/SettingsLayout';
+import { Link } from '@inertiajs/react';
 import { FileText, Download, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const BillingNav = () => (
-    <div className="flex items-center gap-1 mb-6 text-sm border-b border-neutral-100 pb-4">
-        {[
-            { label: 'Visão Geral', href: route('billing.index') },
-            { label: 'Uso de IA', href: route('billing.usage') },
-            { label: 'Por Usuário', href: route('billing.users') },
-            { label: 'Alertas', href: route('billing.alerts') },
-            { label: 'Faturas', href: route('billing.invoices') },
-        ].map((item) => (
-            <Link key={item.href} href={item.href}
-                className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                    window.location.pathname === new URL(item.href).pathname
-                        ? 'bg-primary-50 text-primary-700' : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50'
-                )}>
-                {item.label}
-            </Link>
-        ))}
-    </div>
-);
 
 function formatBrl(n: number) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n); }
 function formatDate(d: string | null) { return d ? new Date(d).toLocaleDateString('pt-BR') : '—'; }
@@ -56,14 +37,12 @@ const statusConfig = {
 
 export default function BillingInvoices({ invoices }: Props) {
     return (
-        <AppLayout title="Faturas">
-            <Head title="Faturas — Faturamento — Nodal" />
+        <SettingsLayout title="Faturas">
             <div className="max-w-5xl mx-auto space-y-6">
                 <div>
                     <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Faturas</h1>
                     <p className="text-sm text-neutral-500 mt-1">Histórico de cobranças e comprovantes de pagamento.</p>
                 </div>
-                <BillingNav />
 
                 <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
                     {invoices.data.length === 0 ? (
@@ -127,6 +106,6 @@ export default function BillingInvoices({ invoices }: Props) {
                     )}
                 </div>
             </div>
-        </AppLayout>
+        </SettingsLayout>
     );
 }

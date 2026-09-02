@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import AppLayout from '@/Layouts/AppLayout';
+import SettingsLayout from '@/Layouts/SettingsLayout';
 import { Head, useForm, router } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
@@ -213,40 +213,14 @@ export default function Settings({ organization, verification }: SettingsProps) 
     const [tab, setTab] = useState<'profile' | 'verification'>('profile');
 
     return (
-        <AppLayout title="Configurações da Organização">
-            <Head title="Configurações da Organização" />
-            <div className="flex gap-8 max-w-5xl">
-                {/* Sidebar */}
-                <aside className="w-52 shrink-0 pt-1">
-                    <nav className="space-y-0.5">
-                        <NavSectionLabel label="Geral" />
-                        <NavItem
-                            label="Perfil da Organização"
-                            icon={Building2}
-                            active={tab === 'profile'}
-                            onClick={() => setTab('profile')}
-                        />
-
-                        <NavSectionLabel label="Segurança" />
-                        <NavGroup label="Verificação" icon={Shield}>
-                            <NavItem
-                                label="Verificação da Empresa"
-                                icon={ShieldCheck}
-                                active={tab === 'verification'}
-                                onClick={() => setTab('verification')}
-                                indent
-                            />
-                        </NavGroup>
-                    </nav>
-                </aside>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                    {tab === 'profile' && <ProfileTab organization={organization} />}
-                    {tab === 'verification' && <VerificationTab organization={organization} verification={verification} />}
-                </div>
-            </div>
-        </AppLayout>
+        <SettingsLayout
+            title="Configurações da Organização"
+            activeTab={tab}
+            onTabChange={setTab}
+        >
+            {tab === 'profile' && <ProfileTab organization={organization} />}
+            {tab === 'verification' && <VerificationTab organization={organization} verification={verification} />}
+        </SettingsLayout>
     );
 }
 

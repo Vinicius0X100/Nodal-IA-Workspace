@@ -1,28 +1,9 @@
 import React, { useState } from 'react';
-import AppLayout from '@/Layouts/AppLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import SettingsLayout from '@/Layouts/SettingsLayout';
+import { Link, router } from '@inertiajs/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/Components/ui/avatar';
 import { cn } from '@/lib/utils';
 
-const BillingNav = () => (
-    <div className="flex items-center gap-1 mb-6 text-sm border-b border-neutral-100 pb-4">
-        {[
-            { label: 'Visão Geral', href: route('billing.index') },
-            { label: 'Uso de IA', href: route('billing.usage') },
-            { label: 'Por Usuário', href: route('billing.users') },
-            { label: 'Alertas', href: route('billing.alerts') },
-            { label: 'Faturas', href: route('billing.invoices') },
-        ].map((item) => (
-            <Link key={item.href} href={item.href}
-                className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                    window.location.pathname === new URL(item.href).pathname
-                        ? 'bg-primary-50 text-primary-700' : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50'
-                )}>
-                {item.label}
-            </Link>
-        ))}
-    </div>
-);
 
 function formatCredits(n: number) { return new Intl.NumberFormat('pt-BR').format(Math.round(n)); }
 
@@ -44,14 +25,12 @@ export default function BillingUsers({ user_usage, org_total, filters }: Props) 
     const [endDate, setEndDate] = useState(filters.end_date);
 
     return (
-        <AppLayout title="Uso por Usuário">
-            <Head title="Uso por Usuário — Faturamento — Nodal" />
+        <SettingsLayout title="Uso por Usuário">
             <div className="max-w-5xl mx-auto space-y-6">
                 <div>
                     <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Uso por Usuário</h1>
                     <p className="text-sm text-neutral-500 mt-1">Consumo de IA detalhado por membro da organização.</p>
                 </div>
-                <BillingNav />
                 
                 <div className="flex items-center gap-3 flex-wrap">
                     <div className="flex items-center gap-2">
@@ -127,6 +106,6 @@ export default function BillingUsers({ user_usage, org_total, filters }: Props) 
                     )}
                 </div>
             </div>
-        </AppLayout>
+        </SettingsLayout>
     );
 }
