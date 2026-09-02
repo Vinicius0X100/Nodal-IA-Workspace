@@ -19,6 +19,20 @@ class AppServiceProvider extends ServiceProvider
             \App\Domain\AI\Contracts\AIProviderInterface::class,
             \App\Domain\AI\Providers\N8nProvider::class
         );
+
+        // Artifact Provider Abstraction — Phase 4
+        $this->app->bind(
+            \App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderResolverInterface::class,
+            \App\Domain\Artifacts\Providers\SpreadsheetProviderResolver::class
+        );
+        $this->app->bind(
+            \App\Domain\Artifacts\Providers\Contracts\SpreadsheetMaterializationReaderInterface::class,
+            \App\Domain\Artifacts\Providers\Materialization\SpreadsheetMaterializationReader::class
+        );
+        $this->app->bind(
+            \App\Domain\Artifacts\Providers\Contracts\SpreadsheetBatchPlannerInterface::class,
+            \App\Domain\Artifacts\Providers\Materialization\SpreadsheetBatchPlanner::class
+        );
     }
 
     /**

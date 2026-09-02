@@ -5,7 +5,7 @@ namespace App\Domain\Artifacts\Jobs\Stages;
 use App\Domain\Artifacts\Models\ArtifactCommitAttempt;
 use App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderResolverInterface;
 use App\Domain\Artifacts\Providers\Contracts\SpreadsheetMaterializationReaderInterface;
-use App\Domain\Artifacts\Providers\SpreadsheetBatchPlanner;
+use App\Domain\Artifacts\Providers\Materialization\SpreadsheetBatchPlanner;
 use App\Domain\Artifacts\Providers\DTOs\SpreadsheetProviderResource;
 use App\Domain\Artifacts\Providers\DTOs\SpreadsheetProviderSheetHandle;
 

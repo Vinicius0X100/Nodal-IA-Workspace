@@ -3,7 +3,7 @@
 namespace App\Domain\Artifacts\Jobs\Stages;
 
 use App\Domain\Artifacts\Models\ArtifactCommitAttempt;
-use App\Domain\Artifacts\Providers\SpreadsheetPreflightValidator;
+use App\Domain\Artifacts\Providers\Materialization\SpreadsheetPreflightValidator;
 use App\Domain\Artifacts\Providers\Contracts\SpreadsheetProviderResolverInterface;
 use App\Domain\Artifacts\Providers\Contracts\SpreadsheetMaterializationReaderInterface;
 
