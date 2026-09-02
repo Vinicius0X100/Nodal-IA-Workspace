@@ -5,6 +5,7 @@ import { ArrowLeft, Activity, CheckCircle2, FileText, Megaphone, RefreshCcw } fr
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
 import { Button } from '@/Components/ui/button';
 import MetaPerformanceTab from './Partials/MetaPerformanceTab';
+import { ConfirmationModal } from '@/Components/ConfirmationModal';
 
 export default function MetaConfig({ app_url, integration, config, ad_accounts = [], facebook_pages = [], instagram_accounts = [], campaigns_tree = [], is_job_running = false }: { app_url?: string, integration?: any, config?: any, ad_accounts?: any[], facebook_pages?: any[], instagram_accounts?: any[], campaigns_tree?: any[], is_job_running?: boolean }) {
     const redirectUri = `${app_url || 'https://nodal.app'}/oauth/meta/callback`;
@@ -14,6 +15,9 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
     const [activeTab, setActiveTab] = useState('general');
     const [copied, setCopied] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
+
+    const [isDisconnectModalOpen, setIsDisconnectModalOpen] = useState(false);
+    const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(redirectUri);
@@ -31,12 +35,20 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
     };
 
     const handleDisconnect = () => {
-        if(confirm('Tem certeza que deseja desconectar? Os tokens de acesso à Meta serão apagados.')) {
-            router.post(route('integrations.disconnect', { provider: 'meta' }));
-        }
+        setIsDisconnectModalOpen(true);
+    };
+
+    const confirmDisconnect = () => {
+        setIsDisconnectModalOpen(false);
+        router.post(route('integrations.disconnect', { provider: 'meta' }));
     };
 
     const handleSyncAssets = () => {
+        setIsSyncModalOpen(true);
+    };
+
+    const confirmSync = () => {
+        setIsSyncModalOpen(false);
         setIsSyncing(true);
         router.post(route('integrations.meta.sync-assets'), {}, {
             onFinish: () => setIsSyncing(false)
@@ -388,6 +400,25 @@ export default function MetaConfig({ app_url, integration, config, ad_accounts =
                     </div>
                 </Tabs>
             </div>
+
+            <ConfirmationModal
+                isOpen={isDisconnectModalOpen}
+                onClose={() => setIsDisconnectModalOpen(false)}
+                onConfirm={confirmDisconnect}
+                title="Desconectar Integração"
+                description="Tem certeza que deseja desconectar? Os tokens de acesso à Meta serão apagados."
+                confirmText="Desconectar"
+                isDestructive={true}
+            />
+
+            <ConfirmationModal
+                isOpen={isSyncModalOpen}
+                onClose={() => setIsSyncModalOpen(false)}
+                onConfirm={confirmSync}
+                title="Sincronizar Ativos"
+                description="Tem certeza que deseja iniciar a sincronização? Os dados de anúncios da Meta serão atualizados em background."
+                confirmText="Sincronizar"
+            />
         </AppLayout>
     );
 }

@@ -5,6 +5,7 @@ import { Button } from '@/Components/ui/button';
 import { Switch } from '@/Components/ui/switch';
 import { Label } from '@/Components/ui/label';
 import CreateRoleWizard from './CreateRoleWizard';
+import { ConfirmationModal } from '@/Components/ConfirmationModal';
 
 interface RolesMatrixProps {
     roles: any[];
@@ -15,6 +16,7 @@ interface RolesMatrixProps {
 export default function RolesMatrix({ roles, users, permissionsGrouped }: RolesMatrixProps) {
     const [selectedRole, setSelectedRole] = useState<any>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
     const permissionsForm = useForm({
         permission_ids: [] as number[],
@@ -51,12 +53,15 @@ export default function RolesMatrix({ roles, users, permissionsGrouped }: RolesM
 
     const deleteRole = () => {
         if (!selectedRole || selectedRole.is_system) return;
-        if (confirm(`Tem certeza que deseja excluir o grupo "${selectedRole.name}"? Isso removerá as permissões de todos os usuários que dependem exclusivamente dele.`)) {
-            router.delete(route('directory.roles.destroy', selectedRole.id), {
-                preserveScroll: true,
-                onSuccess: () => setSelectedRole(null),
-            });
-        }
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = () => {
+        setIsDeleteModalOpen(false);
+        router.delete(route('directory.roles.destroy', selectedRole.id), {
+            preserveScroll: true,
+            onSuccess: () => setSelectedRole(null),
+        });
     };
 
     return (
@@ -178,6 +183,16 @@ export default function RolesMatrix({ roles, users, permissionsGrouped }: RolesM
                 isOpen={isCreateOpen} 
                 onClose={() => setIsCreateOpen(false)} 
                 users={users} 
+            />
+
+            <ConfirmationModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={confirmDelete}
+                title="Excluir Grupo"
+                description={`Tem certeza que deseja excluir o grupo "${selectedRole?.name}"? Isso removerá as permissões de todos os usuários que dependem exclusivamente dele.`}
+                confirmText="Excluir"
+                isDestructive={true}
             />
         </div>
     );

@@ -23,6 +23,7 @@ import {
 } from "@/Components/ui/dialog";
 import ImportWizard from './Components/ImportWizard';
 import CreateRoleWizard from '@/Pages/Directory/Partials/CreateRoleWizard';
+import { ConfirmationModal } from '@/Components/ConfirmationModal';
 
 export default function GoogleWorkspaceConfig({ app_url, integration, config, all_users, google_service_account_client_id }: { app_url?: string, integration?: any, config?: any, all_users?: any[], google_service_account_client_id?: string }) {
     const redirectUri = `${app_url || 'https://nodal.app'}/oauth/google_workspace/callback`;
@@ -39,6 +40,9 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
     // Role Wizard State
     const [roleWizardOpen, setRoleWizardOpen] = useState(false);
     const [roleWizardData, setRoleWizardData] = useState<any>(null);
+
+    const [isDisconnectModalOpen, setIsDisconnectModalOpen] = useState(false);
+    const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(redirectUri);
@@ -62,14 +66,22 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
     };
 
     const handleDisconnect = () => {
-        if(confirm('Tem certeza que deseja desconectar? Todos os usuários sincronizados perderão o vínculo e os tokens serão apagados.')) {
-            router.post(route('integrations.disconnect', { provider: 'google_workspace' }));
-        }
+        setIsDisconnectModalOpen(true);
+    };
+
+    const confirmDisconnect = () => {
+        setIsDisconnectModalOpen(false);
+        router.post(route('integrations.disconnect', { provider: 'google_workspace' }));
     };
 
     const handleSyncOrganization = () => {
         if (!integration?.id) return;
-        router.post(route('integrations.google-workspace.organization.sync', { integrationId: integration.id }), {}, {
+        setIsSyncModalOpen(true);
+    };
+
+    const confirmSync = () => {
+        setIsSyncModalOpen(false);
+        router.post(route('integrations.google-workspace.organization.sync', { integrationId: integration?.id }), {}, {
             preserveScroll: true,
             onSuccess: () => {
                 // Notificação de sucesso pode ser lidada por um toast genérico do layout, se houver
@@ -604,6 +616,25 @@ export default function GoogleWorkspaceConfig({ app_url, integration, config, al
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmationModal
+                isOpen={isDisconnectModalOpen}
+                onClose={() => setIsDisconnectModalOpen(false)}
+                onConfirm={confirmDisconnect}
+                title="Desconectar Integração"
+                description="Tem certeza que deseja desconectar? Todos os usuários sincronizados perderão o vínculo e os tokens serão apagados."
+                confirmText="Desconectar"
+                isDestructive={true}
+            />
+
+            <ConfirmationModal
+                isOpen={isSyncModalOpen}
+                onClose={() => setIsSyncModalOpen(false)}
+                onConfirm={confirmSync}
+                title="Sincronizar Organização"
+                description="Tem certeza que deseja iniciar a sincronização? Isso pode levar alguns minutos dependendo do tamanho do seu Google Workspace."
+                confirmText="Sincronizar"
+            />
         </AppLayout>
     );
 }
