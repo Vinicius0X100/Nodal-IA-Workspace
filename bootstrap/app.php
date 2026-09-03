@@ -70,6 +70,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 && in_array($status, [404, 403, 500, 503])
                 && $request->header('X-Inertia')
             ) {
+                file_put_contents(public_path('error.txt'), $exception->getMessage() . "\n" . $exception->getTraceAsString());
                 return \Inertia\Inertia::render('Error', ['status' => $status])
                     ->toResponse($request)
                     ->setStatusCode($status);
