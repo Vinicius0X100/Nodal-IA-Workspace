@@ -32,9 +32,9 @@ export default function BillingUsage({ daily_rollups, totals, by_model, by_categ
 
     return (
         <SettingsLayout title="Uso de IA">
-            <div className="max-w-5xl mx-auto space-y-6">
+            <div className="space-y-6 w-full">
                 <div>
-                    <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Uso de IA</h1>
+                    <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">Uso de IA</h1>
                     <p className="text-sm text-neutral-500 mt-1">Detalhamento de créditos, tokens e custos.</p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -59,13 +59,13 @@ export default function BillingUsage({ daily_rollups, totals, by_model, by_categ
                         { label: 'Tokens saída', value: formatTokens(totals?.total_output_tokens ?? 0), icon: ArrowRight },
                         { label: 'Thinking', value: formatTokens(totals?.total_thinking_tokens ?? 0), icon: BarChart3 },
                     ].map(({ label, value, icon: Icon }) => (
-                        <div key={label} className="rounded-xl border border-neutral-200 bg-white p-4 space-y-1">
-                            <div className="flex items-center gap-1.5 text-neutral-400"><Icon className="w-3.5 h-3.5" /><p className="text-xs font-medium">{label}</p></div>
-                            <p className="text-lg font-bold text-neutral-900">{value}</p>
+                        <div key={label} className="rounded-lg border border-neutral-200/80 shadow-sm bg-white p-5 space-y-1.5">
+                            <div className="flex items-center gap-1.5 text-neutral-500 tracking-wide uppercase"><Icon className="w-3.5 h-3.5" /><p className="text-[11px] font-semibold">{label}</p></div>
+                            <p className="text-xl font-bold text-neutral-900 tracking-tight">{value}</p>
                         </div>
                     ))}
                 </div>
-                <div className="rounded-xl border border-neutral-200 bg-white p-5">
+                <div className="rounded-lg border border-neutral-200/80 shadow-sm bg-white p-6">
                     <p className="text-sm font-semibold text-neutral-800 mb-4">Créditos por dia</p>
                     {daily_rollups.length === 0 ? <div className="h-32 flex items-center justify-center text-neutral-400 text-sm">Nenhum dado para o período.</div> : (
                         <div className="flex items-end gap-1 h-40 overflow-x-auto pb-4">
@@ -81,8 +81,8 @@ export default function BillingUsage({ daily_rollups, totals, by_model, by_categ
                         </div>
                     )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="rounded-xl border border-neutral-200 bg-white p-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="rounded-lg border border-neutral-200/80 shadow-sm bg-white p-6">
                         <p className="text-sm font-semibold text-neutral-800 mb-3">Por modelo</p>
                         {by_model.length === 0 ? <p className="text-sm text-neutral-400 italic">Sem dados</p> : (
                             <div className="space-y-2">
@@ -97,7 +97,7 @@ export default function BillingUsage({ daily_rollups, totals, by_model, by_categ
                             </div>
                         )}
                     </div>
-                    <div className="rounded-xl border border-neutral-200 bg-white p-5">
+                    <div className="rounded-lg border border-neutral-200/80 shadow-sm bg-white p-6">
                         <p className="text-sm font-semibold text-neutral-800 mb-3">Por categoria</p>
                         {by_category.length === 0 ? <p className="text-sm text-neutral-400 italic">Sem dados</p> : (
                             <div className="space-y-2">

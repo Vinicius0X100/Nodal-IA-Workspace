@@ -76,9 +76,9 @@ export default function SettingsLayout({ children, title, activeTab, onTabChange
     return (
         <AppLayout title={title}>
             <Head title={`${title} — Nodal`} />
-            <div className="flex gap-8 max-w-[1200px]">
+            <div className="flex flex-col md:flex-row gap-8 w-full max-w-none">
                 {/* Sidebar */}
-                <aside className="w-56 shrink-0 pt-1">
+                <aside className="w-full md:w-64 shrink-0 pt-1 md:sticky md:top-6 md:self-start">
                     <nav className="space-y-0.5">
                         <NavSectionLabel label="Geral" />
                         <NavItem

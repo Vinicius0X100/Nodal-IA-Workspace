@@ -38,13 +38,13 @@ const statusConfig = {
 export default function BillingInvoices({ invoices }: Props) {
     return (
         <SettingsLayout title="Faturas">
-            <div className="max-w-5xl mx-auto space-y-6">
+            <div className="space-y-6 w-full">
                 <div>
-                    <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Faturas</h1>
+                    <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">Faturas</h1>
                     <p className="text-sm text-neutral-500 mt-1">Histórico de cobranças e comprovantes de pagamento.</p>
                 </div>
 
-                <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
+                <div className="rounded-lg border border-neutral-200/80 shadow-sm bg-white overflow-hidden">
                     {invoices.data.length === 0 ? (
                         <div className="p-12 text-center flex flex-col items-center">
                             <div className="w-12 h-12 bg-neutral-100 rounded-full flex items-center justify-center mb-4 text-neutral-400">
@@ -57,11 +57,11 @@ export default function BillingInvoices({ invoices }: Props) {
                         <table className="w-full text-sm text-left">
                             <thead className="bg-neutral-50/50 border-b border-neutral-200 text-neutral-500">
                                 <tr>
-                                    <th className="font-medium px-5 py-3">Status</th>
-                                    <th className="font-medium px-5 py-3">Período / Descrição</th>
-                                    <th className="font-medium px-5 py-3 text-right">Valor Total</th>
-                                    <th className="font-medium px-5 py-3">Vencimento</th>
-                                    <th className="font-medium px-5 py-3"></th>
+                                    <th className="font-semibold px-6 py-4">Status</th>
+                                    <th className="font-semibold px-6 py-4">Período / Descrição</th>
+                                    <th className="font-semibold px-6 py-4 text-right">Valor Total</th>
+                                    <th className="font-semibold px-6 py-4">Vencimento</th>
+                                    <th className="font-semibold px-6 py-4"></th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-neutral-100">
@@ -70,30 +70,30 @@ export default function BillingInvoices({ invoices }: Props) {
                                     const StatusIcon = conf.icon;
                                     return (
                                         <tr key={invoice.id} className="hover:bg-neutral-50/50 transition-colors">
-                                            <td className="px-5 py-4">
-                                                <div className={cn("inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-semibold", conf.bg, conf.color)}>
+                                            <td className="px-6 py-4">
+                                                <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-semibold uppercase tracking-wider", conf.bg, conf.color)}>
                                                     <StatusIcon className="w-3.5 h-3.5" />
                                                     {conf.label}
                                                 </div>
                                             </td>
-                                            <td className="px-5 py-4">
-                                                <p className="font-medium text-neutral-900">
+                                            <td className="px-6 py-4">
+                                                <p className="font-semibold text-neutral-900">
                                                     {formatDate(invoice.period_start)} a {formatDate(invoice.period_end)}
                                                 </p>
-                                                <p className="text-xs text-neutral-500">
+                                                <p className="text-xs text-neutral-500 mt-0.5">
                                                     {invoice.subscription?.plan?.name ? `Plano ${invoice.subscription.plan.name}` : 'Cobrança avulsa'}
                                                 </p>
                                             </td>
-                                            <td className="px-5 py-4 text-right">
-                                                <p className="font-medium text-neutral-900">{formatBrl(invoice.total_cents / 100)}</p>
+                                            <td className="px-6 py-4 text-right">
+                                                <p className="font-semibold text-neutral-900">{formatBrl(invoice.total_cents / 100)}</p>
                                             </td>
-                                            <td className="px-5 py-4">
-                                                <p className="text-neutral-700">{formatDate(invoice.due_at)}</p>
+                                            <td className="px-6 py-4">
+                                                <p className="text-sm font-medium text-neutral-700">{formatDate(invoice.due_at)}</p>
                                                 {invoice.status === 'paid' && invoice.paid_at && (
-                                                    <p className="text-xs text-emerald-600 font-medium">Pago em {formatDate(invoice.paid_at)}</p>
+                                                    <p className="text-[11px] text-emerald-600 font-semibold mt-0.5 uppercase tracking-wide">Pago em {formatDate(invoice.paid_at)}</p>
                                                 )}
                                             </td>
-                                            <td className="px-5 py-4 text-right">
+                                            <td className="px-6 py-4 text-right">
                                                 <button className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Baixar PDF">
                                                     <Download className="w-4 h-4" />
                                                 </button>

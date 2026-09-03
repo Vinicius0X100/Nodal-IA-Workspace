@@ -82,10 +82,10 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
 
     return (
         <SettingsLayout title="Faturamento e Uso">
-            <div className="max-w-5xl mx-auto space-y-6">
+            <div className="space-y-6 w-full">
                 {/* Header */}
                 <div>
-                    <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Faturamento e Uso</h1>
+                    <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">Faturamento e Uso</h1>
                     <p className="text-sm text-neutral-500 mt-1">Gerencie seu plano, créditos de IA e alertas de consumo.</p>
                 </div>
 
@@ -104,10 +104,10 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
                 )}
 
                 {/* Grid Principal */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Card Plano */}
-                    <div className="md:col-span-1 rounded-xl border border-neutral-200 bg-white p-5 space-y-3">
-                        <div className="flex items-center gap-2 text-neutral-500 text-xs font-medium uppercase tracking-wider">
+                    <div className="md:col-span-1 rounded-lg border border-neutral-200/80 shadow-sm bg-white p-6 space-y-3">
+                        <div className="flex items-center gap-2 text-neutral-500 text-xs font-semibold uppercase tracking-wider">
                             <CreditCard className="w-3.5 h-3.5" /> Plano Atual
                         </div>
                         {subscription?.plan ? (
@@ -132,9 +132,9 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
                     </div>
 
                     {/* Card Créditos */}
-                    <div className="md:col-span-2 rounded-xl border border-neutral-200 bg-white p-5 space-y-4">
+                    <div className="md:col-span-2 rounded-lg border border-neutral-200/80 shadow-sm bg-white p-6 space-y-5">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-neutral-500 text-xs font-medium uppercase tracking-wider">
+                            <div className="flex items-center gap-2 text-neutral-500 text-xs font-semibold uppercase tracking-wider">
                                 <Zap className="w-3.5 h-3.5" /> Créditos de IA
                             </div>
                             <Link href={route('billing.usage')} className="text-xs text-primary-600 hover:underline flex items-center gap-0.5">
@@ -157,7 +157,7 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
                         </div>
 
                         {/* Barra */}
-                        <div className="h-2.5 w-full bg-neutral-100 rounded-full overflow-hidden">
+                        <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden">
                             <div
                                 className={cn('h-full rounded-full transition-all', progressColor)}
                                 style={{ width: `${Math.min(pct, 100)}%` }}
@@ -189,10 +189,10 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
                 {/* Excedente */}
                 {(usage_state.is_over_quota || projection.projected_overage > 0) && (
                     <div className={cn(
-                        'rounded-xl border p-5 space-y-3',
+                        'rounded-lg border shadow-sm p-6 space-y-4',
                         usage_state.is_over_quota
-                            ? 'border-red-200 bg-red-50'
-                            : 'border-amber-200 bg-amber-50'
+                            ? 'border-red-200/80 bg-red-50/50'
+                            : 'border-amber-200/80 bg-amber-50/50'
                     )}>
                         <div className="flex items-center gap-2">
                             <ArrowUp className={cn('w-4 h-4', usage_state.is_over_quota ? 'text-red-500' : 'text-amber-500')} />
@@ -232,7 +232,7 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
                 )}
 
                 {/* Atalhos */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[
                         { icon: BarChart3, label: 'Uso de IA', desc: 'Gráficos e totais', href: route('billing.usage') },
                         { icon: Users, label: 'Por usuário', desc: 'Consumo individual', href: route('billing.users') },
@@ -242,12 +242,12 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
                         <Link
                             key={href}
                             href={href}
-                            className="flex items-start gap-3 p-4 rounded-xl border border-neutral-200 bg-white hover:border-primary-200 hover:bg-primary-50 transition-colors group"
+                            className="flex items-start gap-3 p-5 rounded-lg border border-neutral-200/80 shadow-sm bg-white hover:border-primary-300 hover:bg-primary-50 transition-colors group"
                         >
-                            <Icon className="w-5 h-5 text-neutral-400 group-hover:text-primary-600 mt-0.5 shrink-0" />
-                            <div>
-                                <p className="text-sm font-medium text-neutral-900">{label}</p>
-                                <p className="text-xs text-neutral-500">{desc}</p>
+                            <Icon className="w-5 h-5 text-neutral-400 group-hover:text-primary-600 shrink-0" />
+                            <div className="-mt-0.5">
+                                <p className="text-sm font-semibold text-neutral-900 tracking-tight">{label}</p>
+                                <p className="text-xs text-neutral-500 mt-0.5">{desc}</p>
                             </div>
                         </Link>
                     ))}

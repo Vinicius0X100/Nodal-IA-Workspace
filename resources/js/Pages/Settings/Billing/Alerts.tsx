@@ -30,9 +30,9 @@ interface Props {
 export default function BillingAlerts({ recipients, postpaid, thresholds }: Props) {
     return (
         <SettingsLayout title="Alertas de Faturamento">
-            <div className="max-w-5xl mx-auto space-y-6">
+            <div className="space-y-6 w-full">
                 <div>
-                    <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Alertas de Consumo</h1>
+                    <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">Alertas de Consumo</h1>
                     <p className="text-sm text-neutral-500 mt-1">Configure quem deve receber alertas de faturamento e excedentes.</p>
                 </div>
                 
@@ -40,9 +40,9 @@ export default function BillingAlerts({ recipients, postpaid, thresholds }: Prop
                     <div className="md:col-span-2 space-y-4">
                         <div className="flex items-center justify-between">
                             <h3 className="font-semibold text-neutral-900">Destinatários</h3>
-                            <Button variant="outline" size="sm" className="h-8 gap-1"><Plus className="w-4 h-4"/> Adicionar</Button>
+                            <Button variant="outline" size="sm" className="h-8 gap-1 rounded-md"><Plus className="w-4 h-4"/> Adicionar</Button>
                         </div>
-                        <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden divide-y divide-neutral-100">
+                        <div className="rounded-lg border border-neutral-200/80 shadow-sm bg-white overflow-hidden divide-y divide-neutral-100">
                             {recipients.length === 0 ? (
                                 <div className="p-8 text-center text-sm text-neutral-500">Nenhum destinatário configurado.</div>
                             ) : (
@@ -51,23 +51,23 @@ export default function BillingAlerts({ recipients, postpaid, thresholds }: Prop
                                         <div className="flex items-center gap-3">
                                             {r.recipient_type === 'user' && r.user ? (
                                                 <>
-                                                    <Avatar className="w-9 h-9 rounded-full border border-neutral-200">
-                                                        <AvatarFallback className="text-xs bg-primary-50 text-primary-700 font-medium">
+                                                    <Avatar className="w-9 h-9 rounded-full border border-neutral-200 shadow-sm">
+                                                        <AvatarFallback className="text-xs bg-primary-50 text-primary-700 font-semibold">
                                                             {r.user.name.substring(0, 2).toUpperCase()}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div>
-                                                        <p className="font-medium text-neutral-900 text-sm">{r.user.name}</p>
+                                                        <p className="font-semibold text-neutral-900 text-sm">{r.user.name}</p>
                                                         <p className="text-xs text-neutral-500">{r.user.email}</p>
                                                     </div>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <div className="w-9 h-9 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-500">
+                                                    <div className="w-9 h-9 rounded-full bg-neutral-100 border border-neutral-200 shadow-sm flex items-center justify-center text-neutral-500">
                                                         <Users className="w-4 h-4" />
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium text-neutral-900 text-sm">{r.group?.name}</p>
+                                                        <p className="font-semibold text-neutral-900 text-sm">{r.group?.name}</p>
                                                         <p className="text-xs text-neutral-500">Grupo</p>
                                                     </div>
                                                 </>
@@ -92,7 +92,7 @@ export default function BillingAlerts({ recipients, postpaid, thresholds }: Prop
 
                     <div className="space-y-4">
                         <h3 className="font-semibold text-neutral-900">Regras de disparo</h3>
-                        <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-4">
+                        <div className="rounded-lg border border-neutral-200/80 shadow-sm bg-white p-6 space-y-5">
                             <div>
                                 <p className="text-sm font-medium text-neutral-800">Franquia do Plano</p>
                                 <p className="text-xs text-neutral-500 mt-0.5 mb-2">Alertas enviados quando os créditos atingem as marcas abaixo:</p>
@@ -109,7 +109,7 @@ export default function BillingAlerts({ recipients, postpaid, thresholds }: Prop
                                     ))}
                                 </div>
                             </div>
-                            <div className="pt-4 border-t border-neutral-100">
+                            <div className="pt-5 border-t border-neutral-100">
                                 <div className="flex items-center justify-between mb-1">
                                     <p className="text-sm font-medium text-neutral-800">Uso Pós-Pago</p>
                                     <span className={cn("text-[10px] uppercase font-bold px-1.5 py-0.5 rounded", postpaid.enabled ? "bg-emerald-100 text-emerald-700" : "bg-neutral-100 text-neutral-500")}>
