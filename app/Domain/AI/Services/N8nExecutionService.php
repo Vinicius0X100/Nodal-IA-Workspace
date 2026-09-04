@@ -165,7 +165,7 @@ class N8nExecutionService
                     'node_name'         => $nodeName,
                     'run_index'         => (int) $runIndex,
                     'provider'          => $this->inferProvider($nodeName, $run),
-                    'model'             => $this->inferModel($run),
+                    'model'             => $this->inferModel($nodeName, $run),
                     'prompt_tokens'     => $promptTokens,
                     'completion_tokens' => $completionTokens,
                     'total_tokens'      => $totalTokens,
@@ -287,9 +287,15 @@ class N8nExecutionService
 
     /**
      * Tenta extrair o nome do modelo a partir dos outputs do run.
+     * Consulta primeiro o mapeamento estático na config.
      */
-    private function inferModel(array $run): string
+    private function inferModel(string $nodeName, array $run): string
     {
+        $mappedModel = config("services.n8n.ai_models.{$nodeName}");
+        if (!empty($mappedModel)) {
+            return (string) $mappedModel;
+        }
+
         $runData = Arr::get($run, 'data', []);
 
         if (is_array($runData)) {

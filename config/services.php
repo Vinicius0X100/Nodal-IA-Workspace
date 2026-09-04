@@ -39,6 +39,10 @@ return [
         'webhook_url' => env('N8N_WEBHOOK_URL'),
         'base_url'    => env('N8N_BASE_URL'),
         'api_key'     => env('N8N_API_KEY'),
+        'ai_models'   => [
+            'Google Gemini Chat Model'       => 'gemini-3.5-flash',
+            'Google Gemini Chat Model Retry' => 'gemini-3.5-flash',
+        ],
     ],
 
     'ai_gateway' => [

@@ -75,9 +75,21 @@ class N8nProvider implements AIProviderInterface
             if ($response->successful()) {
                 $data = $response->json();
                 
-                \Log::info('N8n webhook response', [
-                    'data' => $data,
-                ]);
+                // O payload bruto é retornado pelo n8n.
+                // Dispara o Job de coleta de consumo assíncrona se houver um execution ID.
+                $n8nExecutionId = $data['n8n_execution_id'] ?? null;
+                if (!empty($n8nExecutionId)) {
+                    \App\Jobs\CollectN8nAIUsageJob::dispatch(
+                        $n8nExecutionId,
+                        $organization->id,
+                        $user?->id,
+                        $conversation->id,
+                        $message->id
+                    )->delay(now()->addSeconds(5));
+                }
+
+                // O metering não deve depender de success=true no JSON do Agent.
+                // Mas a resposta do Chat ainda depende do success para extrair os artefatos.
                 $content = '';
                 $artifacts = [];
 
