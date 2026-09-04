@@ -48,13 +48,19 @@ export default function BillingAlerts({ recipients, users, groups, postpaid, thr
     });
 
     const addRecipient = () => {
-        if (users.length === 0) return;
-        const newUser = users[0];
+        if (users.length === 0 && groups.length === 0) {
+            alert('Não há usuários ou grupos disponíveis nesta organização.');
+            return;
+        }
+        
+        const type = users.length > 0 ? 'user' : 'group';
+        const uuid = type === 'user' ? users[0].uuid : groups[0].uuid;
+
         rForm.setData('recipients', [
             ...rForm.data.recipients, 
             {
-                recipient_type: 'user',
-                recipient_uuid: newUser.uuid,
+                recipient_type: type,
+                recipient_uuid: uuid,
                 usage_alerts: true,
                 invoice_alerts: false,
                 payment_alerts: false,
