@@ -75,6 +75,9 @@ class N8nProvider implements AIProviderInterface
             if ($response->successful()) {
                 $data = $response->json();
                 
+                \Log::info('N8n webhook response', [
+                    'data' => $data,
+                ]);
                 $content = '';
                 $artifacts = [];
 
