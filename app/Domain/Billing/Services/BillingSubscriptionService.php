@@ -97,4 +97,52 @@ class BillingSubscriptionService
             'estimated_overage_cents'   => $overageCents,
         ]);
     }
+
+    /**
+     * Sincroniza o período de uso atual (aberto) com a assinatura efetiva da organização.
+     * Atualiza as franquias e recalcula o excedente sem perder o uso existente.
+     */
+    public function syncCurrentPeriod(Organization $organization): void
+    {
+        $subscription = $this->activeSubscription($organization);
+        
+        // Encontra o período mais recente em aberto
+        $period = AiUsagePeriod::where('organization_id', $organization->id)
+            ->where('status', 'open')
+            ->latest('period_start')
+            ->first();
+
+        // Se não houver período em aberto, não há o que retroativamente sincronizar aqui.
+        // O currentPeriod() lidará com a criação quando houver o próximo consumo.
+        if (!$period) {
+            return;
+        }
+
+        // Atualizar as datas caso haja subscription, caso contrário mantém as atuais do período
+        if ($subscription && $subscription->current_period_start) {
+            $periodStart = Carbon::instance($subscription->current_period_start);
+            $periodEnd   = Carbon::instance($subscription->current_period_end);
+        } else {
+            $periodStart = $period->period_start;
+            $periodEnd   = $period->period_end;
+        }
+
+        $includedCredits = $subscription?->effectiveIncludedCredits() ?? 0;
+        $overage = max($period->billable_credits_used - $includedCredits, 0);
+
+        $overageCents = 0;
+        if ($overage > 0 && $subscription) {
+            $overagePricePer1000 = $subscription->effectiveOveragePricePer1000Cents();
+            $overageCents = (int) round(($overage / 1000) * $overagePricePer1000);
+        }
+
+        $period->update([
+            'period_start'            => $periodStart,
+            'period_end'              => $periodEnd,
+            'subscription_id'         => $subscription?->id,
+            'included_credits'        => $includedCredits,
+            'overage_credits'         => $overage,
+            'estimated_overage_cents' => $overageCents,
+        ]);
+    }
 }

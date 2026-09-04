@@ -60,5 +60,7 @@ class AppServiceProvider extends ServiceProvider
                 config('mail.mailers.brevo.key')
             );
         });
+
+        \App\Domain\Billing\Models\OrganizationSubscription::observe(\App\Domain\Billing\Observers\OrganizationSubscriptionObserver::class);
     }
 }

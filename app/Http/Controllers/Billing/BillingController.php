@@ -220,9 +220,13 @@ class BillingController extends Controller
         $periodStart = $usageState['period_start'] ? Carbon::parse($usageState['period_start']) : now()->startOfMonth();
         $periodEnd   = $usageState['period_end']   ? Carbon::parse($usageState['period_end'])   : now()->endOfMonth();
 
-        $daysTotal   = max($periodStart->diffInDays($periodEnd), 1);
-        $daysPassed  = max($periodStart->diffInDays(now()), 1);
-        $daysLeft    = max($periodEnd->diffInDays(now()), 0);
+        // Calculate days cleanly treating start/end days explicitly
+        $daysTotal   = max((int) $periodStart->startOfDay()->diffInDays($periodEnd->endOfDay(), false) + 1, 1);
+        $daysPassed  = max((int) $periodStart->startOfDay()->diffInDays(now()->endOfDay(), false) + 1, 1);
+        $daysLeft    = max((int) now()->startOfDay()->diffInDays($periodEnd->endOfDay(), false), 0);
+
+        // Se passamos do período, ajustar dias para não explodir a projeção
+        $daysPassed  = min($daysPassed, $daysTotal);
 
         $creditsUsed = $usageState['credits_used'];
         $dailyRate   = $daysPassed > 0 ? $creditsUsed / $daysPassed : 0;
