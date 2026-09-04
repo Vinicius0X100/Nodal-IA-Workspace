@@ -116,15 +116,42 @@ class AIUsageLimitService
         return $currentPostpaidUsedBrl < ($postpaidLimitCents / 100);
     }
 
-    public function getRemainingCredits(Organization $organization): float
+    public function getRemainingIncludedCredits(Organization $organization): float
     {
         $period = $this->subscriptionService->currentPeriod($organization);
         return max($period->included_credits - $period->billable_credits_used, 0);
     }
 
-    public function getEstimatedOverage(Organization $organization): float
+    public function getOverageCredits(Organization $organization): float
     {
         $period = $this->subscriptionService->currentPeriod($organization);
         return $period->overage_credits;
+    }
+
+    public function getEstimatedOverage(Organization $organization): int
+    {
+        $period = $this->subscriptionService->currentPeriod($organization);
+        return $period->estimated_overage_cents;
+    }
+
+    public function getRemainingPostpaidAmount(Organization $organization): ?float
+    {
+        $state = $this->getUsageState($organization);
+        return $state['postpaid_remaining_brl'];
+    }
+
+    public function isPostpaidLimitReached(Organization $organization): bool
+    {
+        $state = $this->getUsageState($organization);
+        
+        if (!$state['postpaid_enabled']) {
+            return false;
+        }
+
+        if ($state['postpaid_limit_brl'] === null) {
+            return false; // Ilimitado
+        }
+
+        return $state['postpaid_remaining_brl'] <= 0;
     }
 }

@@ -19,5 +19,6 @@ class AIUsageThresholdReached
         public readonly int           $threshold,
         public readonly float         $percentage,
         public readonly string        $idempotencyKey,
+        public readonly bool          $isTest = false,
     ) {}
 }

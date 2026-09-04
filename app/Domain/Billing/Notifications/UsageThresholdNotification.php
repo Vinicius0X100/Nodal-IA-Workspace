@@ -32,19 +32,61 @@ class UsageThresholdNotification extends Notification implements ShouldQueue
         $creditsUsed      = number_format($this->period->billable_credits_used, 0, ',', '.');
         $includedCredits  = number_format($this->period->included_credits, 0, ',', '.');
         $percentFormatted = number_format($this->percentage, 1, ',', '.');
+        $overageBrl       = number_format($this->period->estimated_overage_cents / 100, 2, ',', '.');
+        $overageFormatted = number_format($this->period->overage_credits, 2, ',', '.');
+        
+        $mail = (new MailMessage)
+            ->greeting("Olá, {$notifiable->name}!");
 
-        return (new MailMessage)
-            ->subject("[{$this->organization->name}] Alerta de consumo de IA — {$this->threshold}% utilizado")
-            ->greeting("Olá, {$notifiable->name}!")
-            ->line("A organização **{$this->organization->name}** atingiu **{$this->threshold}%** dos créditos de IA incluídos no plano.")
-            ->line("**Créditos utilizados:** {$creditsUsed} / {$includedCredits} ({$percentFormatted}%)")
-            ->when($this->period->overage_credits > 0, function (MailMessage $mail) {
-                $overageFormatted = number_format($this->period->overage_credits, 2, ',', '.');
-                $overageBrl       = number_format($this->period->estimated_overage_cents / 100, 2, ',', '.');
-                return $mail->line("**Excedente atual:** {$overageFormatted} créditos (~R$ {$overageBrl})");
-            })
-            ->action('Ver consumo no Nodal', url('/settings/billing'))
-            ->line('Esta é uma mensagem automática. Você recebe este alerta pois é destinatário de alertas de consumo desta organização.');
+        // Mensagens para Limites Pós-pagos
+        if (in_array($this->alertType, [
+            AlertType::POSTPAID_STARTED, 
+            AlertType::POSTPAID_75, 
+            AlertType::POSTPAID_90, 
+            AlertType::POSTPAID_LIMIT_REACHED
+        ])) {
+            $mail->subject("[{$this->organization->name}] " . $this->alertType->label());
+            
+            if ($this->alertType === AlertType::POSTPAID_STARTED) {
+                $mail->line("A franquia mensal de IA da organização **{$this->organization->name}** foi totalmente utilizada.");
+                $mail->line("Novos consumos serão contabilizados como uso adicional conforme as condições do plano.");
+            } elseif ($this->alertType === AlertType::POSTPAID_LIMIT_REACHED) {
+                $mail->line("O limite de uso adicional (pós-pago) da organização **{$this->organization->name}** foi atingido.");
+                $mail->line("Nenhum novo consumo será permitido até a próxima renovação ou expansão do limite.");
+            } else {
+                $mail->line("A organização **{$this->organization->name}** atingiu **{$this->threshold}%** do limite de uso adicional mensal (pós-pago).");
+            }
+
+            $mail->line("**Uso adicional atual:** {$overageFormatted} créditos (~R$ {$overageBrl})");
+        
+        } else {
+            // Mensagens para Consumo de Franquia
+            $mail->subject("[{$this->organization->name}] Alerta de consumo de IA — {$this->threshold}% utilizado");
+            
+            if ($this->threshold === 100) {
+                $mail->line("A franquia mensal de IA da organização **{$this->organization->name}** foi totalmente utilizada.");
+                
+                // Precisamos saber se o pós-pago tá ativo. Como não temos a subscription aqui de forma fácil,
+                // vamos checar se o overage é > 0, o que significa que o pós pago permitiu ou acabou de exceder.
+                // Outra forma é simplesmente dizer que o limite foi atingido.
+                $mail->line("O limite incluído no plano foi atingido.");
+            } else {
+                $mail->line("A organização **{$this->organization->name}** atingiu **{$this->threshold}%** dos créditos de IA incluídos no plano.");
+                $mail->line("**Créditos utilizados:** {$creditsUsed} / {$includedCredits} ({$percentFormatted}%)");
+                $remaining = number_format(max($this->period->included_credits - $this->period->billable_credits_used, 0), 0, ',', '.');
+                $mail->line("**Restante:** {$remaining} créditos");
+            }
+        }
+
+        if ($this->period->period_end) {
+            $renewal = \Carbon\Carbon::parse($this->period->period_end)->format('d/m/Y');
+            $mail->line("**Data de renovação:** {$renewal}");
+        }
+
+        $mail->action('Ver faturamento no Nodal', url('/settings/billing'));
+        $mail->line('Esta é uma mensagem automática. Você recebe este alerta pois é destinatário de alertas de consumo desta organização.');
+
+        return $mail;
     }
 
     public function toArray(object $notifiable): array

@@ -31,6 +31,7 @@ class BillingAlertService
         int           $threshold,
         float         $percentage,
         string        $idempotencyKey,
+        bool          $isTest = false,
     ): ?BillingAlertEvent {
         // Verificação final de idempotência (pode ter sido inserido entre o check e o fire)
         $existing = BillingAlertEvent::where('idempotency_key', $idempotencyKey)->first();
@@ -39,7 +40,8 @@ class BillingAlertService
         }
 
         // Resolver destinatários
-        $recipients = $this->resolveRecipients($organization, 'usage_alerts');
+        $alertField = in_array($alertType, AlertType::postpaidThresholds()) || $alertType === AlertType::POSTPAID_STARTED ? 'overage_alerts' : 'usage_alerts';
+        $recipients = $this->resolveRecipients($organization, $alertField);
 
         if ($recipients->isEmpty()) {
             return null;
@@ -60,6 +62,7 @@ class BillingAlertService
                 'alert_type'             => $alertType->value,
                 'threshold'              => $threshold,
                 'recipient_summary_json' => $recipientSummary,
+                'metadata_json'          => $isTest ? ['is_test' => true] : null,
                 'triggered_at'           => now(),
                 'idempotency_key'        => $idempotencyKey,
             ]);

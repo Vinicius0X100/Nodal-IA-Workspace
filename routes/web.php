@@ -139,8 +139,6 @@ Route::middleware(['auth'])->group(function () {
 
         // As demais rotas serão implementadas nos respectivos controllers depois:
         // Audit
-    });
-});
 
         // Billing e Uso de IA
         Route::prefix('settings/billing')->name('billing.')->group(function () {
@@ -148,5 +146,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/usage', [\App\Http\Controllers\Billing\BillingController::class, 'usage'])->name('usage');
             Route::get('/users', [\App\Http\Controllers\Billing\BillingController::class, 'users'])->name('users');
             Route::get('/alerts', [\App\Http\Controllers\Billing\BillingController::class, 'alerts'])->name('alerts');
+            Route::post('/alerts/recipients', [\App\Http\Controllers\Billing\BillingController::class, 'updateAlertRecipients'])->name('alerts.recipients.update');
+            Route::put('/postpaid', [\App\Http\Controllers\Billing\BillingController::class, 'updatePostpaidSettings'])->name('postpaid.update');
             Route::get('/invoices', [\App\Http\Controllers\Billing\BillingController::class, 'invoices'])->name('invoices');
         });
+    });
+});

@@ -26,6 +26,7 @@ class SendUsageThresholdAlert implements ShouldQueue
             threshold:       $event->threshold,
             percentage:      $event->percentage,
             idempotencyKey:  $event->idempotencyKey,
+            isTest:          $event->isTest,
         );
     }
 }

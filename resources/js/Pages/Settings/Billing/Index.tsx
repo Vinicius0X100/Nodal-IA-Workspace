@@ -186,18 +186,18 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
                     </div>
                 </div>
 
-                {/* Excedente */}
+                {/* Excedente / Pós-pago */}
                 {(usage_state.is_over_quota || projection.projected_overage > 0) && (
                     <div className={cn(
                         'rounded-lg border shadow-sm p-6 space-y-4',
                         usage_state.is_over_quota
-                            ? 'border-red-200/80 bg-red-50/50'
+                            ? (usage_state.can_consume ? 'border-primary-200/80 bg-primary-50/50' : 'border-red-200/80 bg-red-50/50')
                             : 'border-amber-200/80 bg-amber-50/50'
                     )}>
                         <div className="flex items-center gap-2">
-                            <ArrowUp className={cn('w-4 h-4', usage_state.is_over_quota ? 'text-red-500' : 'text-amber-500')} />
+                            <ArrowUp className={cn('w-4 h-4', usage_state.is_over_quota ? (usage_state.can_consume ? 'text-primary-500' : 'text-red-500') : 'text-amber-500')} />
                             <p className="font-semibold text-sm text-neutral-900">
-                                {usage_state.is_over_quota ? 'Excedente atual' : 'Excedente previsto'}
+                                {usage_state.is_over_quota ? (usage_state.postpaid_enabled ? 'Uso Adicional (Pós-pago)' : 'Excedente atual (Limite Atingido)') : 'Excedente previsto'}
                             </p>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -205,11 +205,11 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
                                 <>
                                     <div>
                                         <p className="text-xs text-neutral-500">Créditos excedidos</p>
-                                        <p className="text-base font-bold text-red-700">{formatCredits(usage_state.overage_credits)}</p>
+                                        <p className={cn("text-base font-bold", usage_state.can_consume ? 'text-primary-700' : 'text-red-700')}>{formatCredits(usage_state.overage_credits)}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-neutral-500">Estimativa de cobrança</p>
-                                        <p className="text-base font-bold text-red-700">{formatBrl(usage_state.estimated_overage_brl)}</p>
+                                        <p className={cn("text-base font-bold", usage_state.can_consume ? 'text-primary-700' : 'text-red-700')}>{formatBrl(usage_state.estimated_overage_brl)}</p>
                                     </div>
                                 </>
                             )}
@@ -222,9 +222,25 @@ export default function BillingIndex({ usage_state, subscription, projection }: 
                                 </>
                             )}
                             {usage_state.postpaid_enabled && usage_state.postpaid_limit_brl !== null && (
+                                <div className="col-span-2">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <p className="text-xs text-neutral-500">Limite Adicional</p>
+                                        <p className="text-xs font-semibold text-neutral-900">
+                                            {formatBrl(usage_state.estimated_postpaid_used_brl)} / {formatBrl(usage_state.postpaid_limit_brl)}
+                                        </p>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-neutral-200/60 rounded-full overflow-hidden">
+                                        <div
+                                            className={cn('h-full rounded-full transition-all', usage_state.estimated_postpaid_used_brl >= usage_state.postpaid_limit_brl ? 'bg-red-500' : 'bg-primary-500')}
+                                            style={{ width: `${Math.min((usage_state.estimated_postpaid_used_brl / usage_state.postpaid_limit_brl) * 100, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                            {usage_state.postpaid_enabled && usage_state.postpaid_limit_brl === null && (
                                 <div>
-                                    <p className="text-xs text-neutral-500">Limite pós-pago</p>
-                                    <p className="text-base font-bold text-neutral-700">{formatBrl(usage_state.postpaid_limit_brl)}</p>
+                                    <p className="text-xs text-neutral-500">Limite Adicional</p>
+                                    <p className="text-base font-bold text-neutral-700">Ilimitado</p>
                                 </div>
                             )}
                         </div>

@@ -183,30 +183,65 @@ class AIUsageService
 
     private function checkAndFireThresholds(Organization $organization, $period): void
     {
-        if ($period->included_credits <= 0) return;
+        $state = $this->limitService->getUsageState($organization);
+        
+        // 1. Verificações de Franquia (Créditos Incluídos)
+        if ($state['included_credits'] > 0) {
+            $percentage = $state['usage_percentage'];
 
-        $percentage = $period->usagePercentage();
-
-        foreach (\App\Domain\Billing\Enums\AlertType::creditUsageThresholds() as $threshold) {
-            if ($percentage >= $threshold) {
-                $alertType = \App\Domain\Billing\Enums\AlertType::fromCreditThreshold($threshold);
-                $idempotencyKey = "org_{$organization->id}_period_{$period->id}_{$alertType->value}";
-
-                $alreadyFired = \App\Domain\Billing\Models\BillingAlertEvent::where(
-                    'idempotency_key', $idempotencyKey
-                )->exists();
-
-                if (!$alreadyFired) {
-                    event(new AIUsageThresholdReached(
-                        organization: $organization,
-                        period: $period,
-                        alertType: $alertType,
-                        threshold: $threshold,
-                        percentage: $percentage,
-                        idempotencyKey: $idempotencyKey,
-                    ));
+            foreach (\App\Domain\Billing\Enums\AlertType::creditUsageThresholds() as $threshold) {
+                if ($percentage >= $threshold) {
+                    $alertType = \App\Domain\Billing\Enums\AlertType::fromCreditThreshold($threshold);
+                    $this->fireAlertEvent(
+                        $organization, $period, $alertType, $threshold, $percentage
+                    );
                 }
             }
+        }
+
+        // 2. Verificações de Pós-Pago (se habilitado e com limite em R$)
+        if ($state['postpaid_enabled'] && $state['is_over_quota']) {
+            // POSTPAID_STARTED é disparado assim que o primeiro centavo de overage é gerado.
+            if ($state['estimated_postpaid_used_brl'] > 0) {
+                $this->fireAlertEvent($organization, $period, \App\Domain\Billing\Enums\AlertType::POSTPAID_STARTED, 0);
+            }
+
+            $limitBrl = $state['postpaid_limit_brl'];
+            if ($limitBrl > 0) {
+                $postpaidPercentage = ($state['estimated_postpaid_used_brl'] / $limitBrl) * 100;
+
+                foreach (\App\Domain\Billing\Enums\AlertType::postpaidThresholds() as $threshold) {
+                    if ($postpaidPercentage >= $threshold) {
+                        $alertType = \App\Domain\Billing\Enums\AlertType::fromPostpaidThreshold($threshold);
+                        $this->fireAlertEvent($organization, $period, $alertType, $threshold, $postpaidPercentage);
+                    }
+                }
+            }
+        }
+    }
+
+    private function fireAlertEvent(
+        Organization $organization, 
+        $period, 
+        \App\Domain\Billing\Enums\AlertType $alertType, 
+        int $threshold,
+        float $percentage = 0.0
+    ): void {
+        $idempotencyKey = "org_{$organization->id}_period_{$period->id}_{$alertType->value}";
+
+        $alreadyFired = \App\Domain\Billing\Models\BillingAlertEvent::where(
+            'idempotency_key', $idempotencyKey
+        )->exists();
+
+        if (!$alreadyFired) {
+            event(new \App\Domain\Billing\Events\AIUsageThresholdReached(
+                organization: $organization,
+                period: clone $period,
+                alertType: $alertType,
+                threshold: $threshold,
+                percentage: $percentage,
+                idempotencyKey: $idempotencyKey,
+            ));
         }
     }
 }

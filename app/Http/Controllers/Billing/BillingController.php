@@ -183,8 +183,17 @@ class BillingController extends Controller
             ->with(['user:id,uuid,name,email', 'group:id,uuid,name'])
             ->get();
 
+        $users = \App\Domain\Identity\Models\User::whereHas('organizations', function($q) use ($organization) {
+            $q->where('organization_id', $organization->id);
+        })->select('id', 'uuid', 'name', 'email')->get();
+
+        $groups = \App\Domain\Organizations\Models\Group::where('organization_id', $organization->id)
+            ->select('id', 'uuid', 'name')->get();
+
         return Inertia::render('Settings/Billing/Alerts', [
             'recipients'    => $recipients,
+            'users'         => $users,
+            'groups'        => $groups,
             'postpaid'      => [
                 'enabled'     => $subscription?->postpaid_enabled ?? false,
                 'limit_brl'   => $subscription?->postpaid_limit_cents !== null
@@ -192,6 +201,88 @@ class BillingController extends Controller
             ],
             'thresholds'    => \App\Domain\Billing\Enums\AlertType::creditUsageThresholds(),
         ]);
+    }
+
+    /** POST /settings/billing/alerts/recipients */
+    public function updateAlertRecipients(Request $request)
+    {
+        $organization = $this->organization($request);
+        \Illuminate\Support\Facades\Gate::authorize('billing.alerts.manage', $organization);
+
+        $validated = $request->validate([
+            'recipients' => ['present', 'array'],
+            'recipients.*.recipient_type' => ['required', 'in:user,group'],
+            'recipients.*.recipient_uuid' => ['required', 'uuid'],
+            'recipients.*.usage_alerts' => ['required', 'boolean'],
+            'recipients.*.overage_alerts' => ['required', 'boolean'],
+            'recipients.*.invoice_alerts' => ['required', 'boolean'],
+            'recipients.*.payment_alerts' => ['required', 'boolean'],
+        ]);
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($organization, $validated) {
+            BillingAlertRecipient::where('organization_id', $organization->id)->delete();
+
+            foreach ($validated['recipients'] as $recipient) {
+                $recipientId = null;
+                if ($recipient['recipient_type'] === 'user') {
+                    $user = \App\Domain\Identity\Models\User::where('uuid', $recipient['recipient_uuid'])->firstOrFail();
+                    abort_if(!$organization->hasMember($user), 403, 'Usuário não pertence à organização.');
+                    $recipientId = $user->id;
+                } else {
+                    $group = \App\Domain\Organizations\Models\Group::where('uuid', $recipient['recipient_uuid'])
+                        ->where('organization_id', $organization->id)->firstOrFail();
+                    $recipientId = $group->id;
+                }
+
+                BillingAlertRecipient::create([
+                    'organization_id' => $organization->id,
+                    'recipient_type'  => $recipient['recipient_type'],
+                    'user_id'         => $recipient['recipient_type'] === 'user' ? $recipientId : null,
+                    'group_id'        => $recipient['recipient_type'] === 'group' ? $recipientId : null,
+                    'is_active'       => true,
+                    'usage_alerts'    => $recipient['usage_alerts'],
+                    'overage_alerts'  => $recipient['overage_alerts'],
+                    'invoice_alerts'  => $recipient['invoice_alerts'],
+                    'payment_alerts'  => $recipient['payment_alerts'],
+                ]);
+            }
+        });
+
+        // Simula auditoria (Organization::auditLogs se existir)
+        activity()
+            ->performedOn($organization)
+            ->causedBy($request->user())
+            ->log('billing_alert_recipients_updated');
+
+        return redirect()->back()->with('success', 'Destinatários de alertas atualizados.');
+    }
+
+    /** PUT /settings/billing/postpaid */
+    public function updatePostpaidSettings(Request $request)
+    {
+        $organization = $this->organization($request);
+        \Illuminate\Support\Facades\Gate::authorize('billing.alerts.manage', $organization);
+
+        $validated = $request->validate([
+            'postpaid_enabled'   => ['required', 'boolean'],
+            'postpaid_limit_brl' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $subscription = $this->subscriptionService->activeSubscription($organization);
+        
+        abort_if(!$subscription, 400, 'Organização não possui plano ativo.');
+
+        $subscription->update([
+            'postpaid_enabled'     => $validated['postpaid_enabled'],
+            'postpaid_limit_cents' => $validated['postpaid_limit_brl'] !== null ? intval($validated['postpaid_limit_brl'] * 100) : null,
+        ]);
+
+        activity()
+            ->performedOn($organization)
+            ->causedBy($request->user())
+            ->log('billing_postpaid_settings_updated');
+
+        return redirect()->back()->with('success', 'Configurações de uso adicional atualizadas.');
     }
 
     /** GET /settings/billing/invoices — Faturas */

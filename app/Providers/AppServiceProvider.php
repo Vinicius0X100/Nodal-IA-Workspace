@@ -62,5 +62,11 @@ class AppServiceProvider extends ServiceProvider
         });
 
         \App\Domain\Billing\Models\OrganizationSubscription::observe(\App\Domain\Billing\Observers\OrganizationSubscriptionObserver::class);
+
+        // Registrar Gates para Billing (já que a policy é de domínio e não está mapeada 1:1 para um Model Eloquent padrão aqui)
+        Gate::define('billing.view', [BillingPolicy::class, 'view']);
+        Gate::define('billing.manage', [BillingPolicy::class, 'manage']);
+        Gate::define('billing.alerts.manage', [BillingPolicy::class, 'manageAlerts']);
+        Gate::define('billing.invoices.view', [BillingPolicy::class, 'viewInvoices']);
     }
 }
