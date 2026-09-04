@@ -37,6 +37,8 @@ return [
 
     'n8n' => [
         'webhook_url' => env('N8N_WEBHOOK_URL'),
+        'base_url'    => env('N8N_BASE_URL'),
+        'api_key'     => env('N8N_API_KEY'),
     ],
 
     'ai_gateway' => [
