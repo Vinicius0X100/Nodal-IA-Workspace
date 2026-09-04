@@ -18,8 +18,13 @@ class BillingPolicy
      */
     private function hasCapability(User $user, Organization $organization, string $slug): bool
     {
+        $isOwner = $organization->users()->where('users.id', $user->id)->wherePivot('is_owner', true)->exists();
+        if ($isOwner) {
+            return true;
+        }
+
         return $user->roles()
-            ->where('organization_id', $organization->id)
+            ->where('user_roles.organization_id', $organization->id)
             ->with('permissions')
             ->get()
             ->flatMap(fn ($role) => $role->permissions)

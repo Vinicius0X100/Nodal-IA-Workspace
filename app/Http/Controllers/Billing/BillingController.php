@@ -209,7 +209,7 @@ class BillingController extends Controller
         $organization = $this->organization($request);
         \Illuminate\Support\Facades\Gate::authorize('billing.alerts.manage', $organization);
 
-        $validated = $request->validate([
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'recipients' => ['present', 'array'],
             'recipients.*.recipient_type' => ['required', 'in:user,group'],
             'recipients.*.recipient_uuid' => ['required', 'uuid'],
@@ -217,6 +217,16 @@ class BillingController extends Controller
             'recipients.*.invoice_alerts' => ['required', 'boolean'],
             'recipients.*.payment_alerts' => ['required', 'boolean'],
         ]);
+
+        if ($validator->fails()) {
+            \Illuminate\Support\Facades\Log::error('Billing Alert Validation Failed:', [
+                'errors' => $validator->errors()->all(),
+                'payload' => $request->all()
+            ]);
+            return redirect()->route('billing.alerts')->withErrors($validator)->withInput();
+        }
+
+        $validated = $validator->validated();
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($organization, $validated) {
             BillingAlertRecipient::where('organization_id', $organization->id)->delete();
@@ -248,7 +258,7 @@ class BillingController extends Controller
 
 
 
-        return redirect()->back()->with('success', 'Destinatários de alertas atualizados.');
+        return redirect()->route('billing.alerts')->with('success', 'Destinatários de alertas atualizados.');
     }
 
     /** PUT /settings/billing/postpaid */
@@ -257,7 +267,7 @@ class BillingController extends Controller
         $organization = $this->organization($request);
         \Illuminate\Support\Facades\Gate::authorize('billing.alerts.manage', $organization);
 
-        $validated = $request->validate([
+        $validated = Illuminate\Support\Facades\Validator::make($request->all(), [
             'postpaid_enabled'   => ['required', 'boolean'],
             'postpaid_limit_brl' => ['nullable', 'numeric', 'min:0'],
         ]);
@@ -273,7 +283,7 @@ class BillingController extends Controller
 
 
 
-        return redirect()->back()->with('success', 'Configurações de uso adicional atualizadas.');
+        return redirect()->route('billing.alerts')->with('success', 'Configurações de uso adicional atualizadas.');
     }
 
     /** GET /settings/billing/invoices — Faturas */
