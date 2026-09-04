@@ -15,7 +15,6 @@ interface Recipient {
     usage_alerts: boolean;
     invoice_alerts: boolean;
     payment_alerts: boolean;
-    overage_alerts: boolean;
     channel_email?: boolean;
     channel_in_app?: boolean;
     user?: { uuid: string; name: string; email: string };
@@ -42,7 +41,6 @@ export default function BillingAlerts({ recipients, users, groups, postpaid, thr
             recipient_type: r.recipient_type,
             recipient_uuid: r.recipient_type === 'user' ? r.user?.uuid : r.group?.uuid,
             usage_alerts: r.usage_alerts,
-            overage_alerts: r.overage_alerts || r.invoice_alerts,
             invoice_alerts: r.invoice_alerts,
             payment_alerts: r.payment_alerts,
             _temp_id: Math.random().toString(),
@@ -58,7 +56,6 @@ export default function BillingAlerts({ recipients, users, groups, postpaid, thr
                 recipient_type: 'user',
                 recipient_uuid: newUser.uuid,
                 usage_alerts: true,
-                overage_alerts: true,
                 invoice_alerts: false,
                 payment_alerts: false,
                 _temp_id: Math.random().toString(),
@@ -158,7 +155,6 @@ export default function BillingAlerts({ recipients, users, groups, postpaid, thr
                                                 </div>
                                                 <div className="text-xs text-neutral-500 flex items-center gap-2">
                                                     {r.usage_alerts && <span>• Uso</span>}
-                                                    {r.overage_alerts && <span>• Excedente</span>}
                                                     {r.invoice_alerts && <span>• Faturas</span>}
                                                     {r.payment_alerts && <span>• Pagamentos</span>}
                                                 </div>
@@ -211,10 +207,7 @@ export default function BillingAlerts({ recipients, users, groups, postpaid, thr
                                         <div className="w-full md:w-1/2 space-y-2 pt-2 md:pt-0">
                                             <label className="text-xs font-semibold text-neutral-600">Tipos de Alerta</label>
                                             <label className="flex items-center gap-2 text-sm">
-                                                <input type="checkbox" className="rounded text-primary-600" checked={rec.usage_alerts} onChange={e => updateRecipient(index, 'usage_alerts', e.target.checked)} /> Uso de créditos
-                                            </label>
-                                            <label className="flex items-center gap-2 text-sm">
-                                                <input type="checkbox" className="rounded text-primary-600" checked={rec.overage_alerts} onChange={e => updateRecipient(index, 'overage_alerts', e.target.checked)} /> Excedente (Pós-pago)
+                                                <input type="checkbox" className="rounded text-primary-600" checked={rec.usage_alerts} onChange={e => updateRecipient(index, 'usage_alerts', e.target.checked)} /> Uso de créditos / Pós-pago
                                             </label>
                                             <label className="flex items-center gap-2 text-sm">
                                                 <input type="checkbox" className="rounded text-primary-600" checked={rec.invoice_alerts} onChange={e => updateRecipient(index, 'invoice_alerts', e.target.checked)} /> Emissão de Faturas

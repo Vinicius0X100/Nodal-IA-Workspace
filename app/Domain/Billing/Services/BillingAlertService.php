@@ -40,8 +40,7 @@ class BillingAlertService
         }
 
         // Resolver destinatários
-        $alertField = in_array($alertType, AlertType::postpaidThresholds()) || $alertType === AlertType::POSTPAID_STARTED ? 'overage_alerts' : 'usage_alerts';
-        $recipients = $this->resolveRecipients($organization, $alertField);
+        $recipients = $this->resolveRecipients($organization, 'usage_alerts');
 
         if ($recipients->isEmpty()) {
             return null;

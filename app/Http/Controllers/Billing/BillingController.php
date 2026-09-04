@@ -187,7 +187,7 @@ class BillingController extends Controller
             $q->where('organization_id', $organization->id);
         })->select('id', 'uuid', 'name', 'email')->get();
 
-        $groups = \App\Domain\Organizations\Models\Group::where('organization_id', $organization->id)
+        $groups = \App\Domain\Directory\Models\Group::where('organization_id', $organization->id)
             ->select('id', 'uuid', 'name')->get();
 
         return Inertia::render('Settings/Billing/Alerts', [
@@ -214,7 +214,6 @@ class BillingController extends Controller
             'recipients.*.recipient_type' => ['required', 'in:user,group'],
             'recipients.*.recipient_uuid' => ['required', 'uuid'],
             'recipients.*.usage_alerts' => ['required', 'boolean'],
-            'recipients.*.overage_alerts' => ['required', 'boolean'],
             'recipients.*.invoice_alerts' => ['required', 'boolean'],
             'recipients.*.payment_alerts' => ['required', 'boolean'],
         ]);
@@ -229,7 +228,7 @@ class BillingController extends Controller
                     abort_if(!$organization->hasMember($user), 403, 'Usuário não pertence à organização.');
                     $recipientId = $user->id;
                 } else {
-                    $group = \App\Domain\Organizations\Models\Group::where('uuid', $recipient['recipient_uuid'])
+                    $group = \App\Domain\Directory\Models\Group::where('uuid', $recipient['recipient_uuid'])
                         ->where('organization_id', $organization->id)->firstOrFail();
                     $recipientId = $group->id;
                 }
@@ -241,7 +240,6 @@ class BillingController extends Controller
                     'group_id'        => $recipient['recipient_type'] === 'group' ? $recipientId : null,
                     'is_active'       => true,
                     'usage_alerts'    => $recipient['usage_alerts'],
-                    'overage_alerts'  => $recipient['overage_alerts'],
                     'invoice_alerts'  => $recipient['invoice_alerts'],
                     'payment_alerts'  => $recipient['payment_alerts'],
                 ]);
