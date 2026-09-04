@@ -183,61 +183,63 @@ class N8nExecutionService
     /**
      * Procura por tokenUsage nos caminhos conhecidos dentro de um run.
      *
-     * Caminhos suportados (em ordem de prioridade):
-     *   run.data.main[][][].json.tokenUsage
-     *   run.data.main[][][].json.response.tokenUsage
-     *   run.data.main[][][].json.usageMetadata   (Gemini API nativa)
-     *   run.data.main[][][].json.usage            (OpenAI-compatible)
+     * Percorre TODOS os canais dentro de run.data (ex.: main, ai_languageModel, ai_tool).
      */
     private function findTokenUsage(array $run): ?array
     {
-        $mainOutputs = Arr::get($run, 'data.main', []);
+        $runData = Arr::get($run, 'data', []);
 
-        if (!is_array($mainOutputs)) {
+        if (!is_array($runData)) {
             return null;
         }
 
-        foreach ($mainOutputs as $outputGroup) {
-            if (!is_array($outputGroup)) {
+        foreach ($runData as $channelName => $channelOutputs) {
+            if (!is_array($channelOutputs)) {
                 continue;
             }
 
-            foreach ($outputGroup as $item) {
-                $json = Arr::get($item, 'json', []);
-
-                if (!is_array($json)) {
+            foreach ($channelOutputs as $outputGroup) {
+                if (!is_array($outputGroup)) {
                     continue;
                 }
 
-                // Caminho 1: json.tokenUsage (Google Gemini Chat Model via n8n)
-                if (isset($json['tokenUsage']) && is_array($json['tokenUsage'])) {
-                    return $json['tokenUsage'];
-                }
+                foreach ($outputGroup as $item) {
+                    $json = Arr::get($item, 'json', []);
 
-                // Caminho 2: json.response.tokenUsage
-                if (isset($json['response']['tokenUsage']) && is_array($json['response']['tokenUsage'])) {
-                    return $json['response']['tokenUsage'];
-                }
+                    if (!is_array($json)) {
+                        continue;
+                    }
 
-                // Caminho 3: json.usageMetadata (Gemini API nativa)
-                if (isset($json['usageMetadata']) && is_array($json['usageMetadata'])) {
-                    $meta = $json['usageMetadata'];
-                    return [
-                        'promptTokens'     => $meta['promptTokenCount']     ?? $meta['promptTokens']     ?? 0,
-                        'completionTokens' => $meta['candidatesTokenCount'] ?? $meta['completionTokens'] ?? 0,
-                        'totalTokens'      => $meta['totalTokenCount']      ?? $meta['totalTokens']      ?? 0,
-                    ];
-                }
+                    // Caminho 1: json.tokenUsage (Google Gemini Chat Model via n8n)
+                    if (isset($json['tokenUsage']) && is_array($json['tokenUsage'])) {
+                        return $json['tokenUsage'];
+                    }
 
-                // Caminho 4: json.usage (padrão OpenAI-compatible)
-                if (isset($json['usage']) && is_array($json['usage'])) {
-                    $usage = $json['usage'];
-                    if (isset($usage['prompt_tokens']) || isset($usage['completion_tokens'])) {
+                    // Caminho 2: json.response.tokenUsage
+                    if (isset($json['response']['tokenUsage']) && is_array($json['response']['tokenUsage'])) {
+                        return $json['response']['tokenUsage'];
+                    }
+
+                    // Caminho 3: json.usageMetadata (Gemini API nativa)
+                    if (isset($json['usageMetadata']) && is_array($json['usageMetadata'])) {
+                        $meta = $json['usageMetadata'];
                         return [
-                            'promptTokens'     => $usage['prompt_tokens']     ?? 0,
-                            'completionTokens' => $usage['completion_tokens'] ?? 0,
-                            'totalTokens'      => $usage['total_tokens']      ?? 0,
+                            'promptTokens'     => $meta['promptTokenCount']     ?? $meta['promptTokens']     ?? 0,
+                            'completionTokens' => $meta['candidatesTokenCount'] ?? $meta['completionTokens'] ?? 0,
+                            'totalTokens'      => $meta['totalTokenCount']      ?? $meta['totalTokens']      ?? 0,
                         ];
+                    }
+
+                    // Caminho 4: json.usage (padrão OpenAI-compatible)
+                    if (isset($json['usage']) && is_array($json['usage'])) {
+                        $usage = $json['usage'];
+                        if (isset($usage['prompt_tokens']) || isset($usage['completion_tokens'])) {
+                            return [
+                                'promptTokens'     => $usage['prompt_tokens']     ?? 0,
+                                'completionTokens' => $usage['completion_tokens'] ?? 0,
+                                'totalTokens'      => $usage['total_tokens']      ?? 0,
+                            ];
+                        }
                     }
                 }
             }
@@ -263,14 +265,20 @@ class N8nExecutionService
             return 'anthropic';
         }
 
-        $mainOutputs = Arr::get($run, 'data.main', []);
-        foreach ($mainOutputs as $outputGroup) {
-            foreach ((array) $outputGroup as $item) {
-                $model = Arr::get($item, 'json.model', '')
-                    ?: Arr::get($item, 'json.response.model', '');
-                if (str_contains((string) $model, 'gemini')) return 'google';
-                if (str_contains((string) $model, 'gpt'))    return 'openai';
-                if (str_contains((string) $model, 'claude')) return 'anthropic';
+        $runData = Arr::get($run, 'data', []);
+        
+        if (is_array($runData)) {
+            foreach ($runData as $channelOutputs) {
+                if (!is_array($channelOutputs)) continue;
+                foreach ($channelOutputs as $outputGroup) {
+                    foreach ((array) $outputGroup as $item) {
+                        $model = Arr::get($item, 'json.model', '')
+                            ?: Arr::get($item, 'json.response.model', '');
+                        if (str_contains((string) $model, 'gemini')) return 'google';
+                        if (str_contains((string) $model, 'gpt'))    return 'openai';
+                        if (str_contains((string) $model, 'claude')) return 'anthropic';
+                    }
+                }
             }
         }
 
@@ -282,15 +290,20 @@ class N8nExecutionService
      */
     private function inferModel(array $run): string
     {
-        $mainOutputs = Arr::get($run, 'data.main', []);
+        $runData = Arr::get($run, 'data', []);
 
-        foreach ($mainOutputs as $outputGroup) {
-            foreach ((array) $outputGroup as $item) {
-                $model = Arr::get($item, 'json.model');
-                if (!empty($model)) return (string) $model;
+        if (is_array($runData)) {
+            foreach ($runData as $channelOutputs) {
+                if (!is_array($channelOutputs)) continue;
+                foreach ($channelOutputs as $outputGroup) {
+                    foreach ((array) $outputGroup as $item) {
+                        $model = Arr::get($item, 'json.model');
+                        if (!empty($model)) return (string) $model;
 
-                $model = Arr::get($item, 'json.response.model');
-                if (!empty($model)) return (string) $model;
+                        $model = Arr::get($item, 'json.response.model');
+                        if (!empty($model)) return (string) $model;
+                    }
+                }
             }
         }
 

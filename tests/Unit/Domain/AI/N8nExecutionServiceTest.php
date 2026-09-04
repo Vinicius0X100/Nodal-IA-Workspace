@@ -36,11 +36,11 @@ class N8nExecutionServiceTest extends TestCase
     /**
      * Monta a estrutura de um run de node com tokenUsage no caminho padrão.
      */
-    private function makeRun(array $tokenUsage, array $extraJson = []): array
+    private function makeRun(array $tokenUsage, array $extraJson = [], string $channelName = 'main'): array
     {
         return [
             'data' => [
-                'main' => [
+                $channelName => [
                     [
                         [
                             'json' => array_merge(['tokenUsage' => $tokenUsage], $extraJson),
@@ -320,5 +320,35 @@ class N8nExecutionServiceTest extends TestCase
         $this->assertEquals('Google Gemini Chat Model', $result[1]['node_name']);
         $this->assertEquals(0, $result[0]['run_index']);
         $this->assertEquals(1, $result[1]['run_index']);
+    }
+    /** Cenário 11: tokenUsage via canal ai_languageModel */
+    public function test_token_usage_in_ai_language_model_channel(): void
+    {
+        $execution = $this->makeExecution([
+            'Google Gemini Chat Model' => [
+                $this->makeRun([
+                    'promptTokens'     => 23226,
+                    'completionTokens' => 48,
+                    'totalTokens'      => 23274,
+                ], [], 'ai_languageModel'),
+                $this->makeRun([
+                    'promptTokens'     => 100,
+                    'completionTokens' => 50,
+                    'totalTokens'      => 150,
+                ], [], 'ai_languageModel'),
+            ],
+        ]);
+
+        $result = $this->service->extractAIUsage($execution);
+
+        $this->assertCount(2, $result);
+        
+        $this->assertEquals(23226, $result[0]['prompt_tokens']);
+        $this->assertEquals(48,    $result[0]['completion_tokens']);
+        $this->assertEquals(23274, $result[0]['total_tokens']);
+
+        $this->assertEquals(100,   $result[1]['prompt_tokens']);
+        $this->assertEquals(50,    $result[1]['completion_tokens']);
+        $this->assertEquals(150,   $result[1]['total_tokens']);
     }
 }
