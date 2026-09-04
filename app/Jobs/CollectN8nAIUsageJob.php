@@ -109,11 +109,11 @@ class CollectN8nAIUsageJob implements ShouldQueue
                 requestUuid: null,
                 n8nExecutionId: $this->n8nExecutionId,
                 idempotencyKey: $idempotencyKey,
-                providerUsageJson: json_encode($usage),
-                metadataJson: json_encode([
+                providerUsageJson: $usage,
+                metadataJson: [
                     'node_name' => $usage['node_name'],
                     'run_index' => $usage['run_index'],
-                ])
+                ]
             );
 
             $aiUsageService->record($organization, $input, $user, $conversation);
