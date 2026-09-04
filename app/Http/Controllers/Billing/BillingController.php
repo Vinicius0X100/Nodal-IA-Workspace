@@ -246,11 +246,7 @@ class BillingController extends Controller
             }
         });
 
-        // Simula auditoria (Organization::auditLogs se existir)
-        activity()
-            ->performedOn($organization)
-            ->causedBy($request->user())
-            ->log('billing_alert_recipients_updated');
+
 
         return redirect()->back()->with('success', 'Destinatários de alertas atualizados.');
     }
@@ -275,10 +271,7 @@ class BillingController extends Controller
             'postpaid_limit_cents' => $validated['postpaid_limit_brl'] !== null ? intval($validated['postpaid_limit_brl'] * 100) : null,
         ]);
 
-        activity()
-            ->performedOn($organization)
-            ->causedBy($request->user())
-            ->log('billing_postpaid_settings_updated');
+
 
         return redirect()->back()->with('success', 'Configurações de uso adicional atualizadas.');
     }
