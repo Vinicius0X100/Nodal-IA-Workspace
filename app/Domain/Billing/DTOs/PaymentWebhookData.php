@@ -12,8 +12,12 @@ readonly class PaymentWebhookData
         public string $eventName,
         public ?string $providerExternalPaymentId,
         public ?PaymentStatus $status = null,
-        public ?int $paidAmountCents = null,
-        public ?CarbonInterface $paymentDate = null,
+        public ?int $valueCents = null,
+        public ?int $netValueCents = null,
+        public ?int $feeCents = null,
+        public ?CarbonInterface $eventOccurredAt = null,
+        public ?string $rawPaymentDate = null,
+        public ?string $rawConfirmedDate = null,
         public array $rawPayload = [],
     ) {}
 }

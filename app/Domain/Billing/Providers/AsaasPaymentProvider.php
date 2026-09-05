@@ -8,6 +8,7 @@ use App\Domain\Billing\DTOs\CreatePaymentData;
 use App\Domain\Billing\DTOs\PaymentCustomerData;
 use App\Domain\Billing\DTOs\PaymentCustomerResult;
 use App\Domain\Billing\DTOs\PaymentResult;
+use App\Domain\Billing\DTOs\PaymentWebhookData;
 use App\Domain\Billing\DTOs\PixData;
 use App\Domain\Billing\Enums\PaymentMethod;
 use App\Domain\Billing\Enums\PaymentStatus;
@@ -15,6 +16,7 @@ use App\Domain\Billing\Exceptions\PaymentProviderException;
 use App\Domain\Billing\Services\Asaas\AsaasPaymentStatusMapper;
 use App\Domain\Billing\Support\MoneyConverter;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -357,5 +359,63 @@ class AsaasPaymentProvider implements PaymentProviderInterface
         ]);
 
         throw new PaymentProviderException($errorMessage, $status);
+    }
+
+    /**
+     * Realiza o parsing estruturado do payload de webhook do Asaas para o DTO PaymentWebhookData.
+     * Preserva o timestamp real e auditável dateCreated (convertido de America/Sao_Paulo para UTC).
+     * Nunca permite que paymentDate/confirmedDate date-only sejam convertidos em timestamps.
+     */
+    public function parseWebhook(array $payload, ?CarbonInterface $fallbackReceivedAt = null): PaymentWebhookData
+    {
+        $eventId = (string) ($payload['id'] ?? '');
+        $eventName = (string) ($payload['event'] ?? '');
+        $paymentPayload = $payload['payment'] ?? [];
+        $externalPaymentId = $paymentPayload['id'] ?? null;
+
+        $targetStatus = AsaasPaymentStatusMapper::fromEvent($eventName);
+
+        $valueCents = isset($paymentPayload['value']) ? MoneyConverter::toCents($paymentPayload['value']) : null;
+        $netValueCents = isset($paymentPayload['netValue']) ? MoneyConverter::toCents($paymentPayload['netValue']) : null;
+        $feeCents = ($valueCents !== null && $netValueCents !== null && $valueCents >= $netValueCents)
+            ? ($valueCents - $netValueCents)
+            : null;
+
+        // 1. Timestamp raiz do evento: dateCreated com horário (fuso America/Sao_Paulo do Asaas)
+        $eventOccurredAt = null;
+        $dateCreatedRaw = $payload['dateCreated'] ?? ($paymentPayload['dateCreated'] ?? null);
+
+        if (!empty($dateCreatedRaw) && is_string($dateCreatedRaw) && strlen(trim($dateCreatedRaw)) > 10) {
+            try {
+                $asaasTz = config('services.asaas.timezone', 'America/Sao_Paulo');
+                $eventOccurredAt = Carbon::parse($dateCreatedRaw, $asaasTz)->setTimezone(config('app.timezone', 'UTC'));
+            } catch (\Throwable) {
+                // Em caso de falha no parse, segue para fallbacks
+            }
+        }
+
+        // 2. Fallback: received_at do webhook persistido no banco
+        if (!$eventOccurredAt && $fallbackReceivedAt) {
+            $eventOccurredAt = Carbon::instance($fallbackReceivedAt)->setTimezone(config('app.timezone', 'UTC'));
+        }
+
+        // 3. Fallback final: now()
+        if (!$eventOccurredAt) {
+            $eventOccurredAt = now();
+        }
+
+        return new PaymentWebhookData(
+            eventId: $eventId,
+            eventName: $eventName,
+            providerExternalPaymentId: $externalPaymentId,
+            status: $targetStatus,
+            valueCents: $valueCents,
+            netValueCents: $netValueCents,
+            feeCents: $feeCents,
+            eventOccurredAt: $eventOccurredAt,
+            rawPaymentDate: isset($paymentPayload['paymentDate']) ? (string) $paymentPayload['paymentDate'] : null,
+            rawConfirmedDate: isset($paymentPayload['confirmedDate']) ? (string) $paymentPayload['confirmedDate'] : null,
+            rawPayload: $payload,
+        );
     }
 }

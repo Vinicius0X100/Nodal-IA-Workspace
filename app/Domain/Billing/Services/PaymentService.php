@@ -394,11 +394,10 @@ class PaymentService
     public function processWebhookEvent(BillingPaymentWebhookEvent $event): void
     {
         $payload = $event->payload_json ?? [];
-        $eventName = (string) ($event->event_name ?? ($payload['event'] ?? ''));
-        $paymentPayload = $payload['payment'] ?? [];
+        $webhookData = $this->paymentProvider->parseWebhook($payload, $event->received_at);
 
         $externalPaymentId = $event->provider_external_payment_id
-            ?? ($paymentPayload['id'] ?? null);
+            ?? $webhookData->providerExternalPaymentId;
 
         if (!$externalPaymentId) {
             $event->update([
@@ -409,7 +408,7 @@ class PaymentService
             return;
         }
 
-        DB::transaction(function () use ($event, $eventName, $paymentPayload, $externalPaymentId) {
+        DB::transaction(function () use ($event, $webhookData, $externalPaymentId) {
             $payment = BillingPayment::where('provider', 'asaas')
                 ->where('provider_external_id', $externalPaymentId)
                 ->lockForUpdate()
@@ -428,57 +427,64 @@ class PaymentService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $targetStatus = AsaasPaymentStatusMapper::fromEvent($eventName);
+            $eventName = $webhookData->eventName;
+            $targetStatus = $webhookData->status;
 
             // ── 1. Confirmação / Recebimento de Pagamento ────────────────────
             if (in_array($eventName, ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'], true)) {
-                $providerAmountCents = MoneyConverter::toCents($paymentPayload['value'] ?? 0);
-                $netAmountCents      = isset($paymentPayload['netValue']) ? MoneyConverter::toCents($paymentPayload['netValue']) : null;
-                $feeCents            = ($netAmountCents !== null && $providerAmountCents >= $netAmountCents)
-                    ? ($providerAmountCents - $netAmountCents)
-                    : $payment->fee_cents;
+                $providerAmountCents = $webhookData->valueCents ?? 0;
+                $feeCents            = $webhookData->feeCents ?? $payment->fee_cents;
 
                 // Verificação estrita de centavos
                 if ($providerAmountCents === $invoice->total_cents) {
-                    $paymentDate = isset($paymentPayload['paymentDate'])
-                        ? Carbon::parse($paymentPayload['paymentDate'])
-                        : now();
+                    $isAlreadyPaid = ($payment->status === PaymentStatus::PAID);
+
+                    // Idempotência temporal: preserva o primeiro timestamp de liquidação confirmado
+                    $paidAt = ($isAlreadyPaid && $payment->paid_at)
+                        ? $payment->paid_at
+                        : $webhookData->eventOccurredAt;
+
+                    $invoicePaidAt = ($invoice->status === InvoiceStatus::PAID && $invoice->paid_at)
+                        ? $invoice->paid_at
+                        : $paidAt;
 
                     $payment->update([
                         'status'            => PaymentStatus::PAID,
                         'paid_amount_cents' => $providerAmountCents,
                         'fee_cents'         => $feeCents,
-                        'paid_at'           => $paymentDate,
+                        'paid_at'           => $paidAt,
                     ]);
 
                     $invoice->update([
                         'status'  => InvoiceStatus::PAID,
-                        'paid_at' => $paymentDate,
+                        'paid_at' => $invoicePaidAt,
                     ]);
 
-                    AuditLog::create([
-                        'organization_id' => $invoice->organization_id,
-                        'action'          => 'billing_payment_paid',
-                        'entity_type'     => BillingPayment::class,
-                        'entity_id'       => (string) $payment->id,
-                        'metadata'        => [
-                            'amount_cents'      => $providerAmountCents,
-                            'fee_cents'         => $feeCents,
-                            'paid_at'           => $paymentDate->toIsoString(),
-                            'provider_event_id' => $event->provider_event_id,
-                        ],
-                    ]);
+                    if (!$isAlreadyPaid) {
+                        AuditLog::create([
+                            'organization_id' => $invoice->organization_id,
+                            'action'          => 'billing_payment_paid',
+                            'entity_type'     => BillingPayment::class,
+                            'entity_id'       => (string) $payment->id,
+                            'metadata'        => [
+                                'amount_cents'      => $providerAmountCents,
+                                'fee_cents'         => $feeCents,
+                                'paid_at'           => $paidAt->toIsoString(),
+                                'provider_event_id' => $event->provider_event_id,
+                            ],
+                        ]);
 
-                    AuditLog::create([
-                        'organization_id' => $invoice->organization_id,
-                        'action'          => 'billing_invoice_paid',
-                        'entity_type'     => BillingInvoice::class,
-                        'entity_id'       => (string) $invoice->id,
-                        'metadata'        => [
-                            'total_cents' => $invoice->total_cents,
-                            'paid_at'     => $paymentDate->toIsoString(),
-                        ],
-                    ]);
+                        AuditLog::create([
+                            'organization_id' => $invoice->organization_id,
+                            'action'          => 'billing_invoice_paid',
+                            'entity_type'     => BillingInvoice::class,
+                            'entity_id'       => (string) $invoice->id,
+                            'metadata'        => [
+                                'total_cents' => $invoice->total_cents,
+                                'paid_at'     => $invoicePaidAt->toIsoString(),
+                            ],
+                        ]);
+                    }
                 } else {
                     // Divergência de centavos: NUNCA marcar invoice como paid
                     $payment->update([
@@ -569,3 +575,4 @@ class PaymentService
         });
     }
 }
+

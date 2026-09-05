@@ -78,6 +78,7 @@ return [
         'webhook_token' => env('ASAAS_WEBHOOK_TOKEN'),
         'user_agent'    => env('ASAAS_USER_AGENT', 'Nodal-Billing/1.0'),
         'timeout'       => (int) env('ASAAS_TIMEOUT', 15),
+        'timezone'      => env('ASAAS_TIMEZONE', 'America/Sao_Paulo'),
     ],
 
     'system' => [

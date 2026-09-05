@@ -248,6 +248,156 @@ class PaymentServiceTest extends TestCase
         $this->assertTrue(AuditLog::where('action', 'billing_invoice_paid')->exists());
     }
 
+    public function test_webhook_payment_received_uses_real_date_created_timestamp_without_midnight_conversion(): void
+    {
+        $this->fakeAsaasEndpoints();
+        $payment = $this->paymentService->issueInvoice($this->invoice, PaymentMethod::PIX);
+
+        // Payload real reportado no Sandbox Asaas
+        $event = BillingPaymentWebhookEvent::create([
+            'provider'                     => 'asaas',
+            'provider_event_id'            => 'evt_real_asaas_001',
+            'event_name'                   => 'PAYMENT_RECEIVED',
+            'provider_external_payment_id' => $payment->provider_external_id,
+            'payload_json'                 => [
+                'event'       => 'PAYMENT_RECEIVED',
+                'dateCreated' => '2026-09-05 00:25:43',
+                'payment'     => [
+                    'id'            => $payment->provider_external_id,
+                    'value'         => 1990.00,
+                    'netValue'      => 1988.01,
+                    'paymentDate'   => '2026-09-05',
+                    'confirmedDate' => '2026-09-05',
+                ],
+            ],
+            'status'      => 'received',
+            'received_at' => now(),
+        ]);
+
+        $this->paymentService->processWebhookEvent($event);
+
+        $payment->refresh();
+        $this->invoice->refresh();
+
+        $this->assertSame(PaymentStatus::PAID, $payment->status);
+        $this->assertSame(InvoiceStatus::PAID, $this->invoice->status);
+
+        // Garantir que paid_at NÃO seja 2026-09-05 00:00:00 (sem conversão para midnight)
+        $this->assertNotSame('2026-09-05 00:00:00', $payment->paid_at->format('Y-m-d H:i:s'));
+        $this->assertNotSame('00:00:00', $payment->paid_at->format('H:i:s'));
+        $this->assertNotSame('2026-09-05 00:00:00', $this->invoice->paid_at->format('Y-m-d H:i:s'));
+        $this->assertNotSame('00:00:00', $this->invoice->paid_at->format('H:i:s'));
+
+        // No fuso America/Sao_Paulo (origem do Asaas), o horário é exatamente 00:25:43
+        $this->assertSame('2026-09-05 00:25:43', $payment->paid_at->copy()->setTimezone('America/Sao_Paulo')->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-09-05 00:25:43', $this->invoice->paid_at->copy()->setTimezone('America/Sao_Paulo')->format('Y-m-d H:i:s'));
+    }
+
+    public function test_webhook_payment_received_duplicate_or_subsequent_event_does_not_overwrite_first_paid_at(): void
+    {
+        $this->fakeAsaasEndpoints();
+        $payment = $this->paymentService->issueInvoice($this->invoice, PaymentMethod::PIX);
+
+        // 1. Primeiro evento recebido: PAYMENT_CONFIRMED às 00:20:00
+        $event1 = BillingPaymentWebhookEvent::create([
+            'provider'                     => 'asaas',
+            'provider_event_id'            => 'evt_confirmed_001',
+            'event_name'                   => 'PAYMENT_CONFIRMED',
+            'provider_external_payment_id' => $payment->provider_external_id,
+            'payload_json'                 => [
+                'event'       => 'PAYMENT_CONFIRMED',
+                'dateCreated' => '2026-09-05 00:20:00',
+                'payment'     => [
+                    'id'            => $payment->provider_external_id,
+                    'value'         => 1990.00,
+                    'paymentDate'   => '2026-09-05',
+                    'confirmedDate' => '2026-09-05',
+                ],
+            ],
+            'status'      => 'received',
+            'received_at' => now(),
+        ]);
+
+        $this->paymentService->processWebhookEvent($event1);
+
+        $payment->refresh();
+        $this->invoice->refresh();
+
+        $firstPaymentPaidAt = $payment->paid_at->copy();
+        $firstInvoicePaidAt = $this->invoice->paid_at->copy();
+        $this->assertSame('2026-09-05 00:20:00', $firstPaymentPaidAt->setTimezone('America/Sao_Paulo')->format('Y-m-d H:i:s'));
+
+        // 2. Segundo evento posterior recebido: PAYMENT_RECEIVED com timestamp posterior às 00:25:43
+        $event2 = BillingPaymentWebhookEvent::create([
+            'provider'                     => 'asaas',
+            'provider_event_id'            => 'evt_received_002',
+            'event_name'                   => 'PAYMENT_RECEIVED',
+            'provider_external_payment_id' => $payment->provider_external_id,
+            'payload_json'                 => [
+                'event'       => 'PAYMENT_RECEIVED',
+                'dateCreated' => '2026-09-05 00:25:43',
+                'payment'     => [
+                    'id'            => $payment->provider_external_id,
+                    'value'         => 1990.00,
+                    'netValue'      => 1988.01,
+                    'paymentDate'   => '2026-09-05',
+                    'confirmedDate' => '2026-09-05',
+                ],
+            ],
+            'status'      => 'received',
+            'received_at' => now()->addMinutes(5),
+        ]);
+
+        $this->paymentService->processWebhookEvent($event2);
+
+        $payment->refresh();
+        $this->invoice->refresh();
+
+        // Idempotência: O timestamp de paid_at NÃO deve ser sobrescrito pelo segundo evento
+        $this->assertSame($firstPaymentPaidAt->timestamp, $payment->paid_at->timestamp);
+        $this->assertSame($firstInvoicePaidAt->timestamp, $this->invoice->paid_at->timestamp);
+        $this->assertSame('2026-09-05 00:20:00', $payment->paid_at->copy()->setTimezone('America/Sao_Paulo')->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-09-05 00:20:00', $this->invoice->paid_at->copy()->setTimezone('America/Sao_Paulo')->format('Y-m-d H:i:s'));
+
+        // Valores financeiros complementares (como fee / netValue) são atualizados com segurança
+        $this->assertSame(199, $payment->fee_cents);
+    }
+
+    public function test_webhook_fallback_to_received_at_when_date_created_absent(): void
+    {
+        $this->fakeAsaasEndpoints();
+        $payment = $this->paymentService->issueInvoice($this->invoice, PaymentMethod::PIX);
+
+        $expectedReceivedAt = Carbon::parse('2026-09-05 14:30:15 UTC');
+
+        $event = BillingPaymentWebhookEvent::create([
+            'provider'                     => 'asaas',
+            'provider_event_id'            => 'evt_fallback_001',
+            'event_name'                   => 'PAYMENT_RECEIVED',
+            'provider_external_payment_id' => $payment->provider_external_id,
+            'payload_json'                 => [
+                'event'   => 'PAYMENT_RECEIVED',
+                'payment' => [
+                    'id'          => $payment->provider_external_id,
+                    'value'       => 1990.00,
+                    'paymentDate' => '2026-09-05', // Date-only NÃO deve ser usado
+                ],
+            ],
+            'status'      => 'received',
+            'received_at' => $expectedReceivedAt,
+        ]);
+
+        $this->paymentService->processWebhookEvent($event);
+
+        $payment->refresh();
+        $this->invoice->refresh();
+
+        // Não usa 00:00:00 de paymentDate, usa o received_at com precisão de horário
+        $this->assertSame('14:30:15', $payment->paid_at->format('H:i:s'));
+        $this->assertSame($expectedReceivedAt->timestamp, $payment->paid_at->timestamp);
+        $this->assertSame($expectedReceivedAt->timestamp, $this->invoice->paid_at->timestamp);
+    }
+
     public function test_webhook_payment_received_discrepant_amount_marks_needs_review(): void
     {
         $this->fakeAsaasEndpoints();

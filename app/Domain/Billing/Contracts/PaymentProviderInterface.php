@@ -7,6 +7,7 @@ use App\Domain\Billing\DTOs\CreatePaymentData;
 use App\Domain\Billing\DTOs\PaymentCustomerData;
 use App\Domain\Billing\DTOs\PaymentCustomerResult;
 use App\Domain\Billing\DTOs\PaymentResult;
+use App\Domain\Billing\DTOs\PaymentWebhookData;
 use App\Domain\Billing\DTOs\PixData;
 
 interface PaymentProviderInterface
@@ -66,4 +67,9 @@ interface PaymentProviderInterface
      * Previsto na interface para o futuro (reembolso administrativo).
      */
     public function refundCharge(string $providerExternalId, ?int $amountCents = null): bool;
+
+    /**
+     * Realiza o parsing estruturado do payload de webhook do provedor para o DTO PaymentWebhookData.
+     */
+    public function parseWebhook(array $payload, ?\Carbon\CarbonInterface $fallbackReceivedAt = null): PaymentWebhookData;
 }
