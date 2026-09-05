@@ -267,10 +267,16 @@ class BillingController extends Controller
         $organization = $this->organization($request);
         \Illuminate\Support\Facades\Gate::authorize('billing.alerts.manage', $organization);
 
-        $validated = Illuminate\Support\Facades\Validator::make($request->all(), [
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'postpaid_enabled'   => ['required', 'boolean'],
             'postpaid_limit_brl' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        if ($validator->fails()) {
+            return redirect()->route('billing.alerts')->withErrors($validator)->withInput();
+        }
+
+        $validated = $validator->validated();
 
         $subscription = $this->subscriptionService->activeSubscription($organization);
         
