@@ -61,22 +61,67 @@ class BillingTestAlertCommand extends Command
         [$alertType, $threshold] = $typeMap[$typeArg];
 
         // Precisamos do período atual para que o e-mail exiba as variáveis de forma verídica,
-        // mas não alteramos nem persistimos nada do período.
-        $period = $subscriptionService->currentPeriod($organization);
+        // mas não alteramos nem persistimos nada do período real (se houver).
+        $realPeriod = $subscriptionService->currentPeriod($organization);
+        
+        $included = $realPeriod ? $realPeriod->included_credits : 50000;
+        
+        $overagePrice = 0;
+        $postpaidLimitCents = null;
 
-        if (!$period) {
-            // Se a org não tiver período, criamos um dummy apenas em memória
-            $period = new AiUsagePeriod([
-                'id' => 99999, // dummy ID
-                'organization_id' => $organization->id,
-                'included_credits' => 1000,
-                'billable_credits_used' => ($threshold / 100) * 1000,
-                'overage_credits' => 0,
-                'estimated_overage_cents' => 0,
-                'period_start' => now()->startOfMonth(),
-                'period_end' => now()->endOfMonth(),
-            ]);
-            $this->warn("Aviso: Organização não possui AiUsagePeriod aberto. Usando um em memória para gerar o e-mail.");
+        $subscription = $subscriptionService->activeSubscription($organization);
+        if ($subscription) {
+            $overagePrice = $subscription->effectiveOveragePricePer1000Cents();
+            $postpaidLimitCents = $subscription->postpaid_limit_cents;
+        } else {
+            $overagePrice = 1500; // default $15.00
+            $postpaidLimitCents = 5000; // default $50.00
+        }
+
+        $simulatedUsed = 0;
+        $simulatedOverage = 0;
+        $simulatedOverageCents = 0;
+
+        if (in_array($typeArg, ['credit_70', 'credit_85', 'credit_95', 'credit_100'])) {
+            $simulatedUsed = ($threshold / 100) * $included;
+        } else {
+            // Postpaid tests
+            if ($typeArg === 'postpaid_started') {
+                // Just above included
+                $simulatedOverage = 1; 
+                $simulatedOverageCents = ($simulatedOverage / 1000) * $overagePrice;
+            } else {
+                // To reach $threshold% of the $postpaidLimit
+                $targetOverageCents = $postpaidLimitCents * ($threshold / 100);
+                
+                if ($overagePrice > 0) {
+                    $simulatedOverage = ($targetOverageCents / $overagePrice) * 1000;
+                } else {
+                    $simulatedOverage = 1000; // fallback just in case
+                }
+                
+                $simulatedOverageCents = $targetOverageCents;
+            }
+            $simulatedUsed = $included + $simulatedOverage;
+            if ($simulatedOverageCents === 0 && $simulatedOverage > 0) {
+                 $simulatedOverageCents = ($simulatedOverage / 1000) * $overagePrice;
+            }
+        }
+
+        // Importante: NÃO atribuir 'id' para que o SerializesModels do Laravel (usado pelo evento)
+        // serialize este modelo com os valores em memória, em vez de tentar buscar do banco.
+        $period = new AiUsagePeriod([
+            'organization_id' => $organization->id,
+            'included_credits' => $included,
+            'billable_credits_used' => $simulatedUsed,
+            'overage_credits' => $simulatedOverage,
+            'estimated_overage_cents' => $simulatedOverageCents,
+            'period_start' => $realPeriod ? $realPeriod->period_start : now()->startOfMonth(),
+            'period_end' => $realPeriod ? $realPeriod->period_end : now()->endOfMonth(),
+        ]);
+        
+        if (!$realPeriod) {
+            $this->warn("Aviso: Organização não possui AiUsagePeriod aberto. Usando um período falso para o contexto.");
         }
 
         $idempotencyKey = "test:org_{$organization->id}:{$alertType->value}:" . time();
