@@ -98,7 +98,15 @@ Route::prefix('ai')->middleware('ai.gateway')->group(function () {
     Route::post('/usage/events', [\App\Http\Controllers\Billing\AIUsageApiController::class, 'store']);
 });
 
+// Integer Internal Billing API (Read-Only)
+Route::prefix('v1/internal/integer/billing')->middleware('system.api:integer')->group(function () {
+    Route::get('/invoices', [\App\Http\Controllers\Api\Internal\IntegerBillingApiController::class, 'index']);
+    Route::get('/invoices/{uuid}', [\App\Http\Controllers\Api\Internal\IntegerBillingApiController::class, 'show']);
+});
+
 // Webhooks
 Route::prefix('webhooks')->group(function () {
     Route::post('/google-workspace', [\App\Http\Controllers\Webhooks\GoogleWorkspaceWebhookController::class, 'handle'])->name('webhooks.google_workspace');
+    Route::post('/billing/asaas', [\App\Http\Controllers\Webhooks\AsaasBillingWebhookController::class, 'handle'])->middleware('asaas.webhook')->name('webhooks.billing.asaas');
 });
+

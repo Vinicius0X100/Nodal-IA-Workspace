@@ -22,11 +22,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'org.access' => \App\Http\Middleware\EnsureOrganizationAccess::class,
-            'permission' => \App\Http\Middleware\EnsurePermission::class,
-            'system.api' => \App\Http\Middleware\VerifySystemApiKey::class,
-            'ai.gateway' => \App\Http\Middleware\AIGatewayMiddleware::class,
+            'org.access'    => \App\Http\Middleware\EnsureOrganizationAccess::class,
+            'permission'    => \App\Http\Middleware\EnsurePermission::class,
+            'system.api'    => \App\Http\Middleware\VerifySystemApiKey::class,
+            'ai.gateway'    => \App\Http\Middleware\AIGatewayMiddleware::class,
+            'asaas.webhook' => \App\Http\Middleware\VerifyAsaasWebhookToken::class,
         ]);
+
 
         $middleware->statefulApi();
     })

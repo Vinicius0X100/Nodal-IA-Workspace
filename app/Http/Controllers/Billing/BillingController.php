@@ -300,7 +300,7 @@ class BillingController extends Controller
         $this->authorize('viewInvoices', $organization);
 
         $invoices = BillingInvoice::where('organization_id', $organization->id)
-            ->with(['subscription.plan:id,code,name', 'items'])
+            ->with(['subscription.plan:id,code,name', 'items', 'latestPayment'])
             ->orderByDesc('period_start')
             ->paginate(12);
 
@@ -308,6 +308,76 @@ class BillingController extends Controller
             'invoices' => $invoices,
         ]);
     }
+
+    /** POST /settings/billing/invoices/{uuid}/issue — Emitir fatura */
+    public function issueInvoice(Request $request, string $uuid, \App\Domain\Billing\Services\PaymentService $paymentService)
+    {
+        $organization = $this->organization($request);
+        $this->authorize('manageInvoices', $organization);
+
+        $invoice = BillingInvoice::where('uuid', $uuid)
+            ->where('organization_id', $organization->id)
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'payment_method' => ['required', 'in:pix,boleto'],
+        ]);
+
+        try {
+            $method = \App\Domain\Billing\Enums\PaymentMethod::from($validated['payment_method']);
+            $paymentService->issueInvoice($invoice, $method);
+
+            return redirect()->back()->with('success', 'Cobrança emitida com sucesso.');
+        } catch (\Throwable $e) {
+            return redirect()->back()->withErrors(['error' => $e->getMessage()]);
+        }
+    }
+
+    /** POST /settings/billing/invoices/{uuid}/cancel — Cancelar fatura */
+    public function cancelInvoice(Request $request, string $uuid, \App\Domain\Billing\Services\PaymentService $paymentService)
+    {
+        $organization = $this->organization($request);
+        $this->authorize('manageInvoices', $organization);
+
+        $invoice = BillingInvoice::where('uuid', $uuid)
+            ->where('organization_id', $organization->id)
+            ->firstOrFail();
+
+        try {
+            $paymentService->cancelInvoice($invoice, 'Cancelada manualmente via painel administrativo.');
+
+            return redirect()->back()->with('success', 'Fatura cancelada com sucesso.');
+        } catch (\Throwable $e) {
+            return redirect()->back()->withErrors(['error' => $e->getMessage()]);
+        }
+    }
+
+    /** GET /settings/billing/invoices/{uuid}/payment-details — Detalhes para modal e polling leve */
+    public function paymentDetails(Request $request, string $uuid)
+    {
+        $organization = $this->organization($request);
+        $this->authorize('viewInvoices', $organization);
+
+        $invoice = BillingInvoice::where('uuid', $uuid)
+            ->where('organization_id', $organization->id)
+            ->with(['latestPayment'])
+            ->firstOrFail();
+
+        $payment = $invoice->latestPayment;
+
+        return response()->json([
+            'invoice_status'  => $invoice->status->value,
+            'payment_status'  => $payment?->status?->value,
+            'payment_method'  => $payment?->payment_method?->value,
+            'pix_qr_code'     => $payment?->pix_qr_code,
+            'pix_copy_paste'  => $payment?->pix_copy_paste,
+            'boleto_barcode'  => $payment?->boleto_barcode,
+            'boleto_url'      => $payment?->boleto_url,
+            'due_date'        => $payment?->due_date?->format('Y-m-d'),
+            'paid_at'         => $payment?->paid_at?->toIsoString(),
+        ]);
+    }
+
 
     private function organization(Request $request): Organization
     {

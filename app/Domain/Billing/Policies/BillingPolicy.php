@@ -55,6 +55,12 @@ class BillingPolicy
             || $this->hasCapability($user, $organization, 'billing.manage');
     }
 
+    public function manageInvoices(User $user, Organization $organization): bool
+    {
+        return $this->hasCapability($user, $organization, 'billing.manage');
+    }
+
+
     public function viewAiUsageOrganization(User $user, Organization $organization): bool
     {
         return $this->hasCapability($user, $organization, 'ai_usage.view_organization')

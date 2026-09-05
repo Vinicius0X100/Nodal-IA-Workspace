@@ -2,6 +2,7 @@
 
 namespace App\Domain\Billing\Models;
 
+use App\Domain\Billing\Enums\PaymentMethod;
 use App\Domain\Billing\Enums\SubscriptionStatus;
 use App\Domain\Organizations\Models\Organization;
 use App\Support\Traits\HasSecondaryUuid;
@@ -27,8 +28,10 @@ class OrganizationSubscription extends Model
         'custom_overage_price_per_1000_credits_cents' => 'integer',
         'postpaid_enabled'                            => 'boolean',
         'postpaid_limit_cents'                        => 'integer',
+        'preferred_payment_method'                    => PaymentMethod::class,
         'metadata_json'                               => 'array',
     ];
+
 
     public function organization(): BelongsTo
     {

@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import SettingsLayout from '@/Layouts/SettingsLayout';
-import { FileText, Download, CheckCircle2, Clock, XCircle, Eye, X, ShieldAlert, Sparkles } from 'lucide-react';
+import { 
+    FileText, CheckCircle2, Clock, XCircle, Eye, X, 
+    QrCode, Barcode, Copy, Check, ExternalLink, AlertCircle, 
+    ArrowRight, Ban, RefreshCw
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { router } from '@inertiajs/react';
 
 function formatBrl(cents: number) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
@@ -45,6 +50,24 @@ interface InvoiceItem {
     };
 }
 
+interface Payment {
+    id: number;
+    uuid: string;
+    attempt_number: number;
+    provider: string;
+    payment_method: 'pix' | 'boleto';
+    status: 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled' | 'expired' | 'overdue' | 'refunded' | 'needs_review';
+    amount_cents: number;
+    paid_amount_cents?: number | null;
+    due_date: string;
+    expires_at?: string | null;
+    paid_at?: string | null;
+    pix_copy_paste?: string | null;
+    pix_qr_code?: string | null;
+    boleto_barcode?: string | null;
+    boleto_url?: string | null;
+}
+
 interface Invoice {
     id: number;
     uuid: string;
@@ -70,6 +93,7 @@ interface Invoice {
     };
     subscription?: { plan?: { name: string } };
     items?: InvoiceItem[];
+    latest_payment?: Payment | null;
 }
 
 interface Props {
@@ -86,8 +110,23 @@ const statusConfig = {
     void:   { label: 'Cancelada', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 border-red-200' },
 };
 
+const paymentStatusConfig: Record<string, { label: string; color: string; bg: string }> = {
+    pending:      { label: 'Aguardando Pagamento', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
+    processing:   { label: 'Processando', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
+    paid:         { label: 'Pago', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+    failed:       { label: 'Falhou', color: 'text-red-700', bg: 'bg-red-50 border-red-200' },
+    cancelled:    { label: 'Cancelado', color: 'text-neutral-600', bg: 'bg-neutral-100 border-neutral-200' },
+    expired:      { label: 'Expirado', color: 'text-neutral-600', bg: 'bg-neutral-100 border-neutral-200' },
+    overdue:      { label: 'Vencido', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
+    refunded:     { label: 'Reembolsado', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
+    needs_review: { label: 'Requer Análise', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200' },
+};
+
 export default function BillingInvoices({ invoices }: Props) {
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+    const [issuingMethod, setIssuingMethod] = useState<'pix' | 'boleto'>('pix');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [copiedText, setCopiedText] = useState<string | null>(null);
 
     const getPlanName = (invoice: Invoice) => {
         return invoice.plan_name 
@@ -105,6 +144,37 @@ export default function BillingInvoices({ invoices }: Props) {
             return invoice.metadata_json.monthly_price_cents;
         }
         return Math.max(invoice.subtotal_cents - invoice.overage_cents, 0);
+    };
+
+    const handleCopy = (text: string, field: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedText(field);
+        setTimeout(() => setCopiedText(null), 2500);
+    };
+
+    const handleIssueInvoice = (invoiceUuid: string) => {
+        setIsSubmitting(true);
+        router.post(route('billing.invoices.issue', invoiceUuid), {
+            payment_method: issuingMethod,
+        }, {
+            onFinish: () => {
+                setIsSubmitting(false);
+                setSelectedInvoice(null);
+            },
+        });
+    };
+
+    const handleCancelInvoice = (invoiceUuid: string) => {
+        if (!confirm('Deseja realmente cancelar esta fatura e invalidar a cobrança externa?')) {
+            return;
+        }
+        setIsSubmitting(true);
+        router.post(route('billing.invoices.cancel', invoiceUuid), {}, {
+            onFinish: () => {
+                setIsSubmitting(false);
+                setSelectedInvoice(null);
+            },
+        });
     };
 
     return (
@@ -139,6 +209,7 @@ export default function BillingInvoices({ invoices }: Props) {
                                         <th className="px-6 py-4 text-right">Uso Adicional</th>
                                         <th className="px-6 py-4 text-right">Total</th>
                                         <th className="px-6 py-4 text-center">Status</th>
+                                        <th className="px-6 py-4 text-center">Pagamento</th>
                                         <th className="px-6 py-4 text-right">Ações</th>
                                     </tr>
                                 </thead>
@@ -148,6 +219,8 @@ export default function BillingInvoices({ invoices }: Props) {
                                         const StatusIcon = conf.icon;
                                         const planName = getPlanName(invoice);
                                         const monthlyCents = getMonthlyPriceCents(invoice);
+                                        const payment = invoice.latest_payment;
+                                        const pConf = payment ? paymentStatusConfig[payment.status] : null;
 
                                         return (
                                             <tr 
@@ -191,6 +264,16 @@ export default function BillingInvoices({ invoices }: Props) {
                                                         {conf.label}
                                                     </div>
                                                 </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    {pConf ? (
+                                                        <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-medium", pConf.bg, pConf.color)}>
+                                                            {payment?.payment_method === 'pix' ? <QrCode className="w-3 h-3" /> : <Barcode className="w-3 h-3" />}
+                                                            {pConf.label}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-neutral-400">—</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <button 
                                                         onClick={(e) => {
@@ -213,12 +296,12 @@ export default function BillingInvoices({ invoices }: Props) {
                 </div>
             </div>
 
-            {/* Modal de Detalhe da Fatura */}
+            {/* Modal de Detalhe da Fatura e Pagamento */}
             {selectedInvoice && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl border border-neutral-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl border border-neutral-200 shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto flex flex-col">
                         {/* Header */}
-                        <div className="p-6 border-b border-neutral-100 flex items-start justify-between bg-neutral-50/50">
+                        <div className="p-6 border-b border-neutral-100 flex items-start justify-between bg-neutral-50/50 sticky top-0 bg-white z-10">
                             <div>
                                 <div className="flex items-center gap-2">
                                     <h2 className="text-xl font-bold text-neutral-900">
@@ -237,15 +320,189 @@ export default function BillingInvoices({ invoices }: Props) {
                             </button>
                         </div>
 
-                        {/* Itens */}
+                        {/* Conteúdo */}
                         <div className="p-6 space-y-6">
+                            {/* Status Bar */}
                             <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
-                                <span className="text-xs uppercase font-semibold tracking-wider text-neutral-400">Status</span>
+                                <span className="text-xs uppercase font-semibold tracking-wider text-neutral-400">Status da Fatura</span>
                                 <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-semibold uppercase tracking-wider", statusConfig[selectedInvoice.status].bg, statusConfig[selectedInvoice.status].color)}>
                                     {statusConfig[selectedInvoice.status].label}
                                 </div>
                             </div>
 
+                            {/* ── SEÇÃO DE COBRANÇA E PAGAMENTO ── */}
+                            {selectedInvoice.status === 'draft' && (
+                                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/40 space-y-3">
+                                    <div className="flex items-center gap-2 text-amber-800">
+                                        <AlertCircle className="w-4 h-4" />
+                                        <h4 className="text-xs uppercase font-bold tracking-wider">Fatura em Rascunho</h4>
+                                    </div>
+                                    <p className="text-xs text-neutral-600">
+                                        Esta fatura ainda não foi emitida no provedor de cobrança. Selecione o método desejado para gerar a cobrança oficial:
+                                    </p>
+                                    <div className="flex items-center gap-3 pt-1">
+                                        <label className={cn("flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border text-xs font-semibold cursor-pointer transition-all", issuingMethod === 'pix' ? 'border-primary-600 bg-primary-50 text-primary-900 shadow-sm' : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50')}>
+                                            <input 
+                                                type="radio" 
+                                                name="method" 
+                                                value="pix" 
+                                                checked={issuingMethod === 'pix'} 
+                                                onChange={() => setIssuingMethod('pix')} 
+                                                className="sr-only" 
+                                            />
+                                            <QrCode className="w-4 h-4 text-primary-600" />
+                                            PIX Instantâneo
+                                        </label>
+                                        <label className={cn("flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border text-xs font-semibold cursor-pointer transition-all", issuingMethod === 'boleto' ? 'border-primary-600 bg-primary-50 text-primary-900 shadow-sm' : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50')}>
+                                            <input 
+                                                type="radio" 
+                                                name="method" 
+                                                value="boleto" 
+                                                checked={issuingMethod === 'boleto'} 
+                                                onChange={() => setIssuingMethod('boleto')} 
+                                                className="sr-only" 
+                                            />
+                                            <Barcode className="w-4 h-4 text-primary-600" />
+                                            Boleto Bancário
+                                        </label>
+                                    </div>
+                                    <button
+                                        disabled={isSubmitting}
+                                        onClick={() => handleIssueInvoice(selectedInvoice.uuid)}
+                                        className="w-full mt-2 py-2.5 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                                    >
+                                        {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                                        Emitir Cobrança Oficial ({issuingMethod === 'pix' ? 'PIX' : 'Boleto'})
+                                    </button>
+                                </div>
+                            )}
+
+                            {selectedInvoice.status === 'issued' && selectedInvoice.latest_payment && (
+                                <div className="p-4 rounded-xl border border-neutral-200 bg-neutral-50/50 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            {selectedInvoice.latest_payment.payment_method === 'pix' ? (
+                                                <QrCode className="w-4 h-4 text-neutral-700" />
+                                            ) : (
+                                                <Barcode className="w-4 h-4 text-neutral-700" />
+                                            )}
+                                            <h4 className="text-xs uppercase font-bold tracking-wider text-neutral-700">
+                                                Cobrança {selectedInvoice.latest_payment.payment_method.toUpperCase()} — Tentativa #{selectedInvoice.latest_payment.attempt_number}
+                                            </h4>
+                                        </div>
+                                        <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded border", paymentStatusConfig[selectedInvoice.latest_payment.status]?.bg, paymentStatusConfig[selectedInvoice.latest_payment.status]?.color)}>
+                                            {paymentStatusConfig[selectedInvoice.latest_payment.status]?.label}
+                                        </span>
+                                    </div>
+
+                                    {/* PIX Display */}
+                                    {selectedInvoice.latest_payment.payment_method === 'pix' && (
+                                        <div className="flex flex-col items-center p-4 bg-white rounded-xl border border-neutral-200/80 space-y-4">
+                                            {selectedInvoice.latest_payment.pix_qr_code ? (
+                                                <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm">
+                                                    <img 
+                                                        src={selectedInvoice.latest_payment.pix_qr_code.startsWith('data:') 
+                                                            ? selectedInvoice.latest_payment.pix_qr_code 
+                                                            : `data:image/png;base64,${selectedInvoice.latest_payment.pix_qr_code}`}
+                                                        alt="QR Code PIX"
+                                                        className="w-44 h-44 object-contain"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="w-44 h-44 bg-neutral-100 rounded-xl flex items-center justify-center text-neutral-400 text-xs">
+                                                    QR Code Indisponível
+                                                </div>
+                                            )}
+
+                                            <div className="w-full space-y-1.5">
+                                                <div className="flex items-center justify-between text-xs text-neutral-500">
+                                                    <span>Código PIX Copia e Cola:</span>
+                                                    <span>Vence em: {formatDate(selectedInvoice.latest_payment.due_date)}</span>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        readOnly
+                                                        type="text"
+                                                        value={selectedInvoice.latest_payment.pix_copy_paste || ''}
+                                                        className="w-full bg-neutral-50 border border-neutral-200 rounded-lg text-xs px-3 py-2 text-neutral-600 font-mono truncate"
+                                                    />
+                                                    <button
+                                                        onClick={() => handleCopy(selectedInvoice.latest_payment?.pix_copy_paste || '', 'pix')}
+                                                        className="px-3 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shrink-0 transition-colors"
+                                                    >
+                                                        {copiedText === 'pix' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                                        {copiedText === 'pix' ? 'Copiado!' : 'Copiar'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Boleto Display */}
+                                    {selectedInvoice.latest_payment.payment_method === 'boleto' && (
+                                        <div className="p-4 bg-white rounded-xl border border-neutral-200/80 space-y-3">
+                                            <div className="flex items-center justify-between text-xs text-neutral-500">
+                                                <span>Linha Digitável:</span>
+                                                <span>Vence em: {formatDate(selectedInvoice.latest_payment.due_date)}</span>
+                                            </div>
+                                            {selectedInvoice.latest_payment.boleto_barcode && (
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        readOnly
+                                                        type="text"
+                                                        value={selectedInvoice.latest_payment.boleto_barcode}
+                                                        className="w-full bg-neutral-50 border border-neutral-200 rounded-lg text-xs px-3 py-2 text-neutral-600 font-mono truncate"
+                                                    />
+                                                    <button
+                                                        onClick={() => handleCopy(selectedInvoice.latest_payment?.boleto_barcode || '', 'boleto')}
+                                                        className="px-3 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shrink-0 transition-colors"
+                                                    >
+                                                        {copiedText === 'boleto' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                                        {copiedText === 'boleto' ? 'Copiado!' : 'Copiar'}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {selectedInvoice.latest_payment.boleto_url && (
+                                                <a
+                                                    href={selectedInvoice.latest_payment.boleto_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="w-full py-2 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                                                >
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                    Visualizar / Imprimir Boleto em PDF
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Botão de Cancelamento de Fatura Aberta */}
+                                    <div className="pt-1 flex justify-end">
+                                        <button
+                                            disabled={isSubmitting}
+                                            onClick={() => handleCancelInvoice(selectedInvoice.uuid)}
+                                            className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1 p-1 hover:bg-red-50 rounded transition-colors"
+                                        >
+                                            <Ban className="w-3.5 h-3.5" />
+                                            Cancelar Fatura e Cobrança
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedInvoice.status === 'paid' && (
+                                <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 flex items-center gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                                    <div>
+                                        <p className="text-xs font-bold text-emerald-900">Pagamento Confirmado</p>
+                                        <p className="text-xs text-emerald-700 mt-0.5">
+                                            Liquidado com sucesso em {formatDate(selectedInvoice.paid_at)}.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Itens Discriminados */}
                             <div className="space-y-4">
                                 <h3 className="text-xs uppercase font-semibold tracking-wider text-neutral-400">Itens Discriminados</h3>
                                 
@@ -275,7 +532,6 @@ export default function BillingInvoices({ invoices }: Props) {
                                         ))}
                                     </div>
                                 ) : (
-                                    /* Fallback para caso items ainda não tenham sido populados */
                                     <div className="space-y-3">
                                         <div className="p-3.5 rounded-xl border border-neutral-100 bg-neutral-50/40 flex items-start justify-between">
                                             <div>
@@ -322,7 +578,7 @@ export default function BillingInvoices({ invoices }: Props) {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end">
+                        <div className="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end sticky bottom-0 bg-white">
                             <button
                                 onClick={() => setSelectedInvoice(null)}
                                 className="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 text-sm font-medium rounded-xl hover:bg-neutral-100 transition-colors shadow-sm"
@@ -336,4 +592,3 @@ export default function BillingInvoices({ invoices }: Props) {
         </SettingsLayout>
     );
 }
-

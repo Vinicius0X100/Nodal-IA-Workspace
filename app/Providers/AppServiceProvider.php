@@ -48,6 +48,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(BillingAlertService::class);
         $this->app->singleton(AIUsageLimitService::class);
         $this->app->singleton(AIUsageService::class);
+
+        $this->app->bind(
+            \App\Domain\Billing\Contracts\PaymentProviderInterface::class,
+            \App\Domain\Billing\Providers\AsaasPaymentProvider::class
+        );
     }
 
     /**
@@ -68,5 +73,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('billing.manage', [BillingPolicy::class, 'manage']);
         Gate::define('billing.alerts.manage', [BillingPolicy::class, 'manageAlerts']);
         Gate::define('billing.invoices.view', [BillingPolicy::class, 'viewInvoices']);
+        Gate::define('billing.invoices.manage', [BillingPolicy::class, 'manageInvoices']);
     }
 }
+

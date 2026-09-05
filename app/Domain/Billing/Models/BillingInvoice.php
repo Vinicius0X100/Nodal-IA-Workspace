@@ -49,6 +49,31 @@ class BillingInvoice extends Model
         return $this->hasMany(BillingInvoiceItem::class, 'invoice_id');
     }
 
+    public function payments(): HasMany
+    {
+        return $this->hasMany(BillingPayment::class, 'billing_invoice_id');
+    }
+
+    public function latestPayment(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(BillingPayment::class, 'billing_invoice_id')->latestOfMany('attempt_number');
+    }
+
+    public function activePayment(): ?BillingPayment
+    {
+        return $this->payments->first(fn (BillingPayment $p) => $p->isActive());
+    }
+
+    public function sourceUpdatedAt(): \Carbon\CarbonInterface
+    {
+        $paymentUpdated = $this->latestPayment?->updated_at;
+        if ($paymentUpdated && $paymentUpdated->gt($this->updated_at)) {
+            return $paymentUpdated;
+        }
+
+        return $this->updated_at;
+    }
+
     public function planDisplayName(): string
     {
         return $this->plan_name ?: ($this->subscription?->plan?->name ?: 'Cobrança avulsa');
@@ -59,3 +84,4 @@ class BillingInvoice extends Model
         return $this->total_cents / 100;
     }
 }
+

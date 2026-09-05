@@ -71,4 +71,19 @@ return [
         'service_account_json' => env('GOOGLE_WORKSPACE_SERVICE_ACCOUNT_JSON'),
     ],
 
+    'asaas' => [
+        'environment'   => env('ASAAS_ENVIRONMENT', 'sandbox'),
+        'api_url'       => rtrim(env('ASAAS_API_URL', 'https://api-sandbox.asaas.com/v3'), '/'),
+        'api_key'       => env('ASAAS_API_KEY'),
+        'webhook_token' => env('ASAAS_WEBHOOK_TOKEN'),
+        'user_agent'    => env('ASAAS_USER_AGENT', 'Nodal-Billing/1.0'),
+        'timeout'       => (int) env('ASAAS_TIMEOUT', 15),
+    ],
+
+    'system' => [
+        'api_key'         => env('SYSTEM_API_KEY'),
+        'integer_api_key' => env('INTEGER_SYSTEM_API_KEY'),
+    ],
+
 ];
+

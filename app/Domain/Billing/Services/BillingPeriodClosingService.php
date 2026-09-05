@@ -27,7 +27,9 @@ class BillingPeriodClosingService
 {
     public function __construct(
         private readonly BillingSubscriptionService $subscriptionService,
+        private readonly PaymentCustomerService $customerService,
     ) {}
+
 
     /**
      * Localiza todos os períodos abertos e vencidos e executa o fechamento.
@@ -201,6 +203,10 @@ class BillingPeriodClosingService
                         'custom_included_ai_credits'                  => $subscription?->custom_included_ai_credits,
                         'custom_overage_price_per_1000_credits_cents' => $subscription?->custom_overage_price_per_1000_credits_cents,
                     ],
+                    'customer_snapshot'                    => $this->customerService->buildCustomerSnapshot($organization),
+                    'fiscal_snapshot'                      => [
+                        'service_description' => config('billing.fiscal_service_description', 'Licenciamento de software SaaS'),
+                    ],
                     'closed_at'                            => Carbon::now()->toIsoString(),
                 ],
             ]);
@@ -306,6 +312,14 @@ class BillingPeriodClosingService
 
             return $invoice;
         });
+
+        if ($invoice && $invoice->wasRecentlyCreated && config('billing.auto_issue') && $invoice->subscription?->preferred_payment_method) {
+            \App\Domain\Billing\Jobs\IssueBillingInvoiceJob::dispatch($invoice->id)
+                ->afterCommit()
+                ->onQueue('billing');
+        }
+
+        return $invoice;
     }
 
     /**

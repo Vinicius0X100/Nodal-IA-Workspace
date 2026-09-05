@@ -149,6 +149,11 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/alerts/recipients', [\App\Http\Controllers\Billing\BillingController::class, 'updateAlertRecipients'])->name('alerts.recipients.update');
             Route::put('/postpaid', [\App\Http\Controllers\Billing\BillingController::class, 'updatePostpaidSettings'])->name('postpaid.update');
             Route::get('/invoices', [\App\Http\Controllers\Billing\BillingController::class, 'invoices'])->name('invoices');
+            Route::post('/invoices/{uuid}/issue', [\App\Http\Controllers\Billing\BillingController::class, 'issueInvoice'])->name('invoices.issue');
+            Route::post('/invoices/{uuid}/cancel', [\App\Http\Controllers\Billing\BillingController::class, 'cancelInvoice'])->name('invoices.cancel');
+            Route::get('/invoices/{uuid}/payment-details', [\App\Http\Controllers\Billing\BillingController::class, 'paymentDetails'])->name('invoices.payment-details');
         });
     });
 });
+
+
