@@ -60,71 +60,81 @@ class BillingTestAlertCommand extends Command
 
         [$alertType, $threshold] = $typeMap[$typeArg];
 
-        // Precisamos do período atual para que o e-mail exiba as variáveis de forma verídica,
-        // mas não alteramos nem persistimos nada do período real (se houver).
+        // Validar AiUsagePeriod real persistido
         $realPeriod = $subscriptionService->currentPeriod($organization);
-        
-        $included = $realPeriod ? $realPeriod->included_credits : 50000;
-        
-        $overagePrice = 0;
-        $postpaidLimitCents = null;
-
-        $subscription = $subscriptionService->activeSubscription($organization);
-        if ($subscription) {
-            $overagePrice = $subscription->effectiveOveragePricePer1000Cents();
-            $postpaidLimitCents = $subscription->postpaid_limit_cents;
-        } else {
-            $overagePrice = 1500; // default $15.00
-            $postpaidLimitCents = 5000; // default $50.00
-        }
-
-        $simulatedUsed = 0;
-        $simulatedOverage = 0;
-        $simulatedOverageCents = 0;
-
-        if (in_array($typeArg, ['credit_70', 'credit_85', 'credit_95', 'credit_100'])) {
-            $simulatedUsed = ($threshold / 100) * $included;
-        } else {
-            // Postpaid tests
-            if ($typeArg === 'postpaid_started') {
-                // Just above included
-                $simulatedOverage = 1; 
-                $simulatedOverageCents = ($simulatedOverage / 1000) * $overagePrice;
-            } else {
-                // To reach $threshold% of the $postpaidLimit
-                $targetOverageCents = $postpaidLimitCents * ($threshold / 100);
-                
-                if ($overagePrice > 0) {
-                    $simulatedOverage = ($targetOverageCents / $overagePrice) * 1000;
-                } else {
-                    $simulatedOverage = 1000; // fallback just in case
-                }
-                
-                $simulatedOverageCents = $targetOverageCents;
-            }
-            $simulatedUsed = $included + $simulatedOverage;
-            if ($simulatedOverageCents === 0 && $simulatedOverage > 0) {
-                 $simulatedOverageCents = ($simulatedOverage / 1000) * $overagePrice;
-            }
-        }
-
-        $simulationContext = [
-            'included_credits' => $included,
-            'billable_credits_used' => $simulatedUsed,
-            'overage_credits' => $simulatedOverage,
-            'estimated_overage_cents' => $simulatedOverageCents,
-            'postpaid_limit_cents' => $postpaidLimitCents,
-            'postpaid_percentage' => $threshold,
-        ];
-        
         if (!$realPeriod) {
-            $this->warn("Aviso: Organização não possui AiUsagePeriod em aberto. O modelo passado ao evento será incompleto.");
-            // Creates a temporary empty model but it won't have an ID, however we try to get one from DB if possible
-            // But since the org has no period, this is a diagnostic edge-case. Let's create a minimal persisted one or just pass a non-persisted one?
-            // The prompt says: "Event recebe AiUsagePeriod REAL persistido". 
-            // If they don't have one, we should probably fail the command to enforce realistic testing.
             $this->error("Para testes de fila funcionarem, a organização precisa ter um AiUsagePeriod persistido no banco.");
             return 1;
+        }
+
+        $isPostpaidAlert = in_array($typeArg, ['postpaid_started', 'postpaid_75', 'postpaid_90', 'postpaid_limit']);
+
+        if ($isPostpaidAlert) {
+            $subscription = $subscriptionService->activeSubscription($organization);
+            if (!$subscription) {
+                $this->error("Esta organização não possui uma assinatura ativa para testar alertas pós-pagos.");
+                return 1;
+            }
+
+            $postpaidLimitCents = $subscription->postpaid_limit_cents;
+            if (empty($postpaidLimitCents) || $postpaidLimitCents <= 0) {
+                $this->error("Esta organização não possui limite pós-pago configurado. Configure o limite antes de testar alertas pós-pagos.");
+                return 1;
+            }
+
+            $overagePrice = $subscription->effectiveOveragePricePer1000Cents();
+            if (empty($overagePrice) || $overagePrice <= 0) {
+                $this->error("Esta organização não possui preço de excedente configurado no plano ou na assinatura.");
+                return 1;
+            }
+
+            $included = (float) $realPeriod->included_credits;
+
+            if ($typeArg === 'postpaid_started') {
+                $simulatedOverage = 1.0;
+                $simulatedOverageCents = (int) ceil(($simulatedOverage / 1000) * $overagePrice);
+                $simulatedPercentage = 0.0;
+            } else {
+                $targetOverageCents = (int) round($postpaidLimitCents * ($threshold / 100));
+                $simulatedOverage = ($targetOverageCents / $overagePrice) * 1000;
+                $simulatedOverageCents = $targetOverageCents;
+                $simulatedPercentage = (float) $threshold;
+            }
+
+            $simulatedUsed = $included + $simulatedOverage;
+
+            $simulationContext = [
+                'included_credits'        => $included,
+                'billable_credits_used'   => $simulatedUsed,
+                'overage_credits'         => $simulatedOverage,
+                'estimated_overage_cents' => $simulatedOverageCents,
+                'postpaid_limit_cents'    => $postpaidLimitCents,
+                'postpaid_percentage'     => $simulatedPercentage,
+            ];
+        } else {
+            // Alertas de consumo de franquia (credit_70, credit_85, credit_95, credit_100)
+            $included = (float) $realPeriod->included_credits;
+
+            if ($included <= 0) {
+                $subscription = $subscriptionService->activeSubscription($organization);
+                if ($subscription && $subscription->plan && $subscription->plan->included_ai_credits > 0) {
+                    $included = (float) $subscription->plan->included_ai_credits;
+                } else {
+                    $this->error("Esta organização não possui franquia de créditos incluídos para simular alertas de franquia.");
+                    return 1;
+                }
+            }
+
+            $simulatedUsed = ($threshold / 100) * $included;
+
+            $simulationContext = [
+                'included_credits'        => $included,
+                'billable_credits_used'   => $simulatedUsed,
+                'overage_credits'         => 0.0,
+                'estimated_overage_cents' => 0,
+                'postpaid_limit_cents'    => null,
+                'postpaid_percentage'     => null,
+            ];
         }
 
         $idempotencyKey = "test:org_{$organization->id}:{$alertType->value}:" . time();

@@ -14,27 +14,77 @@ class UsageThresholdNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    public Organization  $organization;
+    public AiUsagePeriod $period;
+    public AlertType     $alertType;
+    public int           $threshold;
+    public float         $percentage;
+    public bool          $isTest;
+    public ?array        $simulationContext;
+
     public function __construct(
-        private readonly Organization  $organization,
-        private readonly AiUsagePeriod $period,
-        private readonly AlertType     $alertType,
-        private readonly int           $threshold,
-        private readonly float         $percentage,
-        private readonly bool          $isTest = false,
-        private readonly ?array        $simulationContext = null,
-    ) {}
+        Organization  $organization,
+        AiUsagePeriod $period,
+        AlertType     $alertType,
+        int           $threshold,
+        float         $percentage,
+        bool          $isTest = false,
+        ?array        $simulationContext = null,
+    ) {
+        $this->organization      = $organization;
+        $this->period            = $period;
+        $this->alertType         = $alertType;
+        $this->threshold         = $threshold;
+        $this->percentage        = $percentage;
+        $this->isTest            = $isTest;
+        $this->simulationContext = $simulationContext;
+        $this->queue             = 'notifications';
+    }
 
     public function via(object $notifiable): array
     {
         return ['mail', 'database'];
     }
 
+    public function viaQueues(): array
+    {
+        return [
+            'mail'     => 'notifications',
+            'database' => 'notifications',
+        ];
+    }
+
+    public function resolveUsageContext(): array
+    {
+        if ($this->isTest && $this->simulationContext !== null) {
+            return [
+                'billable_credits_used'   => (float) ($this->simulationContext['billable_credits_used'] ?? 0),
+                'included_credits'        => (float) ($this->simulationContext['included_credits'] ?? 0),
+                'overage_credits'         => (float) ($this->simulationContext['overage_credits'] ?? 0),
+                'estimated_overage_cents' => (int) ($this->simulationContext['estimated_overage_cents'] ?? 0),
+                'postpaid_limit_cents'    => isset($this->simulationContext['postpaid_limit_cents']) ? (int) $this->simulationContext['postpaid_limit_cents'] : null,
+                'postpaid_percentage'     => isset($this->simulationContext['postpaid_percentage']) ? (float) $this->simulationContext['postpaid_percentage'] : null,
+            ];
+        }
+
+        return [
+            'billable_credits_used'   => (float) $this->period->billable_credits_used,
+            'included_credits'        => (float) $this->period->included_credits,
+            'overage_credits'         => (float) $this->period->overage_credits,
+            'estimated_overage_cents' => (int) $this->period->estimated_overage_cents,
+            'postpaid_limit_cents'    => null,
+            'postpaid_percentage'     => null,
+        ];
+    }
+
     public function toMail(object $notifiable): MailMessage
     {
-        $creditsUsedValue = $this->isTest && $this->simulationContext ? $this->simulationContext['billable_credits_used'] : $this->period->billable_credits_used;
-        $includedCreditsValue = $this->isTest && $this->simulationContext ? $this->simulationContext['included_credits'] : $this->period->included_credits;
-        $estimatedOverageCentsValue = $this->isTest && $this->simulationContext ? $this->simulationContext['estimated_overage_cents'] : $this->period->estimated_overage_cents;
-        $overageCreditsValue = $this->isTest && $this->simulationContext ? $this->simulationContext['overage_credits'] : $this->period->overage_credits;
+        $ctx = $this->resolveUsageContext();
+
+        $creditsUsedValue           = $ctx['billable_credits_used'];
+        $includedCreditsValue       = $ctx['included_credits'];
+        $estimatedOverageCentsValue = $ctx['estimated_overage_cents'];
+        $overageCreditsValue        = $ctx['overage_credits'];
 
         $creditsUsed      = number_format($creditsUsedValue, 0, ',', '.');
         $includedCredits  = number_format($includedCreditsValue, 0, ',', '.');
@@ -72,10 +122,6 @@ class UsageThresholdNotification extends Notification implements ShouldQueue
             
             if ($this->threshold === 100) {
                 $mail->line("A franquia mensal de IA da organização **{$this->organization->name}** foi totalmente utilizada.");
-                
-                // Precisamos saber se o pós-pago tá ativo. Como não temos a subscription aqui de forma fácil,
-                // vamos checar se o overage é > 0, o que significa que o pós pago permitiu ou acabou de exceder.
-                // Outra forma é simplesmente dizer que o limite foi atingido.
                 $mail->line("O limite incluído no plano foi atingido.");
             } else {
                 $mail->line("A organização **{$this->organization->name}** atingiu **{$this->threshold}%** dos créditos de IA incluídos no plano.");
@@ -98,22 +144,23 @@ class UsageThresholdNotification extends Notification implements ShouldQueue
 
     public function toArray(object $notifiable): array
     {
-        $creditsUsedValue = $this->isTest && $this->simulationContext ? $this->simulationContext['billable_credits_used'] : $this->period->billable_credits_used;
-        $includedCreditsValue = $this->isTest && $this->simulationContext ? $this->simulationContext['included_credits'] : $this->period->included_credits;
-        $overageCreditsValue = $this->isTest && $this->simulationContext ? $this->simulationContext['overage_credits'] : $this->period->overage_credits;
+        $ctx = $this->resolveUsageContext();
 
         return [
-            'type'                => 'billing_usage_threshold',
-            'organization_id'     => $this->organization->id,
-            'organization_name'   => $this->organization->name,
-            'alert_type'          => $this->alertType->value,
-            'threshold'           => $this->threshold,
-            'percentage'          => $this->percentage,
-            'credits_used'        => $creditsUsedValue,
-            'included_credits'    => $includedCreditsValue,
-            'overage_credits'     => $overageCreditsValue,
-            'period_end'          => $this->period->period_end?->toISOString(),
-            'is_test'             => $this->isTest,
+            'type'                    => 'billing_usage_threshold',
+            'organization_id'         => $this->organization->id,
+            'organization_name'       => $this->organization->name,
+            'alert_type'              => $this->alertType->value,
+            'threshold'               => $this->threshold,
+            'percentage'              => $this->percentage,
+            'credits_used'            => $ctx['billable_credits_used'],
+            'included_credits'        => $ctx['included_credits'],
+            'overage_credits'         => $ctx['overage_credits'],
+            'estimated_overage_cents' => $ctx['estimated_overage_cents'],
+            'postpaid_limit_cents'    => $ctx['postpaid_limit_cents'],
+            'postpaid_percentage'     => $ctx['postpaid_percentage'],
+            'period_end'              => $this->period->period_end?->toISOString(),
+            'is_test'                 => $this->isTest,
         ];
     }
 }

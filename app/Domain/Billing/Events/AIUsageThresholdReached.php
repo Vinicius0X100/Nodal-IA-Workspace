@@ -12,14 +12,32 @@ class AIUsageThresholdReached
 {
     use Dispatchable, SerializesModels;
 
+    public Organization  $organization;
+    public AiUsagePeriod $period;
+    public AlertType     $alertType;
+    public int           $threshold;
+    public float         $percentage;
+    public string        $idempotencyKey;
+    public bool          $isTest;
+    public ?array        $simulationContext;
+
     public function __construct(
-        public readonly Organization  $organization,
-        public readonly AiUsagePeriod $period,
-        public readonly AlertType     $alertType,
-        public readonly int           $threshold,
-        public readonly float         $percentage,
-        public readonly string        $idempotencyKey,
-        public readonly bool          $isTest = false,
-        public readonly ?array        $simulationContext = null,
-    ) {}
+        Organization  $organization,
+        AiUsagePeriod $period,
+        AlertType     $alertType,
+        int           $threshold,
+        float         $percentage,
+        string        $idempotencyKey,
+        bool          $isTest = false,
+        ?array        $simulationContext = null,
+    ) {
+        $this->organization      = $organization;
+        $this->period            = $period;
+        $this->alertType         = $alertType;
+        $this->threshold         = $threshold;
+        $this->percentage        = $percentage;
+        $this->idempotencyKey    = $idempotencyKey;
+        $this->isTest            = $isTest;
+        $this->simulationContext = $simulationContext;
+    }
 }
