@@ -297,7 +297,7 @@ class BillingController extends Controller
     {
         $organization = $this->organization($request);
 
-        $this->authorize('viewInvoices', $organization);
+        \Illuminate\Support\Facades\Gate::authorize('billing.invoices.view', $organization);
 
         $invoices = BillingInvoice::where('organization_id', $organization->id)
             ->with(['subscription.plan:id,code,name', 'items', 'latestPayment'])
@@ -313,7 +313,7 @@ class BillingController extends Controller
     public function issueInvoice(Request $request, string $uuid, \App\Domain\Billing\Services\PaymentService $paymentService)
     {
         $organization = $this->organization($request);
-        $this->authorize('manageInvoices', $organization);
+        \Illuminate\Support\Facades\Gate::authorize('billing.invoices.manage', $organization);
 
         $invoice = BillingInvoice::where('uuid', $uuid)
             ->where('organization_id', $organization->id)
@@ -337,7 +337,7 @@ class BillingController extends Controller
     public function cancelInvoice(Request $request, string $uuid, \App\Domain\Billing\Services\PaymentService $paymentService)
     {
         $organization = $this->organization($request);
-        $this->authorize('manageInvoices', $organization);
+        \Illuminate\Support\Facades\Gate::authorize('billing.invoices.manage', $organization);
 
         $invoice = BillingInvoice::where('uuid', $uuid)
             ->where('organization_id', $organization->id)
@@ -356,12 +356,13 @@ class BillingController extends Controller
     public function paymentDetails(Request $request, string $uuid)
     {
         $organization = $this->organization($request);
-        $this->authorize('viewInvoices', $organization);
+        \Illuminate\Support\Facades\Gate::authorize('billing.invoices.view', $organization);
 
         $invoice = BillingInvoice::where('uuid', $uuid)
             ->where('organization_id', $organization->id)
             ->with(['latestPayment'])
             ->firstOrFail();
+
 
         $payment = $invoice->latestPayment;
 
