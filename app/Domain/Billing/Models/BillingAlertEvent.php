@@ -17,6 +17,7 @@ class BillingAlertEvent extends Model
         'alert_type'             => AlertType::class,
         'threshold'              => 'integer',
         'recipient_summary_json' => 'array',
+        'metadata_json'          => 'array',
         'triggered_at'           => 'datetime',
     ];
 

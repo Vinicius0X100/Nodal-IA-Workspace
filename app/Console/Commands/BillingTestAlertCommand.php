@@ -108,20 +108,23 @@ class BillingTestAlertCommand extends Command
             }
         }
 
-        // Importante: NÃO atribuir 'id' para que o SerializesModels do Laravel (usado pelo evento)
-        // serialize este modelo com os valores em memória, em vez de tentar buscar do banco.
-        $period = new AiUsagePeriod([
-            'organization_id' => $organization->id,
+        $simulationContext = [
             'included_credits' => $included,
             'billable_credits_used' => $simulatedUsed,
             'overage_credits' => $simulatedOverage,
             'estimated_overage_cents' => $simulatedOverageCents,
-            'period_start' => $realPeriod ? $realPeriod->period_start : now()->startOfMonth(),
-            'period_end' => $realPeriod ? $realPeriod->period_end : now()->endOfMonth(),
-        ]);
+            'postpaid_limit_cents' => $postpaidLimitCents,
+            'postpaid_percentage' => $threshold,
+        ];
         
         if (!$realPeriod) {
-            $this->warn("Aviso: Organização não possui AiUsagePeriod aberto. Usando um período falso para o contexto.");
+            $this->warn("Aviso: Organização não possui AiUsagePeriod em aberto. O modelo passado ao evento será incompleto.");
+            // Creates a temporary empty model but it won't have an ID, however we try to get one from DB if possible
+            // But since the org has no period, this is a diagnostic edge-case. Let's create a minimal persisted one or just pass a non-persisted one?
+            // The prompt says: "Event recebe AiUsagePeriod REAL persistido". 
+            // If they don't have one, we should probably fail the command to enforce realistic testing.
+            $this->error("Para testes de fila funcionarem, a organização precisa ter um AiUsagePeriod persistido no banco.");
+            return 1;
         }
 
         $idempotencyKey = "test:org_{$organization->id}:{$alertType->value}:" . time();
@@ -134,12 +137,13 @@ class BillingTestAlertCommand extends Command
 
         event(new AIUsageThresholdReached(
             organization: $organization,
-            period: $period,
+            period: $realPeriod,
             alertType: $alertType,
             threshold: $threshold,
             percentage: $threshold, // Opcional/Visual
             idempotencyKey: $idempotencyKey,
-            isTest: true
+            isTest: true,
+            simulationContext: $simulationContext
         ));
 
         $this->info("\n✅ Evento disparado com sucesso!");

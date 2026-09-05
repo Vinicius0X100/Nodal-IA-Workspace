@@ -32,6 +32,7 @@ class BillingAlertService
         float         $percentage,
         string        $idempotencyKey,
         bool          $isTest = false,
+        ?array        $simulationContext = null,
     ): ?BillingAlertEvent {
         // Verificação final de idempotência (pode ter sido inserido entre o check e o fire)
         $existing = BillingAlertEvent::where('idempotency_key', $idempotencyKey)->first();
@@ -81,6 +82,8 @@ class BillingAlertService
                 alertType:    $alertType,
                 threshold:    $threshold,
                 percentage:   $percentage,
+                isTest:       $isTest,
+                simulationContext: $simulationContext,
             ));
         }
 

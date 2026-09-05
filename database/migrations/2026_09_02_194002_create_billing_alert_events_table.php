@@ -23,6 +23,8 @@ return new class extends Migration
 
             // Snapshot dos destinatários notificados
             $table->json('recipient_summary_json')->nullable();
+            
+            $table->json('metadata_json')->nullable();
 
             $table->timestamp('triggered_at');
 

@@ -20,6 +20,8 @@ class UsageThresholdNotification extends Notification implements ShouldQueue
         private readonly AlertType     $alertType,
         private readonly int           $threshold,
         private readonly float         $percentage,
+        private readonly bool          $isTest = false,
+        private readonly ?array        $simulationContext = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -29,11 +31,16 @@ class UsageThresholdNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $creditsUsed      = number_format($this->period->billable_credits_used, 0, ',', '.');
-        $includedCredits  = number_format($this->period->included_credits, 0, ',', '.');
+        $creditsUsedValue = $this->isTest && $this->simulationContext ? $this->simulationContext['billable_credits_used'] : $this->period->billable_credits_used;
+        $includedCreditsValue = $this->isTest && $this->simulationContext ? $this->simulationContext['included_credits'] : $this->period->included_credits;
+        $estimatedOverageCentsValue = $this->isTest && $this->simulationContext ? $this->simulationContext['estimated_overage_cents'] : $this->period->estimated_overage_cents;
+        $overageCreditsValue = $this->isTest && $this->simulationContext ? $this->simulationContext['overage_credits'] : $this->period->overage_credits;
+
+        $creditsUsed      = number_format($creditsUsedValue, 0, ',', '.');
+        $includedCredits  = number_format($includedCreditsValue, 0, ',', '.');
         $percentFormatted = number_format($this->percentage, 1, ',', '.');
-        $overageBrl       = number_format($this->period->estimated_overage_cents / 100, 2, ',', '.');
-        $overageFormatted = number_format($this->period->overage_credits, 2, ',', '.');
+        $overageBrl       = number_format($estimatedOverageCentsValue / 100, 2, ',', '.');
+        $overageFormatted = number_format($overageCreditsValue, 2, ',', '.');
         
         $mail = (new MailMessage)
             ->greeting("Olá, {$notifiable->name}!");
@@ -73,7 +80,7 @@ class UsageThresholdNotification extends Notification implements ShouldQueue
             } else {
                 $mail->line("A organização **{$this->organization->name}** atingiu **{$this->threshold}%** dos créditos de IA incluídos no plano.");
                 $mail->line("**Créditos utilizados:** {$creditsUsed} / {$includedCredits} ({$percentFormatted}%)");
-                $remaining = number_format(max($this->period->included_credits - $this->period->billable_credits_used, 0), 0, ',', '.');
+                $remaining = number_format(max($includedCreditsValue - $creditsUsedValue, 0), 0, ',', '.');
                 $mail->line("**Restante:** {$remaining} créditos");
             }
         }
@@ -91,6 +98,10 @@ class UsageThresholdNotification extends Notification implements ShouldQueue
 
     public function toArray(object $notifiable): array
     {
+        $creditsUsedValue = $this->isTest && $this->simulationContext ? $this->simulationContext['billable_credits_used'] : $this->period->billable_credits_used;
+        $includedCreditsValue = $this->isTest && $this->simulationContext ? $this->simulationContext['included_credits'] : $this->period->included_credits;
+        $overageCreditsValue = $this->isTest && $this->simulationContext ? $this->simulationContext['overage_credits'] : $this->period->overage_credits;
+
         return [
             'type'                => 'billing_usage_threshold',
             'organization_id'     => $this->organization->id,
@@ -98,10 +109,11 @@ class UsageThresholdNotification extends Notification implements ShouldQueue
             'alert_type'          => $this->alertType->value,
             'threshold'           => $this->threshold,
             'percentage'          => $this->percentage,
-            'credits_used'        => $this->period->billable_credits_used,
-            'included_credits'    => $this->period->included_credits,
-            'overage_credits'     => $this->period->overage_credits,
+            'credits_used'        => $creditsUsedValue,
+            'included_credits'    => $includedCreditsValue,
+            'overage_credits'     => $overageCreditsValue,
             'period_end'          => $this->period->period_end?->toISOString(),
+            'is_test'             => $this->isTest,
         ];
     }
 }
