@@ -109,7 +109,8 @@ class AIUsageService
         });
 
         // 6. Atualizar período de uso (fora da transação principal para não bloquear)
-        $period = $this->subscriptionService->currentPeriod($organization);
+        $occurredCarbon = \Carbon\Carbon::instance($occurredAt);
+        $period = $this->subscriptionService->currentPeriod($organization, $occurredCarbon);
         $this->subscriptionService->updatePeriodAggregates(
             $period,
             $cost->creditsUsed, // registra custo real independente de billable

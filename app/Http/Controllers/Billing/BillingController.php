@@ -297,8 +297,10 @@ class BillingController extends Controller
     {
         $organization = $this->organization($request);
 
+        $this->authorize('viewInvoices', $organization);
+
         $invoices = BillingInvoice::where('organization_id', $organization->id)
-            ->with('subscription.plan:id,code,name')
+            ->with(['subscription.plan:id,code,name', 'items'])
             ->orderByDesc('period_start')
             ->paginate(12);
 

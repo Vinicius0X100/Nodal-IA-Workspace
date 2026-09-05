@@ -39,9 +39,19 @@ class BillingInvoice extends Model
         return $this->belongsTo(OrganizationSubscription::class, 'subscription_id');
     }
 
+    public function usagePeriod(): BelongsTo
+    {
+        return $this->belongsTo(AiUsagePeriod::class, 'usage_period_id');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(BillingInvoiceItem::class, 'invoice_id');
+    }
+
+    public function planDisplayName(): string
+    {
+        return $this->plan_name ?: ($this->subscription?->plan?->name ?: 'Cobrança avulsa');
     }
 
     public function totalBrl(): float

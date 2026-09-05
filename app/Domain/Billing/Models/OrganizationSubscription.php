@@ -70,6 +70,16 @@ class OrganizationSubscription extends Model
             ?? 0;
     }
 
+    /**
+     * Preço mensal efetivo da assinatura (em centavos).
+     */
+    public function effectiveMonthlyPriceCents(): int
+    {
+        return $this->custom_monthly_price_cents
+            ?? $this->plan?->monthly_price_cents
+            ?? 0;
+    }
+
     public function isActive(): bool
     {
         return $this->status?->isUsable() ?? false;

@@ -29,23 +29,36 @@ class BillingSubscriptionService
     }
 
     /**
-     * Retorna ou cria o período de uso atual da organização.
+     * Retorna ou cria o período de uso atual da organização para um dado timestamp.
      *
-     * Se não houver assinatura ativa, cria um período sem franquia (included_credits=0)
-     * para fins de registro/monitoramento.
+     * Garante blindagem por data: se o timestamp pertencer a um novo período,
+     * resolve o período vigente mesmo que o período anterior ainda não tenha sido fechado.
      */
-    public function currentPeriod(Organization $organization): AiUsagePeriod
+    public function currentPeriod(Organization $organization, ?Carbon $targetDate = null): AiUsagePeriod
     {
-        $subscription = $this->activeSubscription($organization);
-        $now = Carbon::now();
+        $timestamp = $targetDate ? $targetDate->copy() : Carbon::now();
 
-        // Calcula período mensal com base na assinatura ou mês corrente
-        if ($subscription && $subscription->current_period_start) {
+        // 1. Verificar se já existe período aberto compreendendo o timestamp
+        $existing = AiUsagePeriod::where('organization_id', $organization->id)
+            ->where('status', 'open')
+            ->where('period_start', '<=', $timestamp)
+            ->where('period_end', '>=', $timestamp)
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $subscription = $this->activeSubscription($organization);
+
+        // 2. Determinar limites do período
+        if ($subscription && $subscription->current_period_start && $subscription->current_period_end
+            && $subscription->current_period_start <= $timestamp && $subscription->current_period_end >= $timestamp) {
             $periodStart = Carbon::instance($subscription->current_period_start);
             $periodEnd   = Carbon::instance($subscription->current_period_end);
         } else {
-            $periodStart = $now->copy()->startOfMonth();
-            $periodEnd   = $now->copy()->endOfMonth();
+            $periodStart = $timestamp->copy()->startOfMonth();
+            $periodEnd   = $timestamp->copy()->endOfMonth();
         }
 
         $period = AiUsagePeriod::firstOrCreate(
@@ -66,6 +79,7 @@ class BillingSubscriptionService
 
     /**
      * Atualiza os agregados de um período com base no novo evento.
+     * Rejeita agregação se o período não estiver com status 'open'.
      */
     public function updatePeriodAggregates(
         AiUsagePeriod $period,
@@ -73,6 +87,10 @@ class BillingSubscriptionService
         float $providerCostBrl,
         bool  $billable
     ): void {
+        if ($period->status !== 'open') {
+            return;
+        }
+
         if ($billable) {
             $period->increment('billable_credits_used', $creditsUsed);
             $period->increment('provider_cost_brl', $providerCostBrl);
@@ -83,6 +101,10 @@ class BillingSubscriptionService
 
         // Recalcular excedente
         $fresh = $period->fresh();
+        if (!$fresh || $fresh->status !== 'open') {
+            return;
+        }
+
         $overage = max($fresh->billable_credits_used - $fresh->included_credits, 0);
 
         $overageCents = 0;
