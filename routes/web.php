@@ -152,6 +152,9 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/invoices/{uuid}/issue', [\App\Http\Controllers\Billing\BillingController::class, 'issueInvoice'])->name('invoices.issue');
             Route::post('/invoices/{uuid}/cancel', [\App\Http\Controllers\Billing\BillingController::class, 'cancelInvoice'])->name('invoices.cancel');
             Route::get('/invoices/{uuid}/payment-details', [\App\Http\Controllers\Billing\BillingController::class, 'paymentDetails'])->name('invoices.payment-details');
+            Route::post('/invoices/{uuid}/refresh-payment', [\App\Http\Controllers\Billing\BillingController::class, 'refreshPayment'])
+                ->middleware('throttle:10,1')
+                ->name('invoices.refresh-payment');
         });
     });
 });

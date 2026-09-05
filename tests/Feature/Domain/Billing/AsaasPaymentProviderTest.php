@@ -147,6 +147,25 @@ class AsaasPaymentProviderTest extends TestCase
         $this->assertNotNull($pixData->expiresAt);
     }
 
+    public function test_get_pix_data_with_exact_real_asaas_sandbox_payload(): void
+    {
+        Http::fake([
+            'https://api-sandbox.asaas.com/v3/payments/pay_jfsowtwo4p81cqf5/pixQrCode' => Http::response([
+                'success'        => true,
+                'encodedImage'   => 'BASE64',
+                'payload'        => 'PIX_PAYLOAD',
+                'expirationDate' => '2027-09-10 23:59:59',
+                'description'    => 'Fatura Nodal Business',
+            ], 200),
+        ]);
+
+        $pixData = $this->provider->getPixData('pay_jfsowtwo4p81cqf5');
+
+        $this->assertSame('PIX_PAYLOAD', $pixData->copyPaste);
+        $this->assertSame('BASE64', $pixData->qrCodeBase64);
+        $this->assertSame('2027-09-10 23:59:59', $pixData->expiresAt?->format('Y-m-d H:i:s'));
+    }
+
     public function test_get_boleto_data(): void
     {
         Http::fake([

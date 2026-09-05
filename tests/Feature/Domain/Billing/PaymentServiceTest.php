@@ -344,4 +344,161 @@ class PaymentServiceTest extends TestCase
         $this->assertNotSame(InvoiceStatus::VOID, $this->invoice->status);
         $this->assertTrue(AuditLog::where('action', 'billing_payment_refunded')->exists());
     }
+
+    public function test_issue_invoice_persists_exact_real_asaas_payload_and_preserves_commercial_due_date(): void
+    {
+        Http::fake([
+            'https://api-sandbox.asaas.com/v3/customers*' => Http::response(['id' => 'cus_000123'], 200),
+            'https://api-sandbox.asaas.com/v3/payments/*/pixQrCode' => Http::response([
+                'success'        => true,
+                'encodedImage'   => 'BASE64_REAL_CODE',
+                'payload'        => 'PIX_PAYLOAD_REAL_STRING',
+                'expirationDate' => '2027-09-10 23:59:59',
+                'description'    => 'Fatura Nodal Business',
+            ], 200),
+            'https://api-sandbox.asaas.com/v3/payments*' => Http::response([
+                'id'          => 'pay_jfsowtwo4p81cqf5',
+                'customer'    => 'cus_000123',
+                'value'       => 1990.00,
+                'netValue'    => 1988.01,
+                'billingType' => 'PIX',
+                'status'      => 'PENDING',
+                'dueDate'     => '2026-09-10',
+            ], 200),
+        ]);
+
+        $payment = $this->paymentService->issueInvoice($this->invoice, PaymentMethod::PIX, dueDays: 5);
+
+        // Asserts do PIX
+        $this->assertSame('pay_jfsowtwo4p81cqf5', $payment->provider_external_id);
+        $this->assertSame('BASE64_REAL_CODE', $payment->pix_qr_code);
+        $this->assertSame('PIX_PAYLOAD_REAL_STRING', $payment->pix_copy_paste);
+        $this->assertSame('2027-09-10T23:59:59.000000Z', $payment->metadata_json['pix_expires_at'] ?? null);
+
+        // Assert crucial: o vencimento comercial da fatura NÃO foi sobrescrito pela validade de 2027 do Asaas!
+        $this->invoice->refresh();
+        $this->assertNotSame('2027-09-10', $this->invoice->due_at->format('Y-m-d'));
+        $this->assertSame(now()->addDays(5)->format('Y-m-d'), $this->invoice->due_at->format('Y-m-d'));
+    }
+
+    public function test_issue_invoice_keeps_invoice_issued_and_payment_pending_when_pix_qr_retrieval_fails(): void
+    {
+        Http::fake([
+            'https://api-sandbox.asaas.com/v3/customers*' => Http::response(['id' => 'cus_000123'], 200),
+            // Falha temporária no endpoint do QR code
+            'https://api-sandbox.asaas.com/v3/payments/*/pixQrCode' => Http::response([
+                'errors' => [['description' => 'QR Code temporariamente indisponível.']],
+            ], 500),
+            'https://api-sandbox.asaas.com/v3/payments*' => Http::response([
+                'id'          => 'pay_temporary_qr_fail',
+                'customer'    => 'cus_000123',
+                'value'       => 1990.00,
+                'billingType' => 'PIX',
+                'status'      => 'PENDING',
+            ], 200),
+        ]);
+
+        // Não deve lançar exceção nem falhar a emissão da cobrança
+        $payment = $this->paymentService->issueInvoice($this->invoice, PaymentMethod::PIX);
+
+        $this->assertSame('pay_temporary_qr_fail', $payment->provider_external_id);
+        $this->assertSame(PaymentStatus::PENDING, $payment->status);
+        $this->assertNull($payment->pix_qr_code);
+        $this->assertNull($payment->pix_copy_paste);
+        $this->assertNotNull($payment->metadata_json['instruction_retrieval_error'] ?? null);
+
+        // Fatura permanece emitida normalmente
+        $this->invoice->refresh();
+        $this->assertSame(InvoiceStatus::ISSUED, $this->invoice->status);
+    }
+
+    public function test_refresh_payment_instructions_updates_existing_payment_without_creating_new_charge(): void
+    {
+        Http::fake([
+            'https://api-sandbox.asaas.com/v3/customers*' => Http::response(['id' => 'cus_000123'], 200),
+            // Primeira chamada no issueInvoice falha na obtenção do QR Code
+            'https://api-sandbox.asaas.com/v3/payments/pay_existing_123/pixQrCode' => Http::sequence()
+                ->push(['errors' => [['description' => 'Ainda processando']]], 500)
+                ->push([
+                    'success'        => true,
+                    'encodedImage'   => 'RECOVERED_BASE64',
+                    'payload'        => 'RECOVERED_PIX_PAYLOAD',
+                    'expirationDate' => '2027-09-10 23:59:59',
+                ], 200),
+            'https://api-sandbox.asaas.com/v3/payments*' => Http::response([
+                'id'          => 'pay_existing_123',
+                'customer'    => 'cus_000123',
+                'value'       => 1990.00,
+                'billingType' => 'PIX',
+                'status'      => 'PENDING',
+            ], 200),
+        ]);
+
+        $payment = $this->paymentService->issueInvoice($this->invoice, PaymentMethod::PIX);
+        $this->assertNull($payment->pix_copy_paste);
+        $initialAttempt = $payment->attempt_number;
+        $initialIdempotency = $payment->idempotency_key;
+        $initialAmount = $payment->amount_cents;
+
+        // Agora executa o refresh isolado
+        $refreshed = $this->paymentService->refreshPaymentInstructions($payment);
+
+        $this->assertSame('RECOVERED_PIX_PAYLOAD', $refreshed->pix_copy_paste);
+        $this->assertSame('RECOVERED_BASE64', $refreshed->pix_qr_code);
+        $this->assertSame('2027-09-10T23:59:59.000000Z', $refreshed->metadata_json['pix_expires_at'] ?? null);
+
+        // Garante que NADA estrutural ou financeiro foi alterado
+        $this->assertSame($initialAttempt, $refreshed->attempt_number);
+        $this->assertSame($initialIdempotency, $refreshed->idempotency_key);
+        $this->assertSame($initialAmount, $refreshed->amount_cents);
+        $this->assertSame('pay_existing_123', $refreshed->provider_external_id);
+        $this->assertSame(1, BillingPayment::where('billing_invoice_id', $this->invoice->id)->count());
+
+        // Garante que NENHUM novo POST para /payments foi disparado (apenas o POST inicial e chamadas GET)
+        Http::assertSent(function ($request) {
+            return true;
+        });
+        $postPaymentsCount = 0;
+        foreach (Http::recorded() as [$request, $response]) {
+            if ($request->method() === 'POST' && str_contains($request->url(), '/payments')) {
+                $postPaymentsCount++;
+            }
+        }
+        $this->assertSame(1, $postPaymentsCount, 'Não deve criar nenhuma segunda cobrança no provedor!');
+    }
+
+    public function test_refresh_payment_instructions_validates_eligibility(): void
+    {
+        $this->fakeAsaasEndpoints();
+        $payment = $this->paymentService->issueInvoice($this->invoice, PaymentMethod::PIX);
+
+        // 1. Sem provider_external_id
+        $payment->update(['provider_external_id' => null]);
+        try {
+            $this->paymentService->refreshPaymentInstructions($payment);
+            $this->fail('Deveria ter lançado exceção para pagamento sem external ID');
+        } catch (PaymentInvalidStateException $e) {
+            $this->assertStringContainsString('identificador externo', $e->getMessage());
+        }
+
+        // 2. Status cancelado
+        $payment->update([
+            'provider_external_id' => 'pay_test_cancelled',
+            'status'               => PaymentStatus::CANCELLED,
+        ]);
+        try {
+            $this->paymentService->refreshPaymentInstructions($payment);
+            $this->fail('Deveria ter lançado exceção para pagamento cancelado');
+        } catch (PaymentInvalidStateException $e) {
+            $this->assertStringContainsString('cancelled', $e->getMessage());
+        }
+
+        // 3. Status já pago (não deve chamar provedor)
+        $payment->update([
+            'provider_external_id' => 'pay_test_paid',
+            'status'               => PaymentStatus::PAID,
+        ]);
+        $returned = $this->paymentService->refreshPaymentInstructions($payment);
+        $this->assertSame(PaymentStatus::PAID, $returned->status);
+    }
 }

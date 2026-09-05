@@ -379,6 +379,45 @@ class BillingController extends Controller
         ]);
     }
 
+    /** POST /settings/billing/invoices/{uuid}/refresh-payment — Recarrega instruções de pagamento no provedor */
+    public function refreshPayment(Request $request, string $uuid, \App\Domain\Billing\Services\PaymentService $paymentService)
+    {
+        $organization = $this->organization($request);
+        \Illuminate\Support\Facades\Gate::authorize('billing.invoices.manage', $organization);
+
+        $invoice = BillingInvoice::where('uuid', $uuid)
+            ->where('organization_id', $organization->id)
+            ->firstOrFail();
+
+        $payment = $invoice->latestPayment;
+        if (!$payment) {
+            return redirect()->back()->withErrors(['error' => 'Nenhum pagamento encontrado para esta fatura.']);
+        }
+
+        try {
+            $updated = $paymentService->refreshPaymentInstructions($payment);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Instruções de pagamento atualizadas com sucesso.',
+                    'payment' => [
+                        'status'         => $updated->status->value,
+                        'pix_copy_paste' => $updated->pix_copy_paste,
+                        'pix_qr_code'    => $updated->pix_qr_code,
+                    ],
+                ]);
+            }
+
+            return redirect()->back()->with('success', 'Instruções de pagamento atualizadas com sucesso.');
+        } catch (\Throwable $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => $e->getMessage()], 400);
+            }
+            return redirect()->back()->withErrors(['error' => $e->getMessage()]);
+        }
+    }
+
 
     private function organization(Request $request): Organization
     {

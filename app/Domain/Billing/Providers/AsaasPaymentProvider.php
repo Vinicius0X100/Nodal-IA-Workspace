@@ -243,10 +243,11 @@ class AsaasPaymentProvider implements PaymentProviderInterface
 
     public function getPixData(string $providerExternalId): PixData
     {
-        $response = $this->client()->get("/payments/{$providerExternalId}/pixQrCode");
+        $id = trim($providerExternalId);
+        $response = $this->client()->get("/payments/{$id}/pixQrCode");
 
         if (!$response->successful()) {
-            $this->handleErrorResponse($response, "Falha ao obter QR Code PIX para cobrança {$providerExternalId}");
+            $this->handleErrorResponse($response, "Falha ao obter QR Code PIX para cobrança {$id}");
         }
 
         $data = $response->json();
@@ -260,10 +261,11 @@ class AsaasPaymentProvider implements PaymentProviderInterface
 
     public function getBoletoData(string $providerExternalId): BoletoData
     {
-        $response = $this->client()->get("/payments/{$providerExternalId}/identificationField");
+        $id = trim($providerExternalId);
+        $response = $this->client()->get("/payments/{$id}/identificationField");
 
         if (!$response->successful()) {
-            $this->handleErrorResponse($response, "Falha ao obter linha digitável do Boleto para {$providerExternalId}");
+            $this->handleErrorResponse($response, "Falha ao obter linha digitável do Boleto para {$id}");
         }
 
         $data = $response->json();

@@ -126,7 +126,40 @@ export default function BillingInvoices({ invoices }: Props) {
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [issuingMethod, setIssuingMethod] = useState<'pix' | 'boleto'>('pix');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [copiedText, setCopiedText] = useState<string | null>(null);
+
+    const autoRefreshedUuids = React.useRef<Set<string>>(new Set());
+
+    const handleRefreshPayment = (invoiceUuid: string) => {
+        setIsRefreshing(true);
+        router.post(route('billing.invoices.refresh-payment', invoiceUuid), {}, {
+            preserveScroll: true,
+            onFinish: () => setIsRefreshing(false),
+            onSuccess: (page) => {
+                const updated = (page.props.invoices as any)?.data?.find((i: Invoice) => i.uuid === invoiceUuid);
+                if (updated) {
+                    setSelectedInvoice(updated);
+                }
+            },
+        });
+    };
+
+    React.useEffect(() => {
+        if (!selectedInvoice) return;
+        const p = selectedInvoice.latest_payment;
+        if (
+            selectedInvoice.status === 'issued' &&
+            p &&
+            p.payment_method === 'pix' &&
+            p.status === 'pending' &&
+            !p.pix_copy_paste &&
+            !autoRefreshedUuids.current.has(selectedInvoice.uuid)
+        ) {
+            autoRefreshedUuids.current.add(selectedInvoice.uuid);
+            handleRefreshPayment(selectedInvoice.uuid);
+        }
+    }, [selectedInvoice]);
 
     const getPlanName = (invoice: Invoice) => {
         return invoice.plan_name 
@@ -390,9 +423,20 @@ export default function BillingInvoices({ invoices }: Props) {
                                                 Cobrança {selectedInvoice.latest_payment.payment_method.toUpperCase()} — Tentativa #{selectedInvoice.latest_payment.attempt_number}
                                             </h4>
                                         </div>
-                                        <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded border", paymentStatusConfig[selectedInvoice.latest_payment.status]?.bg, paymentStatusConfig[selectedInvoice.latest_payment.status]?.color)}>
-                                            {paymentStatusConfig[selectedInvoice.latest_payment.status]?.label}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                disabled={isRefreshing}
+                                                onClick={() => handleRefreshPayment(selectedInvoice.uuid)}
+                                                title="Atualizar instruções de pagamento"
+                                                className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded transition-colors disabled:opacity-50"
+                                            >
+                                                <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
+                                            </button>
+                                            <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded border", paymentStatusConfig[selectedInvoice.latest_payment.status]?.bg, paymentStatusConfig[selectedInvoice.latest_payment.status]?.color)}>
+                                                {paymentStatusConfig[selectedInvoice.latest_payment.status]?.label}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {/* PIX Display */}
@@ -409,8 +453,16 @@ export default function BillingInvoices({ invoices }: Props) {
                                                     />
                                                 </div>
                                             ) : (
-                                                <div className="w-44 h-44 bg-neutral-100 rounded-xl flex items-center justify-center text-neutral-400 text-xs">
-                                                    QR Code Indisponível
+                                                <div className="w-44 h-44 bg-neutral-100 rounded-xl flex flex-col items-center justify-center text-neutral-400 text-xs p-4 text-center space-y-2">
+                                                    <span>QR Code Indisponível</span>
+                                                    <button
+                                                        disabled={isRefreshing}
+                                                        onClick={() => handleRefreshPayment(selectedInvoice.uuid)}
+                                                        className="text-primary-600 hover:text-primary-700 font-medium text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                                                    >
+                                                        <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
+                                                        {isRefreshing ? 'Atualizando...' : 'Recarregar instruções'}
+                                                    </button>
                                                 </div>
                                             )}
 

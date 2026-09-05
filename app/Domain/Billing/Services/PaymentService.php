@@ -183,26 +183,10 @@ class PaymentService
             }
         }
 
-        // Obtém detalhes específicos do método (PIX QR code ou Boleto linha digitável)
-        $pixData = null;
-        $boletoData = null;
-        try {
-            if ($resolvedMethod === PaymentMethod::PIX) {
-                $pixData = $this->paymentProvider->getPixData($chargeResult->providerExternalId);
-            } elseif ($resolvedMethod === PaymentMethod::BOLETO) {
-                $boletoData = $this->paymentProvider->getBoletoData($chargeResult->providerExternalId);
-            }
-        } catch (\Throwable $detailError) {
-            Log::warning('Não foi possível obter dados complementares do método imediatamente', [
-                'charge_id' => $chargeResult->providerExternalId,
-                'error'     => $detailError->getMessage(),
-            ]);
-        }
-
         // ═══════════════════════════════════════════════════════════════════
-        // TRANSAÇÃO 2: Persistência do ID externo, atualização de estado e auditoria
+        // TRANSAÇÃO 2: Persistência imediata do ID externo, status PENDING e emissão da fatura
         // ═══════════════════════════════════════════════════════════════════
-        return DB::transaction(function () use ($payment, $invoice, $chargeResult, $pixData, $boletoData, $dueDate) {
+        $payment = DB::transaction(function () use ($payment, $invoice, $chargeResult, $dueDate) {
             $lockedPayment = BillingPayment::where('id', $payment->id)->lockForUpdate()->firstOrFail();
             $lockedInvoice = BillingInvoice::where('id', $invoice->id)->lockForUpdate()->firstOrFail();
 
@@ -210,9 +194,6 @@ class PaymentService
                 'provider_external_id'  => $chargeResult->providerExternalId,
                 'status'                => PaymentStatus::PENDING,
                 'fee_cents'             => $chargeResult->feeCents,
-                'pix_copy_paste'        => $pixData?->copyPaste,
-                'pix_qr_code'           => $pixData?->qrCodeBase64,
-                'boleto_barcode'        => $boletoData?->barcode ?? $boletoData?->identificationField,
                 'boleto_url'            => $chargeResult->bankSlipUrl,
                 'provider_payload_json' => $chargeResult->rawResponse,
             ]);
@@ -255,6 +236,85 @@ class PaymentService
 
             return $lockedPayment;
         });
+
+        // ═══════════════════════════════════════════════════════════════════
+        // FORA DA TRANSAÇÃO: Obtenção de instruções visuais (PIX QR code / Boleto linha digitável)
+        // ═══════════════════════════════════════════════════════════════════
+        try {
+            $payment = $this->refreshPaymentInstructions($payment);
+        } catch (\Throwable $detailError) {
+            Log::warning('Não foi possível obter dados complementares do método imediatamente', [
+                'charge_id'  => $chargeResult->providerExternalId,
+                'payment_id' => $payment->id,
+                'error'      => $detailError->getMessage(),
+            ]);
+
+            $payment->update([
+                'metadata_json' => array_merge($payment->metadata_json ?? [], [
+                    'instruction_retrieval_error'     => $detailError->getMessage(),
+                    'instruction_retrieval_failed_at' => now()->toIsoString(),
+                ]),
+            ]);
+        }
+
+        return $payment->fresh();
+    }
+
+    /**
+     * Atualiza com segurança as instruções de pagamento (PIX QR code/copia-e-cola ou Boleto linha digitável)
+     * para uma cobrança já existente no provedor, sem criar nova cobrança e de forma estritamente idempotente.
+     *
+     * @throws PaymentInvalidStateException
+     * @throws PaymentProviderException
+     */
+    public function refreshPaymentInstructions(BillingPayment $payment): BillingPayment
+    {
+        // 1. Validação estrita de elegibilidade
+        if (empty($payment->provider_external_id)) {
+            throw new PaymentInvalidStateException('O pagamento não possui identificador externo no provedor.');
+        }
+
+        if ($payment->provider !== $this->paymentProvider->providerName()) {
+            throw new PaymentInvalidStateException("Provedor '{$payment->provider}' incompatível com o provedor ativo.");
+        }
+
+        if (!in_array($payment->payment_method, [PaymentMethod::PIX, PaymentMethod::BOLETO], true)) {
+            throw new PaymentInvalidStateException("Método de pagamento '{$payment->payment_method->value}' não suporta atualização de instruções.");
+        }
+
+        if (in_array($payment->status, [PaymentStatus::CANCELLED, PaymentStatus::REFUNDED], true)) {
+            throw new PaymentInvalidStateException("Não é permitido atualizar instruções de um pagamento com status {$payment->status->value}.");
+        }
+
+        // Se já está quitado, não há necessidade de reconsultar instruções visuais
+        if ($payment->status === PaymentStatus::PAID) {
+            return $payment;
+        }
+
+        // 2. Execução da recuperação de instruções de acordo com o método
+        if ($payment->payment_method === PaymentMethod::PIX) {
+            $pixData = $this->paymentProvider->getPixData($payment->provider_external_id);
+
+            $metadata = $payment->metadata_json ?? [];
+            if ($pixData->expiresAt) {
+                $metadata['pix_expires_at'] = $pixData->expiresAt->toIsoString();
+            }
+            unset($metadata['instruction_retrieval_error'], $metadata['instruction_retrieval_failed_at']);
+
+            $payment->update([
+                'pix_copy_paste' => $pixData->copyPaste,
+                'pix_qr_code'    => $pixData->qrCodeBase64,
+                'metadata_json'  => $metadata,
+            ]);
+        } elseif ($payment->payment_method === PaymentMethod::BOLETO) {
+            $boletoData = $this->paymentProvider->getBoletoData($payment->provider_external_id);
+
+            $payment->update([
+                'boleto_barcode' => $boletoData->barcode ?? $boletoData->identificationField,
+            ]);
+        }
+
+        return $payment->fresh();
     }
 
     /**
